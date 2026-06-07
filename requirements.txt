@@ -1,0 +1,9 @@
+fastapi>=0.110.0
+uvicorn[standard]>=0.27.0
+duckdb>=0.10.0
+pydantic>=2.5.0
+pyyaml>=6.0
+python-dateutil>=2.8.0
+pytest>=8.0.0
+httpx>=0.27.0       # FastAPI TestClient 依赖
+anthropic>=0.40.0   # M3 大模型 SDK（兼容 OpenAI-compatible Anthropic API）

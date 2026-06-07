@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+*.egg-info/
+data/tasks.duckdb
+data/config.yaml
+data/export/
+data/*.bak*
+.env
+.DS_Store
+.playwright-mcp/
+*.png
