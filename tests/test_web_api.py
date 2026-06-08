@@ -656,3 +656,146 @@ def test_stale_with_old_logs(client):
     r = client.get("/api/insights/stale", params={"idle_days": 30})
     ids = [t["id"] for t in r.json()]
     assert tid in ids
+
+
+# ============================================================
+# 聊天 tool use 多轮测试
+# ============================================================
+
+
+def _mk_text_delta_event(text: str):
+    """构造一个 RawContentBlockDeltaEvent，type=text_delta。"""
+    from anthropic.types.raw_content_block_delta_event import RawContentBlockDeltaEvent
+    return RawContentBlockDeltaEvent(
+        index=0,
+        delta={"type": "text_delta", "text": text},  # type: ignore[list-item]
+        type="content_block_delta",
+    )
+
+
+def _mk_block_start_tool_use(idx: int, block_id: str, name: str):
+    from anthropic.types.raw_content_block_start_event import RawContentBlockStartEvent
+    return RawContentBlockStartEvent(
+        index=idx,
+        content_block={"type": "tool_use", "id": block_id, "name": name, "input": {}},  # type: ignore[list-item]
+        type="content_block_start",
+    )
+
+
+def _mk_input_json_delta(idx: int, partial_json: str):
+    from anthropic.types.raw_content_block_delta_event import RawContentBlockDeltaEvent
+    return RawContentBlockDeltaEvent(
+        index=idx,
+        delta={"type": "input_json_delta", "partial_json": partial_json},  # type: ignore[list-item]
+        type="content_block_delta",
+    )
+
+
+@_pytest.fixture
+def mock_chat_stream(monkeypatch):
+    """monkeypatch chat_stream_with_tools 的最终结果。
+
+    简化做法：直接 mock 函数返固定 yield（不动 client.messages.stream）。
+    这样测试只验证 SSE 端点的事件流解析，工具循环逻辑通过端到端
+    验证（手动 e2e）。
+    """
+    def _fake_chat_stream(messages, **_kwargs):
+        # 模拟"调 list_tasks 工具一次 → 第二轮回文本"两轮流
+        yield ("tool_call", {"name": "list_tasks", "input": {}})
+        yield ("tool_result", {"name": "list_tasks", "ok": True})
+        for ch in "你", "好", "呀":
+            yield ("text", ch)
+        yield ("__final__", "你好呀", '{"id":"msg_mock"}')
+
+    monkeypatch.setattr(
+        "trail_app.web.routes.llm.chat_stream_with_tools", _fake_chat_stream
+    )
+    # _call_chat_tools 同步版同样 mock，避免 _get_client 真去读 env
+    def _fake_call_chat(messages, **_kwargs):
+        return (
+            "你好",
+            "[system]\nmock\n\n[user]\nhi",
+            '{"id":"msg_mock_sync"}',
+        )
+    monkeypatch.setattr(
+        "trail_app.web.routes.llm._call_chat_tools", _fake_call_chat
+    )
+    return _fake_chat_stream
+
+
+def test_chat_tool_use_stream(client, mock_chat_stream):
+    """SSE 端点解析 tool_call / tool_result / text / done / [DONE] 五种事件。"""
+    import json as _json
+    with client.stream(
+        "POST", "/api/chat/stream",
+        json={"messages": [{"role": "user", "content": "你好"}]},
+    ) as r:
+        assert r.status_code == 200
+        events = []
+        for line in r.iter_lines():
+            if line.startswith("data:"):
+                payload = line[5:].strip()
+                if payload == "[DONE]":
+                    events.append({"_kind": "[DONE]"})
+                    continue
+                events.append(_json.loads(payload))
+    # 抽出每个事件的 key
+    def _kind(e):
+        for k in ("delta", "tool_call", "tool_result", "done", "error"):
+            if k in e:
+                return k
+        return None
+
+    kinds = [_kind(e) for e in events]
+    assert "tool_call" in kinds
+    assert "tool_result" in kinds
+    assert "delta" in kinds
+    assert "done" in kinds
+    # 三个 delta 拼起来是 "你好呀"
+    deltas = [e["delta"] for e in events if "delta" in e]
+    assert "".join(deltas) == "你好呀"
+    assert any(e.get("_kind") == "[DONE]" for e in events)
+
+
+def test_chat_sync_endpoint(client, mock_chat_stream):
+    """/api/chat 同步版返 ChatOut。"""
+    r = client.post(
+        "/api/chat",
+        json={"messages": [{"role": "user", "content": "你好"}]},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["text"] == "你好"
+
+
+def test_chat_stream_unconfigured(client, monkeypatch):
+    """未配置 LLM 时流式端点 503（不进 stream）。"""
+    from trail_app.llm_service import LLMNotConfigured
+    def _raise():
+        raise LLMNotConfigured("未配置")
+    monkeypatch.setattr(
+        "trail_app.web.routes.llm._get_client", _raise
+    )
+    r = client.post(
+        "/api/chat/stream",
+        json={"messages": [{"role": "user", "content": "x"}]},
+    )
+    assert r.status_code == 503
+
+
+def test_chat_tool_use_minimal_payload(client, mock_chat_stream):
+    """SSE 流以 [DONE] 收尾。"""
+    with client.stream(
+        "POST", "/api/chat/stream",
+        json={"messages": [{"role": "user", "content": "hi"}]},
+    ) as r:
+        assert r.status_code == 200
+        seen_done = False
+        for line in r.iter_lines():
+            if line.startswith("data:"):
+                payload = line[5:].strip()
+                if payload == "[DONE]":
+                    seen_done = True
+                    break
+        assert seen_done
+
