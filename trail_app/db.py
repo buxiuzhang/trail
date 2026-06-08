@@ -102,6 +102,13 @@ _DDL: list[str] = [
         created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
     """,
+    # LLM 配置（加密存储）
+    """
+    CREATE TABLE IF NOT EXISTS llm_settings (
+        key     VARCHAR PRIMARY KEY,
+        value   VARCHAR NOT NULL
+    )
+    """,
     # 索引
     "CREATE INDEX IF NOT EXISTS idx_contact_channels_task  ON contact_channels(task_id)",
     "CREATE INDEX IF NOT EXISTS idx_work_logs_task         ON work_logs(task_id)",

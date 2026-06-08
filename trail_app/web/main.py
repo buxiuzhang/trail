@@ -18,7 +18,7 @@ from trail_app.db import (
     recreate_schema,
 )
 from trail_app.utils import get_db_path
-from trail_app.web.routes import insights, llm, logs, tasks
+from trail_app.web.routes import insights, llm, logs, settings, tasks
 
 # 静态文件目录：trail_app/web/static/
 STATIC_DIR = Path(__file__).parent / "static"
@@ -97,6 +97,7 @@ app.include_router(tasks.router)
 app.include_router(logs.router)
 app.include_router(insights.router)
 app.include_router(llm.router)
+app.include_router(settings.router)
 
 
 @app.get("/api/health")

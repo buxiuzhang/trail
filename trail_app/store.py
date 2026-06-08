@@ -788,3 +788,57 @@ class InsightStore:
             }
         finally:
             self._close(con)
+
+
+# ============================================================
+# LLM 设置（加密存储）
+# ============================================================
+
+class LLMSettingsStore:
+    """LLM 配置的加密读写。所有值加密后存 DuckDB。"""
+
+    def __init__(self, db_path: str | None = None):
+        from trail_app.utils import get_db_path
+        self._db_path = db_path or str(get_db_path())
+
+    def _connect(self):
+        import duckdb
+        return duckdb.connect(self._db_path)
+
+    def _close(self, con):
+        try:
+            con.close()
+        except Exception:
+            pass
+
+    def get_all(self) -> dict[str, str]:
+        """返回所有已保存的明文设置。"""
+        from trail_app.crypto import decrypt
+        con = self._connect()
+        try:
+            rows = con.execute("SELECT key, value FROM llm_settings").fetchall()
+            return {row[0]: decrypt(row[1]) for row in rows}
+        finally:
+            self._close(con)
+
+    def save(self, settings: dict[str, str]) -> None:
+        """保存设置（加密后 upsert）。"""
+        from trail_app.crypto import encrypt
+        con = self._connect()
+        try:
+            for key, value in settings.items():
+                token = encrypt(value)
+                con.execute(
+                    "INSERT OR REPLACE INTO llm_settings (key, value) VALUES (?, ?)",
+                    [key, token],
+                )
+        finally:
+            self._close(con)
+
+    def delete(self, key: str) -> None:
+        """删除某项设置。"""
+        con = self._connect()
+        try:
+            con.execute("DELETE FROM llm_settings WHERE key = ?", [key])
+        finally:
+            self._close(con)

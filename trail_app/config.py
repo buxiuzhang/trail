@@ -81,13 +81,39 @@ def get_llm_config() -> Optional[LLMConfig]:
     def _valid_key(s: str) -> str:
         return s.strip() if len(s.strip()) >= 20 else ""
 
+    # 最高优先级：DB 加密存储
+    db_settings: dict = {}
+    try:
+        from trail_app.store import LLMSettingsStore
+        db_settings = LLMSettingsStore().get_all()
+    except Exception:
+        pass
+
     yaml_key = _valid_key(_cfg_get(llm_yaml, "api_key", default=""))
     env_key = (
         _valid_key(os.environ.get("ANTHROPIC_API_KEY", ""))
         or _valid_key(os.environ.get("MINIMAX_API_KEY", ""))
     )
-    # YAML 中有 api_key 时优先用 YAML 全套配置（避免 env 残留干扰）
-    if yaml_key:
+    db_key = _valid_key(db_settings.get("api_key", ""))
+
+    # 优先级：DB > YAML > env
+    if db_key:
+        api_key = db_key
+        db_base_url = db_settings.get("base_url", "").strip()
+        using_minimax = "minimax" in db_base_url.lower() if db_base_url else False
+        base_url = (
+            db_base_url
+            or os.environ.get("ANTHROPIC_BASE_URL", "").strip()
+            or os.environ.get("MINIMAX_BASE_URL", "").strip()
+            or (_DEFAULT_MINIMAX_BASE_URL if using_minimax else _DEFAULT_BASE_URL)
+        )
+        model = (
+            db_settings.get("model", "").strip()
+            or os.environ.get("ANTHROPIC_DEFAULT_HAIKU_MODEL", "").strip()
+            or os.environ.get("MINIMAX_MODEL", "").strip()
+            or ("MiniMax-M1" if using_minimax else _DEFAULT_MODEL)
+        )
+    elif yaml_key:
         api_key = yaml_key
         using_minimax = "minimax" in _cfg_get(llm_yaml, "base_url", default="").lower()
         base_url = (
