@@ -335,7 +335,21 @@ def _build_chat_context(
     """构建聊天系统提示中的任务概况。
 
     返回一段中文文本，包含任务总数、状态分布、活跃任务及最近日志摘要。
+
+    活跃判定：除「已作废」外，满足以下任一条件即视为活跃——
+    - 状态为「进行中」/「维护中」（保持随时可能继续的传统活跃任务）
+    - 状态为「未开始」（将来要做，LLM 也需要知道）
+    - 最近 14 天内有日志更新（覆盖"已完成但还在改"的维护期尾部）
+
+    这样可以避免：僵尸"进行中"任务没被剔除、已完成任务但本周还在改没
+    出现在 context 里。
     """
+    from datetime import date, timedelta
+
+    ACTIVE_WINDOW_DAYS = 14
+    today = date.today()
+    window_start = today - timedelta(days=ACTIVE_WINDOW_DAYS)
+
     all_tasks = tasks.list_tasks()
 
     # 状态分布
@@ -347,8 +361,20 @@ def _build_chat_context(
     total = len(all_tasks)
     status_str = "、".join(f"{k} {v} 项" for k, v in status_counts.items())
 
-    # 活跃任务（进行中 / 维护中），取最近 3 条日志摘要
-    active = [t for t in all_tasks if t["status"] in ("进行中", "维护中")]
+    def _is_active(t: dict) -> bool:
+        if t["status"] == "已作废":
+            return False
+        # 进行中 / 维护中 / 未开始 必定活跃
+        if t["status"] in ("进行中", "维护中", "未开始"):
+            return True
+        # 已完成：看最近 14 天有无日志
+        try:
+            latest = logs.latest_log_date(t["id"])
+        except Exception:
+            latest = None
+        return bool(latest and latest >= window_start)
+
+    active = [t for t in all_tasks if _is_active(t)]
     active_lines: list[str] = []
     for t in active[:20]:  # 上限防 token 超
         task_logs = logs.list_logs(t["id"])
@@ -363,6 +389,7 @@ def _build_chat_context(
 
     lines = [
         f"任务总数: {total}。按状态: {status_str}。",
+        f"活跃判定窗口: 最近 {ACTIVE_WINDOW_DAYS} 天内有日志更新，或状态为进行中/维护中/未开始。",
         "活跃任务:",
     ]
     lines.extend(active_lines if active_lines else ["（无活跃任务）"])

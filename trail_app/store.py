@@ -382,6 +382,25 @@ class WorkLogStore:
         finally:
             self._close(gen)
 
+    def latest_log_date(self, task_id: int) -> Optional[str]:
+        """返回任务最近一条未软删日志的 log_date（'YYYY-MM-DD'），无则 None。
+
+        用于「活跃判定」等只需要日期的轻量查询，比 list_logs 省内存。
+        """
+        con, gen = self._connect()
+        try:
+            row = con.execute(
+                """
+                SELECT MAX(log_date)
+                FROM work_logs
+                WHERE task_id = ? AND is_deleted = FALSE
+                """,
+                [task_id],
+            ).fetchone()
+            return row[0] if row and row[0] else None
+        finally:
+            self._close(gen)
+
     def add_log(
         self,
         task_id: int,
