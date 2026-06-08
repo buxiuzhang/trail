@@ -253,6 +253,222 @@ def chat_stream(
 
 
 # ============================================================
+# Tool use 基础设施（chat 重构）
+# ============================================================
+
+
+# Anthropic 协议的工具定义（结构化 JSON Schema）。
+# Anthropic SDK 0.105 接受 dict 形式作为 tools 参数。
+TOOLS: list[dict] = [
+    {
+        "name": "list_tasks",
+        "description": "查询任务列表。可按 status/nature/search 过滤。上限 20 条。",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string",
+                    "enum": ["未开始", "进行中", "维护中", "已完成", "已作废"],
+                    "description": "按状态过滤",
+                },
+                "nature": {
+                    "type": "string",
+                    "enum": ["业务", "技术", "会议", "其他"],
+                    "description": "按性质过滤",
+                },
+                "search": {
+                    "type": "string",
+                    "description": "标题模糊匹配（中文子串）",
+                },
+            },
+        },
+    },
+    {
+        "name": "list_recent_logs",
+        "description": (
+            "查某任务的近期工作日志。content 字段截断 800 字。"
+            "适合「最近干了啥」类问题。"
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "task_id": {"type": "integer", "description": "任务 ID"},
+                "since_days": {
+                    "type": "integer",
+                    "default": 30,
+                    "description": "只看最近 N 天的日志",
+                },
+                "limit": {
+                    "type": "integer",
+                    "default": 5,
+                    "maximum": 20,
+                    "description": "最多返多少条",
+                },
+                "phase": {
+                    "type": "string",
+                    "enum": ["main", "maintenance"],
+                    "description": "按阶段过滤",
+                },
+            },
+            "required": ["task_id"],
+        },
+    },
+    {
+        "name": "get_task_detail",
+        "description": (
+            "查某任务完整信息：标题、别名、状态、起止日期、性质、"
+            "summary、maintenance_summary、tags、contacts。"
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "task_id": {"type": "integer", "description": "任务 ID"},
+            },
+            "required": ["task_id"],
+        },
+    },
+    {
+        "name": "count_tasks_by_status",
+        "description": (
+            "返任务总数、按状态分组计数、按性质分组计数。"
+            "适合「一共多少任务」类问题。"
+        ),
+        "input_schema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "ask_maintenance_suggestion",
+        "description": (
+            "让 LLM 评估某任务是否进入维护期。**不改库**，仅返建议文本。"
+            "logs 可选传入预读日志，否则内部自取。"
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "task_id": {"type": "integer", "description": "任务 ID"},
+                "logs": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "log_date": {"type": "string"},
+                            "content": {"type": "string"},
+                        },
+                    },
+                    "description": "可选：预读日志，否则内部自取",
+                },
+            },
+            "required": ["task_id"],
+        },
+    },
+]
+
+
+class _BlockBuilder:
+    """流式累积一个 content block 的元数据。
+
+    用途：在 content_block_start 时新建；input_json_delta 时累积 partial_json；
+    最终从 input_buf json.loads 还原成 input dict。
+    """
+
+    __slots__ = ("id", "name", "input_buf")
+
+    def __init__(self, id: str, name: str, input_buf: str = ""):
+        self.id = id
+        self.name = name
+        self.input_buf = input_buf
+
+
+def _render_chat_system(user_prompt: str) -> str:
+    """用户自定义 chat system prompt 拼上 {tools_desc} 描述。
+
+    双轨：
+    - 用户 prompt 含 {tools_desc} 占位符 → 替换
+    - 不含 → 末尾追加（兜底，避免用户漏写导致 LLM 不知道有工具可用）
+    """
+    from trail_app.prompts import TOOLS_DESC
+
+    if "{tools_desc}" in user_prompt:
+        return user_prompt.format(tools_desc=TOOLS_DESC)
+    return user_prompt.rstrip() + "\n\n" + TOOLS_DESC
+
+
+def _execute_tool(
+    name: str,
+    input_data: dict,
+    *,
+    task_store,
+    work_log_store,
+    insight_store,
+) -> str:
+    """执行一个工具调用，返 JSON 字符串作为 tool_result.content。
+
+    异常：抛 ValueError / NotFound / StoreError → 调用方转 is_error=true。
+    """
+    from trail_app.models import LogPhase
+    from trail_app.store import NotFound
+
+    if name == "list_tasks":
+        tasks = task_store.list_tasks(
+            status=input_data.get("status"),
+            nature=input_data.get("nature"),
+            search=input_data.get("search"),
+        )
+        return json.dumps(tasks[:20], ensure_ascii=False, default=str)
+
+    if name == "list_recent_logs":
+        task_id = int(input_data["task_id"])
+        since_days = input_data.get("since_days")
+        limit = input_data.get("limit")
+        phase = input_data.get("phase")
+        # phase 值要兼容 "main"/"maintenance"
+        logs = work_log_store.list_logs(
+            task_id=task_id,
+            phase=phase,
+            since_days=since_days,
+            limit=limit,
+        )
+        # 单条 content 截断 800 字
+        truncated = []
+        for l in logs:
+            d = dict(l)
+            if d.get("content") and len(d["content"]) > 800:
+                d["content"] = d["content"][:800] + "…"
+            truncated.append(d)
+        return json.dumps(truncated, ensure_ascii=False, default=str)
+
+    if name == "get_task_detail":
+        task_id = int(input_data["task_id"])
+        task = task_store.get_task(task_id)
+        return json.dumps(task, ensure_ascii=False, default=str)
+
+    if name == "count_tasks_by_status":
+        return json.dumps(
+            insight_store.overview(), ensure_ascii=False, default=str
+        )
+
+    if name == "ask_maintenance_suggestion":
+        task_id = int(input_data["task_id"])
+        task = task_store.get_task(task_id)
+        # 优先用 LLM 预传的 logs，否则内部自取主体阶段最近 10 条
+        logs = input_data.get("logs")
+        if not logs:
+            logs = work_log_store.list_logs(
+                task_id=task_id, phase=LogPhase.MAIN.value, limit=10
+            )
+        log_dicts = [
+            {"log_date": l["log_date"], "content": l["content"]} for l in logs
+        ]
+        text, _, _ = ask_maintenance(
+            title=task["title"],
+            status=task["status"],
+            logs=log_dicts,
+        )
+        return json.dumps({"suggestion": text}, ensure_ascii=False)
+
+    raise ValueError(f"未知工具：{name}")
+
+
+# ============================================================
 # 公开 API
 # ============================================================
 
