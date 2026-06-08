@@ -449,8 +449,9 @@ class WorkLogStore:
             ordinal = int(row[0]) if row else 0
             cur = con.execute(
                 """
-                INSERT INTO work_logs (task_id, log_date, phase, ordinal, content)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO work_logs
+                  (task_id, log_date, phase, ordinal, content, is_deleted, edit_count)
+                VALUES (?, ?, ?, ?, ?, FALSE, 0)
                 RETURNING id
                 """,
                 [task_id, log_date, phase, ordinal, content.strip()],
