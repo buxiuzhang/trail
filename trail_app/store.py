@@ -117,33 +117,42 @@ class TaskStore:
         nature: Optional[str] = None,
         search: Optional[str] = None,
     ) -> list[dict]:
-        sql = "SELECT * FROM tasks WHERE 1=1"
-        params: list = []
-        if status:
-            sql += " AND status = ?"
-            params.append(status)
-        if nature:
-            sql += " AND nature = ?"
-            params.append(nature)
-        if search:
-            sql += " AND title LIKE ?"
-            params.append(f"%{search}%")
-        sql += (
-            " ORDER BY"
-            "  pinned_at DESC NULLS LAST,"
-            "  CASE status"
-            "    WHEN '维护中' THEN 0"
-            "    WHEN '进行中' THEN 1"
-            "    WHEN '未开始' THEN 2"
-            "    WHEN '已完成' THEN 3"
-            "    WHEN '已作废' THEN 4"
-            "    ELSE 5"
-            "  END,"
-            "  start_date DESC NULLS LAST,"
-            "  title"
-        )
         con, gen = self._connect()
         try:
+            # 自动升级：临时任务超过一个月未完成 → 长期
+            con.execute(
+                "UPDATE tasks SET nature = ?, updated_at = CURRENT_TIMESTAMP"
+                " WHERE nature = ? AND status NOT IN (?, ?)"
+                " AND start_date IS NOT NULL AND start_date < CURRENT_DATE - 30",
+                [TaskNature.LONG_TERM.value, TaskNature.TEMPORARY.value,
+                 TaskStatus.COMPLETED.value, TaskStatus.CANCELLED.value],
+            )
+
+            sql = "SELECT * FROM tasks WHERE 1=1"
+            params: list = []
+            if status:
+                sql += " AND status = ?"
+                params.append(status)
+            if nature:
+                sql += " AND nature = ?"
+                params.append(nature)
+            if search:
+                sql += " AND title LIKE ?"
+                params.append(f"%{search}%")
+            sql += (
+                " ORDER BY"
+                "  pinned_at DESC NULLS LAST,"
+                "  CASE status"
+                "    WHEN '维护中' THEN 0"
+                "    WHEN '进行中' THEN 1"
+                "    WHEN '未开始' THEN 2"
+                "    WHEN '已完成' THEN 3"
+                "    WHEN '已作废' THEN 4"
+                "    ELSE 5"
+                "  END,"
+                "  start_date DESC NULLS LAST,"
+                "  title"
+            )
             rows = con.execute(sql, params).fetchall()
             cols = [d[0] for d in con.description]
             return [_row_to_dict_with_dates(zip(cols, r)) for r in rows]
@@ -276,6 +285,9 @@ class TaskStore:
             if new_status in (TaskStatus.COMPLETED.value, TaskStatus.MAINTENANCE.value):
                 # 主体完成 / 进入维护：end_date 写"完成时间"
                 updates["end_date"] = end_date or date.today().isoformat()
+            if new_status == TaskStatus.MAINTENANCE.value:
+                # 进入维护中 → 性质自动转为"维护"
+                updates["nature"] = TaskNature.MAINTENANCE.value
             if new_status == TaskStatus.CANCELLED.value:
                 # 作废：清空 end_date
                 updates["end_date"] = None
