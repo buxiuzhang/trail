@@ -20,8 +20,6 @@ from trail_app.db import (
 from trail_app.utils import get_db_path
 from trail_app.web.routes import insights, llm, logs, settings, tasks
 
-# 静态文件目录：trail_app/web/static/
-STATIC_DIR = Path(__file__).parent / "static"
 
 # 前端构建产物目录（React Vite build）
 # 可通过环境变量 TRAIL_FRONTEND_DIR 指定，或默认查找 trail_web/dist
@@ -131,42 +129,3 @@ if FRONTEND_DIR and FRONTEND_DIR.exists():
         if not index_path.exists():
             return JSONResponse({"detail": "前端未构建，请先运行 npm run build"}, status_code=503)
         return FileResponse(index_path, media_type="text/html")
-
-else:
-    # 回退：使用旧版静态文件（trail_app/web/static/）
-    _PAGE_ROUTES = {
-        "/": "index.html",
-    }
-    _MEDIA = {
-        "/app.js": ("app.js", "application/javascript"),
-        "/style.css": ("style.css", "text/css"),
-    }
-
-    def _serve(path: Path, media_type: str | None = None):
-        if not path.exists():
-            return JSONResponse({"detail": "Not Found"}, status_code=404)
-        return FileResponse(path, media_type=media_type)
-
-    if STATIC_DIR.exists():
-        for route, fname in _PAGE_ROUTES.items():
-            def make_handler(name: str):
-                def handler():
-                    return _serve(STATIC_DIR / name)
-                return handler
-            app.get(route, include_in_schema=False)(make_handler(fname))
-
-        for route, (fname, mtype) in _MEDIA.items():
-            def make_handler(name: str, mt: str):
-                def handler():
-                    return _serve(STATIC_DIR / name, media_type=mt)
-                return handler
-            app.get(route, include_in_schema=False)(make_handler(fname, mtype))
-    else:
-        @app.get("/")
-        def index_fallback():
-            return {
-                "name": "Trail v2",
-                "status": "running",
-                "docs": "/docs",
-                "note": "static/ 目录未找到，仅 API 可用",
-            }
