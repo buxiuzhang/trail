@@ -68,6 +68,8 @@ class TaskUpdate(BaseModel):
     maintenance_summary: Optional[str] = None
     tags: Optional[list[str]] = None
     contacts: Optional[list[ContactIn]] = None
+    # 编辑表单可一并改状态（走状态机校验）
+    status: Optional[str] = None
 
 
 class StatusChange(BaseModel):

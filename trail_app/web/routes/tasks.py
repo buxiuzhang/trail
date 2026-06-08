@@ -120,7 +120,17 @@ def update_task(
             fields[k] = v.isoformat()
 
     try:
-        result = store.update_task(task_id, **fields)
+        # status 走单独的状态机校验路径（不混进 update_task）
+        if payload.status is not None and payload.status != "":
+            end_date_str = (
+                fields.get("end_date")
+                or (payload.end_date.isoformat() if payload.end_date else None)
+            )
+            result = store.change_status(
+                task_id, new_status=payload.status, end_date=end_date_str
+            )
+        else:
+            result = store.update_task(task_id, **fields)
         if payload.contacts is not None:
             contacts.set_contacts(task_id, [c.model_dump() for c in payload.contacts])
         return _to_out(result, contacts.list_contacts(task_id))
