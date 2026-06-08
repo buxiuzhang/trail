@@ -54,20 +54,27 @@ _client_cfg_key: Optional[tuple] = None
 def _get_client():
     """获取 anthropic.Anthropic 客户端（按配置缓存）。
 
-    anthropic.Anthropic() 默认从 env 读 ANTHROPIC_API_KEY / ANTHROPIC_BASE_URL，
-    跟我们 config.py 用的 env 一致，所以这里可以**不传**这两个参数。
+    兼容 MiniMax：MiniMax 用 Bearer 认证，需要显式设置 api_key 并通过
+    default_headers 传 Authorization header。
     """
     global _client, _client_cfg_key
     import anthropic
 
     cfg = get_llm_config()
     if cfg is None:
-        raise LLMNotConfigured("ANTHROPIC_API_KEY 未设置")
+        raise LLMNotConfigured("ANTHROPIC_API_KEY / MINIMAX_API_KEY 未设置")
 
     sig = (cfg.api_key, cfg.base_url)
     if _client is None or _client_cfg_key != sig:
-        # SDK 默认从 env 读；显式传更稳
-        _client = anthropic.Anthropic(api_key=cfg.api_key, base_url=cfg.base_url)
+        using_minimax = "minimax" in cfg.base_url.lower()
+        if using_minimax:
+            # MiniMax 用 Bearer 认证；不能同时传 api_key（否则 SDK 加 x-api-key 冲突）
+            _client = anthropic.Anthropic(
+                base_url=cfg.base_url,
+                default_headers={"Authorization": f"Bearer {cfg.api_key}"},
+            )
+        else:
+            _client = anthropic.Anthropic(api_key=cfg.api_key, base_url=cfg.base_url)
         _client_cfg_key = sig
     return _client, cfg
 

@@ -35,6 +35,7 @@ class LLMConfig:
 
 
 _DEFAULT_BASE_URL = "https://api.anthropic.com"
+_DEFAULT_MINIMAX_BASE_URL = "https://api.minimaxi.com/anthropic"
 _DEFAULT_MODEL = "claude-haiku-4-5"
 _DEFAULT_MAX_TOKENS = 1000
 
@@ -73,21 +74,49 @@ def get_llm_config() -> Optional[LLMConfig]:
 
     返回 None 表示未配置（不抛异常，调用方决定是否 503）。
     """
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
-    if not api_key:
-        return None
-
     yaml_cfg = _load_yaml()
     llm_yaml = _cfg_get(yaml_cfg, "llm", default={}) or {}
 
-    base_url = (
-        os.environ.get("ANTHROPIC_BASE_URL", "").strip()
-        or _cfg_get(llm_yaml, "base_url", default=_DEFAULT_BASE_URL)
+    # 依次尝试各来源，跳过太短的无效值
+    def _valid_key(s: str) -> str:
+        return s.strip() if len(s.strip()) >= 20 else ""
+
+    yaml_key = _valid_key(_cfg_get(llm_yaml, "api_key", default=""))
+    env_key = (
+        _valid_key(os.environ.get("ANTHROPIC_API_KEY", ""))
+        or _valid_key(os.environ.get("MINIMAX_API_KEY", ""))
     )
-    model = (
-        os.environ.get("ANTHROPIC_DEFAULT_HAIKU_MODEL", "").strip()
-        or _cfg_get(llm_yaml, "model", default=_DEFAULT_MODEL)
-    )
+    # YAML 中有 api_key 时优先用 YAML 全套配置（避免 env 残留干扰）
+    if yaml_key:
+        api_key = yaml_key
+        using_minimax = "minimax" in _cfg_get(llm_yaml, "base_url", default="").lower()
+        base_url = (
+            _cfg_get(llm_yaml, "base_url", default="")
+            or os.environ.get("ANTHROPIC_BASE_URL", "").strip()
+            or os.environ.get("MINIMAX_BASE_URL", "").strip()
+            or (_DEFAULT_MINIMAX_BASE_URL if using_minimax else _DEFAULT_BASE_URL)
+        )
+        model = (
+            _cfg_get(llm_yaml, "model", default="")
+            or os.environ.get("ANTHROPIC_DEFAULT_HAIKU_MODEL", "").strip()
+            or os.environ.get("MINIMAX_MODEL", "").strip()
+            or ("MiniMax-M1" if using_minimax else _DEFAULT_MODEL)
+        )
+    else:
+        api_key = env_key
+        if not api_key:
+            return None
+        using_minimax = bool(_valid_key(os.environ.get("MINIMAX_API_KEY", "")))
+        base_url = (
+            os.environ.get("ANTHROPIC_BASE_URL", "").strip()
+            or os.environ.get("MINIMAX_BASE_URL", "").strip()
+            or (_DEFAULT_MINIMAX_BASE_URL if using_minimax else _DEFAULT_BASE_URL)
+        )
+        model = (
+            os.environ.get("ANTHROPIC_DEFAULT_HAIKU_MODEL", "").strip()
+            or os.environ.get("MINIMAX_MODEL", "").strip()
+            or ("MiniMax-M1" if using_minimax else _DEFAULT_MODEL)
+        )
     max_tokens = int(_cfg_get(llm_yaml, "max_tokens", default=_DEFAULT_MAX_TOKENS))
 
     return LLMConfig(
