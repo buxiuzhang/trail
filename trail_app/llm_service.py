@@ -516,3 +516,286 @@ def ask_maintenance(title: str, status: str, logs: list[dict]) -> Tuple[str, str
     )
     user = ASK_MAINTENANCE_USER.format(title=title, status=status, logs=body)
     return _call(ASK_MAINTENANCE_SYSTEM, user, cfg, client)
+
+
+# ============================================================
+# Tool use 多轮 chat（流式 + 同步两个版本）
+# ============================================================
+
+
+# 流式生成器 yield 的元组类型：
+#   ("text", str)                  — 模型文本片段（推前端）
+#   ("tool_call", {name, input})   — 工具调用开始
+#   ("tool_result", {name, ok})    — 工具执行完（OK / 异常）
+#   ("__final__", full_text, raw)  — 整轮结束，full_text 是拼接所有 text，
+#                                    raw 是最后一条 final message 的 JSON 序列化
+
+
+MAX_TOOL_ITERATIONS = 3
+
+
+def _to_api_messages(messages: list[dict]) -> list[dict]:
+    """把前端的 {"role","content":str} 序列化成 Anthropic API 格式。
+
+    Anthropic 多轮 messages 里 user/assistant 的 content 是 list[block]，
+    单条字符串要包成 [{"type":"text","text":...}]。
+    """
+    out: list[dict] = []
+    for m in messages:
+        content = m["content"]
+        if isinstance(content, str):
+            content = [{"type": "text", "text": content}]
+        out.append({"role": m["role"], "content": content})
+    return out
+
+
+def chat_stream_with_tools(
+    messages: list[dict],
+    *,
+    task_store,
+    work_log_store,
+    insight_store,
+    max_iterations: int = MAX_TOOL_ITERATIONS,
+):
+    """多轮 tool use 循环流式 chat。yield 协议见模块顶部注释。
+
+    实现要点：
+    - 用 client.messages.stream(..., tools=TOOLS) 单次 stream 内同时产
+      text_delta 和 input_json_delta
+    - text_delta 直接 yield；input_json_delta 累积到 _BlockBuilder
+    - 每轮结束看 stop_reason：tool_use → 执行工具 + 回填下一轮；end_turn
+      → 结束
+    - cap=max_iterations 截断；中间不报错
+    - 单工具异常走 is_error=true 回填 LLM，让 LLM 自己决定怎么回
+    """
+    client, cfg = _get_client()
+    sys_prompt = _render_chat_system(cfg.chat_system_prompt)
+    api_messages = _to_api_messages(messages)
+
+    text_parts: list[str] = []
+    raw: str = ""
+
+    for iteration in range(max_iterations):
+        block_builders: dict = {}
+        round_text: list[str] = []
+        try:
+            with client.messages.stream(
+                model=cfg.model,
+                max_tokens=cfg.max_tokens,
+                system=sys_prompt,
+                tools=TOOLS,
+                messages=api_messages,
+            ) as stream:
+                for event in stream:
+                    etype = getattr(event, "type", None)
+                    if etype == "content_block_start":
+                        idx = getattr(event, "index", None)
+                        cb = getattr(event, "content_block", None)
+                        if cb is not None and getattr(cb, "type", None) == "tool_use":
+                            block_builders[idx] = _BlockBuilder(
+                                id=getattr(cb, "id", ""),
+                                name=getattr(cb, "name", ""),
+                            )
+                    elif etype == "content_block_delta":
+                        idx = getattr(event, "index", None)
+                        delta = getattr(event, "delta", None)
+                        dtype = getattr(delta, "type", None)
+                        if dtype == "text_delta":
+                            piece = getattr(delta, "text", "") or ""
+                            if piece:
+                                round_text.append(piece)
+                                text_parts.append(piece)
+                                yield ("text", piece)
+                        elif dtype == "input_json_delta":
+                            b = block_builders.get(idx)
+                            if b is not None:
+                                b.input_buf += getattr(delta, "partial_json", "") or ""
+                    # content_block_stop / message_stop 等不需要处理
+
+                final = stream.get_final_message()
+                try:
+                    raw = json.dumps(
+                        final.model_dump(), ensure_ascii=False, default=str
+                    )
+                except Exception:
+                    raw = f"<unserializable: {type(final).__name__}>"
+        except Exception as e:
+            raise LLMError(f"LLM 调用失败：{e!r}") from e
+
+        # 收尾：把所有 tool_use block 的 input 解析成 dict
+        tool_uses: list[dict] = []
+        for block in final.content:
+            if getattr(block, "type", None) != "tool_use":
+                continue
+            idx = getattr(block, "index", None)
+            builder = block_builders.get(idx)
+            if builder is not None and builder.input_buf:
+                try:
+                    input_dict = json.loads(builder.input_buf)
+                except Exception:
+                    input_dict = {}
+            else:
+                # 兜底：直接从 block 取（不走流式累积的场景）
+                input_dict = getattr(block, "input", None) or {}
+            tool_uses.append(
+                {
+                    "id": getattr(block, "id", ""),
+                    "name": getattr(block, "name", ""),
+                    "input": input_dict,
+                }
+            )
+
+        stop_reason = getattr(final, "stop_reason", None)
+        if stop_reason != "tool_use" or not tool_uses:
+            break  # end_turn / max_tokens / 无 tool_use，结束
+
+        # 把本轮 assistant 完整 content 回填到 messages
+        api_messages.append(
+            {
+                "role": "assistant",
+                "content": [
+                    b.model_dump() if hasattr(b, "model_dump") else b
+                    for b in final.content
+                ],
+            }
+        )
+
+        # 执行工具
+        tool_results: list[dict] = []
+        for tu in tool_uses:
+            yield (
+                "tool_call",
+                {"name": tu["name"], "input": tu["input"]},
+            )
+            try:
+                result_text = _execute_tool(
+                    tu["name"],
+                    tu["input"],
+                    task_store=task_store,
+                    work_log_store=work_log_store,
+                    insight_store=insight_store,
+                )
+                ok = True
+            except Exception as e:
+                result_text = (
+                    f"工具执行失败：{type(e).__name__}: {e}"
+                )
+                ok = False
+            yield ("tool_result", {"name": tu["name"], "ok": ok})
+            tool_results.append(
+                {
+                    "type": "tool_result",
+                    "tool_use_id": tu["id"],
+                    "content": result_text,
+                    "is_error": not ok,
+                }
+            )
+
+        api_messages.append({"role": "user", "content": tool_results})
+
+    yield ("__final__", "".join(text_parts).strip(), raw)
+
+
+def _call_chat_tools(
+    messages: list[dict],
+    *,
+    task_store,
+    work_log_store,
+    insight_store,
+    max_iterations: int = MAX_TOOL_ITERATIONS,
+) -> Tuple[str, str, str]:
+    """同步版 tool use chat（/api/chat 旧端点用）。
+
+    走 client.messages.create 不开 stream；多轮直到 end_turn 或 cap。
+    返 (text, prompt_text, raw)。
+    """
+    client, cfg = _get_client()
+    sys_prompt = _render_chat_system(cfg.chat_system_prompt)
+    api_messages = _to_api_messages(messages)
+
+    text_parts: list[str] = []
+    raw: str = ""
+
+    for _ in range(max_iterations):
+        try:
+            msg = client.messages.create(
+                model=cfg.model,
+                max_tokens=cfg.max_tokens,
+                system=sys_prompt,
+                tools=TOOLS,
+                messages=api_messages,
+            )
+        except Exception as e:
+            raise LLMError(f"LLM 调用失败：{e!r}") from e
+
+        try:
+            raw = json.dumps(msg.model_dump(), ensure_ascii=False, default=str)
+        except Exception:
+            raw = f"<unserializable: {type(msg).__name__}>"
+
+        # 解析 content
+        for block in msg.content:
+            btype = getattr(block, "type", None)
+            if btype == "text":
+                t = getattr(block, "text", "") or ""
+                if t:
+                    text_parts.append(t)
+
+        stop_reason = getattr(msg, "stop_reason", None)
+        if stop_reason != "tool_use":
+            break
+
+        # 收集 tool_use + 回填
+        tool_uses: list[dict] = []
+        for block in msg.content:
+            if getattr(block, "type", None) != "tool_use":
+                continue
+            tool_uses.append(
+                {
+                    "id": getattr(block, "id", ""),
+                    "name": getattr(block, "name", ""),
+                    "input": getattr(block, "input", None) or {},
+                }
+            )
+        if not tool_uses:
+            break
+
+        api_messages.append(
+            {
+                "role": "assistant",
+                "content": [
+                    b.model_dump() if hasattr(b, "model_dump") else b
+                    for b in msg.content
+                ],
+            }
+        )
+
+        tool_results: list[dict] = []
+        for tu in tool_uses:
+            try:
+                result_text = _execute_tool(
+                    tu["name"],
+                    tu["input"],
+                    task_store=task_store,
+                    work_log_store=work_log_store,
+                    insight_store=insight_store,
+                )
+                is_error = False
+            except Exception as e:
+                result_text = (
+                    f"工具执行失败：{type(e).__name__}: {e}"
+                )
+                is_error = True
+            tool_results.append(
+                {
+                    "type": "tool_result",
+                    "tool_use_id": tu["id"],
+                    "content": result_text,
+                    "is_error": is_error,
+                }
+            )
+        api_messages.append({"role": "user", "content": tool_results})
+
+    prompt_text = f"[system]\n{sys_prompt}"
+    return "".join(text_parts).strip(), prompt_text, raw
+
