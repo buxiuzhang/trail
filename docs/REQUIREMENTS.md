@@ -17,7 +17,7 @@
 - **后端**：Python 3.12 + FastAPI
 - **前端**：单页 HTML + 原生 JS（fetch 调用 API）。不引入任何前端框架。
 - **DB**：DuckDB 单文件 `data/tasks.duckdb`
-- **LLM**：Anthropic Python SDK（兼容 OpenAI-compatible 代理）。`trail_app/llm_service.py` 封装 4 个函数：polish / summarize_main / summarize_maintenance / ask_maintenance。Base URL 通过 `ANTHROPIC_BASE_URL` 环境变量指定（项目里常用 `https://api.minimaxi.com/anthropic`），model 走 `ANTHROPIC_DEFAULT_HAIKU_MODEL`。
+- **LLM**：Anthropic Python SDK（兼容 OpenAI-compatible 代理）。`trail_app/llm_service.py` 封装 4 个函数：polish / summarize_main / summarize_maintenance / ask_maintenance；chat 走 Anthropic 协议原生 tool use 多轮循环（详见 `docs/CHAT_TOOLS.md`）。Base URL 通过 `ANTHROPIC_BASE_URL` 环境变量指定（项目里常用 `https://api.minimaxi.com/anthropic`），model 走 `ANTHROPIC_DEFAULT_HAIKU_MODEL`。
 - **配置**：`data/config.yaml`（git 忽略）。优先级：环境变量 > yaml > 内置默认。API key 永不落库 / 不入 prompt / 不入 ai_records。
 - **入口**：`python -m trail_app.web`（默认端口 8765）
 
@@ -53,6 +53,7 @@
 | 落档后润色某条 | LLM 改写 → 写 `polished_content`（M3，原始 `content` 不动） |
 | 任务标记完成 | LLM 生成主体总结 → 弹窗问"含维护 / 不再维护" |
 | 维护期生成总结 | LLM 基于 maintenance 日志生成 |
+| 聊天（多轮 tool use 协议） | LLM 主动调 list_tasks / list_recent_logs / get_task_detail / count_tasks_by_status / ask_maintenance_suggestion，详见 `docs/CHAT_TOOLS.md` |
 | 过期任务盘点 | 本地规则，无 LLM |
 
 **硬规则**：LLM 永不直写库。所有写入用户显式确认。
