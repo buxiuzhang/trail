@@ -276,9 +276,6 @@ class TaskStore:
             if new_status in (TaskStatus.COMPLETED.value, TaskStatus.MAINTENANCE.value):
                 # 主体完成 / 进入维护：end_date 写"完成时间"
                 updates["end_date"] = end_date or date.today().isoformat()
-            if new_status == TaskStatus.MAINTENANCE.value:
-                # 进入维护中 → 性质自动转为"维护"
-                updates["nature"] = TaskNature.MAINTENANCE.value
             if new_status == TaskStatus.CANCELLED.value:
                 # 作废：清空 end_date
                 updates["end_date"] = None

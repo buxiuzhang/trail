@@ -270,7 +270,6 @@ def test_status_transition_to_maintenance(client):
     t = r.json()
     assert t["status"] == "维护中"
     assert t["end_date"] is not None  # end_date 是主体完成时间
-    assert t["nature"] == "维护"  # 进入维护中自动设性质为"维护"
 
 
 def test_status_to_cancelled_clears_end_date(client):
