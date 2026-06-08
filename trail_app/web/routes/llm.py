@@ -13,20 +13,25 @@
 """
 from __future__ import annotations
 
+import json
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from trail_app.llm_service import (
     LLMError,
     LLMNotConfigured,
+    _get_client,
     ask_maintenance,
     chat,
+    chat_stream,
     polish_text,
     summarize_main,
     summarize_maintenance,
 )
+from trail_app.prompts import DEFAULT_CHAT_SYSTEM
 from trail_app.store import (
     AiRecordStore,
     NotFound,
@@ -77,6 +82,11 @@ def _date_range(logs: list[dict]) -> str:
         return "无"
     dates = [l["log_date"] for l in logs]
     return f"{dates[0]} ~ {dates[-1]}（{len(dates)} 条）"
+
+
+def _get_default_chat_system() -> str:
+    """审计 fallback：DB 未配置聊天提示时用内置默认。"""
+    return DEFAULT_CHAT_SYSTEM
 
 
 def _collect_logs(
@@ -397,3 +407,79 @@ def chat_endpoint(
         pass
 
     return ChatOut(text=text)
+
+
+# ============================================================
+# 7) 多轮对话流式版（SSE）
+# ============================================================
+
+
+@router.post("/chat/stream")
+def chat_stream_endpoint(
+    payload: ChatIn,
+    tasks: TaskStore = Depends(task_store),
+    logs: WorkLogStore = Depends(work_log_store),
+    records: AiRecordStore = Depends(ai_record_store),
+):
+    """多轮对话流式版（SSE）。
+
+    数据格式：
+    - `data: {"delta":"文本片段"}\n\n`  每次 LLM 输出新 token
+    - `data: {"done":true}\n\n`        流结束
+    - `data: [DONE]\n\n`               关闭标记
+    - `data: {"error":"..."}\n\n`      mid-stream 错误
+    """
+    # 预检：未配置时直接 503，不进入 stream
+    try:
+        _get_client()
+    except LLMNotConfigured as e:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(e))
+
+    context = _build_chat_context(tasks, logs)
+    messages = [{"role": m.role, "content": m.content} for m in payload.messages]
+
+    def gen():
+        raw: str = ""
+        full_text = ""
+        try:
+            for piece in chat_stream(messages, context):
+                if isinstance(piece, tuple) and piece and piece[0] == "__final__":
+                    _, full_text, raw = piece
+                else:
+                    yield f"data: {json.dumps({'delta': piece}, ensure_ascii=False)}\n\n"
+            yield f"data: {json.dumps({'done': True}, ensure_ascii=False)}\n\n"
+            yield "data: [DONE]\n\n"
+        except LLMError as e:
+            yield f"data: {json.dumps({'error': str(e)}, ensure_ascii=False)}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'error': f'流式异常：{e!r}'}, ensure_ascii=False)}\n\n"
+        else:
+            # 审计：流正常结束后写 ai_records（失败不抛）
+            try:
+                _, cfg = _get_client()
+                sys_prompt = (
+                    cfg.chat_system_prompt
+                    or _get_default_chat_system()
+                ).format(context=context)
+                prompt_text = f"[system]\n{sys_prompt}"
+                for m in messages:
+                    prompt_text += f"\n\n[{m['role']}]\n{m['content']}"
+                records.add_record(
+                    task_id=0,
+                    log_id=None,
+                    op="chat",
+                    prompt=prompt_text,
+                    response=raw,
+                    user_confirmed=False,
+                )
+            except Exception:
+                pass
+
+    return StreamingResponse(
+        gen(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )

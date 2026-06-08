@@ -205,6 +205,53 @@ def chat(
     return _call_chat(system, messages, cfg, client)
 
 
+def chat_stream(
+    messages: list[dict],
+    context: str,
+):
+    """多轮对话的流式版本。生成器，每个 text_delta 片段 yield 一次。
+
+    最后 yield 一个三元组 ("__final__", full_text, raw_json) 供审计使用。
+    出错抛 LLMError。
+    """
+    from trail_app.config import LLMConfig as _LC
+    client, cfg = _get_client()
+    if not isinstance(cfg, _LC):
+        cfg = _LC(**cfg)  # 防御性，正常情况 cfg 就是 LLMConfig
+    system = cfg.chat_system_prompt.format(context=context)
+    api_messages = [
+        {"role": m["role"], "content": [{"type": "text", "text": m["content"]}]}
+        for m in messages
+    ]
+
+    text_parts: list[str] = []
+    try:
+        with client.messages.stream(
+            model=cfg.model,
+            max_tokens=cfg.max_tokens,
+            system=system,
+            messages=api_messages,
+        ) as stream:
+            for event in stream:
+                etype = getattr(event, "type", None)
+                if etype == "content_block_delta":
+                    delta = getattr(event, "delta", None)
+                    if getattr(delta, "type", None) == "text_delta":
+                        piece = getattr(delta, "text", "") or ""
+                        if piece:
+                            text_parts.append(piece)
+                            yield piece
+            final = stream.get_final_message()
+            try:
+                raw = json.dumps(final.model_dump(), ensure_ascii=False, default=str)
+            except Exception:
+                raw = f"<unserializable: {type(final).__name__}>"
+    except Exception as e:
+        raise LLMError(f"LLM 调用失败：{e!r}") from e
+
+    yield ("__final__", "".join(text_parts).strip(), raw)
+
+
 # ============================================================
 # 公开 API
 # ============================================================
