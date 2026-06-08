@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
 
-from trail_app.prompts import DEFAULT_CHAT_SYSTEM
+from trail_app.prompts import DEFAULT_CHAT_SYSTEM, TOOLS_DESC
 from trail_app.store import LLMSettingsStore
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
@@ -11,7 +11,12 @@ router = APIRouter(prefix="/api/settings", tags=["settings"])
 
 @router.get("/llm")
 def get_llm_settings():
-    """获取已保存的 LLM 配置（明文返回）。"""
+    """获取已保存的 LLM 配置（明文返回）。
+
+    tools_desc 字段只读：5 工具的自然语言描述，前端编辑 prompt 时可
+    参考。实际拼装由 llm_service._render_chat_system 完成（用户漏写
+    {tools_desc} 占位符时末尾兜底追加）。
+    """
     try:
         settings = LLMSettingsStore().get_all()
         return {
@@ -20,6 +25,7 @@ def get_llm_settings():
             "model": settings.get("model", ""),
             "max_tokens": settings.get("max_tokens", ""),
             "chat_system_prompt": settings.get("chat_system_prompt", "") or DEFAULT_CHAT_SYSTEM,
+            "tools_desc": TOOLS_DESC,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"读取配置失败：{e}")
