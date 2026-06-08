@@ -82,6 +82,10 @@ def _row_to_dict_with_dates(zipped) -> dict:
             d[k] = v.isoformat()
     if d.get("tags") is None:
         d["tags"] = []
+    if d.get("is_deleted") is None:
+        d["is_deleted"] = False
+    if d.get("edit_count") is None:
+        d["edit_count"] = 0
     return d
 
 
