@@ -5,8 +5,9 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from trail_app.store import NotFound, StoreError, WorkLogStore
-from trail_app.web.deps import work_log_store
+from trail_app.models import TaskStatus
+from trail_app.store import NotFound, StoreError, TaskStore, WorkLogStore
+from trail_app.web.deps import task_store, work_log_store
 from trail_app.web.schemas import LogCreate, LogOut, LogUpdate
 
 router = APIRouter(prefix="/api/tasks/{task_id}/logs", tags=["logs"])
@@ -34,9 +35,10 @@ def add_log(
     task_id: int,
     payload: LogCreate,
     store: WorkLogStore = Depends(work_log_store),
+    task_s: TaskStore = Depends(task_store),
 ):
     try:
-        return _to_out(
+        result = _to_out(
             store.add_log(
                 task_id=task_id,
                 log_date=payload.log_date.isoformat(),
@@ -44,6 +46,11 @@ def add_log(
                 phase=payload.phase,
             )
         )
+        # 首次日志：未开始 → 进行中
+        task = task_s.get_task(task_id)
+        if task["status"] == TaskStatus.NOT_STARTED.value:
+            task_s.change_status(task_id, TaskStatus.IN_PROGRESS.value)
+        return result
     except NotFound as e:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
     except StoreError as e:

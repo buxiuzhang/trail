@@ -623,8 +623,8 @@ function renderDetail(t) {
 
           <div class="meta-actions">
             <a class="btn" href="#/edit/${t.id}" data-link="#/edit/${t.id}" style="text-decoration:none">✎ 编辑条目</a>
-            <button class="btn" data-action="add-log">＋ 记录今日</button>
-            <button class="btn btn--ghost" data-action="change-status" data-id="${t.id}">变更状态</button>
+            ${(t.status !== "已完成" && t.status !== "已作废") ? `<button class="btn" data-action="add-log">＋ 记录今日</button>` : ""}
+            ${(t.status === "进行中" || t.status === "维护中") ? `<button class="btn btn--ghost" data-action="change-status" data-id="${t.id}">变更状态</button>` : ""}
             ${t.status !== "已作废" ? `<button class="btn btn--danger" data-action="cancel" data-id="${t.id}">作废此条</button>` : ""}
           </div>
         </aside>
@@ -635,7 +635,7 @@ function renderDetail(t) {
             <span class="logbook__count">${logs.length} entries · 可改可软删</span>
           </header>
 
-          ${renderCompose(t)}
+          ${(t.status !== "已完成" && t.status !== "已作废") ? renderCompose(t) : `<div class="empty-log"><span class="empty-log__glyph">✕</span>此任务已封版，不再接受新日志。</div>`}
 
           <div class="log-entries">
             ${logs.length === 0
@@ -698,6 +698,8 @@ function renderLogEntry(t, l) {
 }
 
 function renderCompose(t, editing = null) {
+  // 已完成 / 已作废 → 封版，不渲染日志表单
+  if (t.status === "已完成" || t.status === "已作废") return "";
   // editing = null → 新增；editing = log 对象 → 编辑模式
   const isEdit = !!editing;
   const initialDate = isEdit ? editing.log_date : TODAY;
@@ -779,21 +781,28 @@ function renderForm(mode, task) {
         <div class="field-row">
           <div class="field">
             <div class="field__label"><span>状态</span></div>
-            <select class="field__select" name="status" data-action="status-toggle">
-              <option value="未开始" ${t.status === "未开始" ? "selected" : ""}>未开始</option>
-              <option value="进行中" ${(!t.status || t.status === "进行中") ? "selected" : ""}>进行中</option>
-              <option value="已完成" ${t.status === "已完成" ? "selected" : ""}>已完成</option>
-              <option value="维护中" ${t.status === "维护中" ? "selected" : ""}>维护中</option>
-              <option value="已作废" ${t.status === "已作废" ? "selected" : ""}>已作废</option>
-            </select>
+            ${isEdit ? `
+              <div style="display:flex; align-items:center; gap:12px; padding-top:4px;">
+                <span class="stamp ${statusStampClass(t.status)}">${escapeHtml(t.status)}</span>
+                ${(t.status === "进行中" || t.status === "维护中") ? `<button type="button" class="btn btn--ghost" data-action="change-status" data-id="${t.id}" style="font-size:10px;padding:5px 10px;">变更状态</button>` : ""}
+              </div>
+            ` : `
+              <div style="display:flex; align-items:center; gap:12px; padding-top:4px;">
+                <span class="stamp stamp--ns">未开始</span>
+                <span style="font-family:var(--body);font-size:12px;color:var(--ink-ghost);font-style:italic;">添加日志后自动转入进行中</span>
+              </div>
+            `}
           </div>
-          <div class="field" data-when-status="已完成">
-            <div class="field__label">
-              <span>完成时间</span>
-              <span class="field__hint">可手动覆盖</span>
-            </div>
-            <input class="field__input" name="end_date" type="date" value="${escapeHtml(t.end_date || "")}" />
-          </div>
+          ${(isEdit && t.status === "已完成") || (!isEdit)
+            ? ""
+            : `<div class="field" data-when-status="已完成">
+                <div class="field__label">
+                  <span>完成时间</span>
+                  <span class="field__hint">可手动覆盖</span>
+                </div>
+                <input class="field__input" name="end_date" type="date" value="${escapeHtml(t.end_date || "")}" />
+              </div>`
+          }
         </div>
         <div class="field">
           <div class="field__label">
@@ -1035,10 +1044,10 @@ function attachMainHandlers() {
         processing_date: fd.get("processing_date") || null,
         end_date: fd.get("end_date") || null,
         nature: fd.get("nature"),
-        status: fd.get("status"),
         tags,
         contacts,
       };
+      // 状态变更统一走专用按钮+状态机（openStatusModal / cancelTask），表单不再传 status
       try {
         if (mode === "edit" && taskId) {
           await api.put(`/api/tasks/${taskId}`, payload);
@@ -1095,6 +1104,23 @@ function openStatusModal(id) {
       buttons: [
         { label: "已完成 · 不再维护", class: "btn--primary", action: async () => { await updateStatus(id, "已完成"); } },
         { label: "维护中 · 仍要照看", class: "btn--ghost",   action: async () => { await updateStatus(id, "维护中"); } },
+      ],
+    });
+    return;
+  }
+
+  if (t.status === "维护中") {
+    showModal({
+      eyebrow: "封版询问",
+      title: "将此任务标记为已完成？",
+      titleMode: "zh",
+      bodyHtml: `
+        <p>任务 <em>${escapeHtml(t.title)}</em> 当前为 <span class="stamp stamp--mt">维护中</span>。</p>
+        <p>标记为已完成后将<em style="color:var(--oxblood)">封版</em>，不能再添加日志。</p>
+      `,
+      buttons: [
+        { label: "取消", class: "btn--ghost", action: closeModal },
+        { label: "已完成 · 封版", class: "btn--primary", action: async () => { await updateStatus(id, "已完成"); } },
       ],
     });
     return;

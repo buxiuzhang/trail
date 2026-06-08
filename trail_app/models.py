@@ -148,7 +148,7 @@ class Task:
 
     id: Optional[int] = None  # DB 自增，新建前为 None
     title: str = ""
-    status: str = TaskStatus.IN_PROGRESS.value
+    status: str = TaskStatus.NOT_STARTED.value
     nature: str = TaskNature.TEMPORARY.value
     alias: Optional[str] = None
     description: Optional[str] = None
@@ -206,7 +206,7 @@ class ParsedTask:
     start_date: Optional[str] = None
     processing_date: Optional[str] = None
     completed_date: Optional[str] = None
-    status: str = TaskStatus.IN_PROGRESS.value
+    status: str = TaskStatus.NOT_STARTED.value
     nature: str = TaskNature.TEMPORARY.value
     summary: Optional[str] = None
     tags: list[str] = field(default_factory=list)

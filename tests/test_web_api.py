@@ -68,7 +68,7 @@ def test_create_task_minimal(client):
     assert r.status_code == 201
     t = r.json()
     assert t["title"] == "测试任务"
-    assert t["status"] == "进行中"
+    assert t["status"] == "未开始"
     assert t["nature"] == "临时"
     assert isinstance(t["id"], int)
     assert t["contacts"] == []
@@ -240,6 +240,8 @@ def test_status_transition_valid(client):
 
 def test_status_transition_to_completed_sets_end_date(client):
     tid = client.post("/api/tasks", json={"title": "T"}).json()["id"]
+    # 默认"未开始"，先转"进行中"
+    client.post(f"/api/tasks/{tid}/status", json={"new_status": "进行中"})
     r = client.post(f"/api/tasks/{tid}/status", json={
         "new_status": "已完成",
         "summary": "做完了",
@@ -261,11 +263,14 @@ def test_status_transition_invalid(client):
 
 def test_status_transition_to_maintenance(client):
     tid = client.post("/api/tasks", json={"title": "T"}).json()["id"]
+    # 默认"未开始"，先转"进行中"
+    client.post(f"/api/tasks/{tid}/status", json={"new_status": "进行中"})
     r = client.post(f"/api/tasks/{tid}/status", json={"new_status": "维护中"})
     assert r.status_code == 200
     t = r.json()
     assert t["status"] == "维护中"
     assert t["end_date"] is not None  # end_date 是主体完成时间
+    assert t["nature"] == "维护"  # 进入维护中自动设性质为"维护"
 
 
 def test_status_to_cancelled_clears_end_date(client):
@@ -374,6 +379,36 @@ def test_add_log_404(client):
         "content": "x",
     })
     assert r.status_code == 404
+
+
+def test_first_log_auto_transitions_to_in_progress(client):
+    """首次日志：未开始 → 进行中（后端自动）。"""
+    tid = client.post("/api/tasks", json={"title": "T"}).json()["id"]
+    # 确认新建为"未开始"
+    t = client.get(f"/api/tasks/{tid}").json()
+    assert t["status"] == "未开始"
+    # 添加首条日志
+    r = client.post(f"/api/tasks/{tid}/logs", json={
+        "log_date": "2026-06-01", "content": "第一条日志"
+    })
+    assert r.status_code == 201
+    # 状态应自动变为"进行中"
+    t = client.get(f"/api/tasks/{tid}").json()
+    assert t["status"] == "进行中"
+
+
+def test_cannot_add_log_to_completed_task(client):
+    """已完成/已作废任务不能添加日志。"""
+    tid = client.post("/api/tasks", json={"title": "T"}).json()["id"]
+    # 先转进行中再转已完成
+    client.post(f"/api/tasks/{tid}/status", json={"new_status": "进行中"})
+    client.post(f"/api/tasks/{tid}/status", json={"new_status": "已完成"})
+    # 尝试添加日志
+    r = client.post(f"/api/tasks/{tid}/logs", json={
+        "log_date": "2026-06-01", "content": "不应成功"
+    })
+    assert r.status_code == 400
+    assert "已完成" in r.json()["detail"]
 
 
 def test_list_logs(client):

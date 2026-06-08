@@ -51,7 +51,7 @@ class TaskCreate(BaseModel):
     start_date: Optional[date] = None
     processing_date: Optional[date] = None
     nature: str = TaskNature.TEMPORARY.value
-    status: str = TaskStatus.IN_PROGRESS.value
+    status: str = TaskStatus.NOT_STARTED.value
     tags: list[str] = Field(default_factory=list)
     contacts: list[ContactIn] = Field(default_factory=list)
 

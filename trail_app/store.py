@@ -170,7 +170,7 @@ class TaskStore:
         description: Optional[str] = None,
         start_date: Optional[str] = None,
         processing_date: Optional[str] = None,
-        status: str = TaskStatus.IN_PROGRESS.value,
+        status: str = TaskStatus.NOT_STARTED.value,
         tags: Optional[list[str]] = None,
     ) -> dict:
         if not title or not title.strip():
@@ -276,6 +276,9 @@ class TaskStore:
             if new_status in (TaskStatus.COMPLETED.value, TaskStatus.MAINTENANCE.value):
                 # 主体完成 / 进入维护：end_date 写"完成时间"
                 updates["end_date"] = end_date or date.today().isoformat()
+            if new_status == TaskStatus.MAINTENANCE.value:
+                # 进入维护中 → 性质自动转为"维护"
+                updates["nature"] = TaskNature.MAINTENANCE.value
             if new_status == TaskStatus.CANCELLED.value:
                 # 作废：清空 end_date
                 updates["end_date"] = None
@@ -432,11 +435,14 @@ class WorkLogStore:
 
         con, gen = self._connect()
         try:
-            # 校验任务存在
-            if not con.execute(
-                "SELECT 1 FROM tasks WHERE id = ?", [task_id]
-            ).fetchone():
+            # 校验任务存在 + 已完成/已作废不可再写日志
+            row = con.execute(
+                "SELECT status FROM tasks WHERE id = ?", [task_id]
+            ).fetchone()
+            if not row:
                 raise NotFound(f"任务不存在：{task_id}")
+            if row[0] in (TaskStatus.COMPLETED.value, TaskStatus.CANCELLED.value):
+                raise StoreError("已完成/已作废的任务不能添加日志")
             # 同 phase 同日期内 ordinal 自增
             row = con.execute(
                 """
