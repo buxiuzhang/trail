@@ -81,6 +81,21 @@ ASK_MAINTENANCE_USER = (
 )
 
 
+# ============================================================
+# 多轮对话（右下聊天气泡）
+# ============================================================
+
+DEFAULT_CHAT_SYSTEM = (
+    "你是 Trail 工作日志助教。你帮助用户回顾工作进展、整理任务状态、"
+    "回答关于工作日志的问题。回答使用中文，简洁、有条理，用第二人称（你/您）。"
+    "回答可以适当使用条目列表，但不要用 Markdown 标题（#）。"
+    "下面是用户当前的任务概况，你可以据此回答问题：\n\n"
+    "{context}"
+)
+
+CHAT_USER = "{message}"
+
+
 def build_prompt(template: str, **kwargs) -> str:
     """填模板的 helper。缺失变量报 KeyError（写错时早发现）。"""
     return dedent(template).format(**kwargs)

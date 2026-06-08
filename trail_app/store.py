@@ -100,15 +100,13 @@ class TaskStore:
     def __init__(self, db_path: Optional[str] = None) -> None:
         self.db_path = db_path
 
-    def _connect(self) -> duckdb.DuckDBPyConnection:
+    def _connect(self):
         gen = _open(self.db_path)
-        con = gen.__enter__()
-        self._gen = gen
-        return con
+        return gen.__enter__(), gen
 
-    def _close(self, con: duckdb.DuckDBPyConnection) -> None:
+    def _close(self, gen) -> None:
         try:
-            self._gen.__exit__(None, None, None)
+            gen.__exit__(None, None, None)
         except Exception:
             pass
 
@@ -144,16 +142,16 @@ class TaskStore:
             "  start_date DESC NULLS LAST,"
             "  title"
         )
-        con = self._connect()
+        con, gen = self._connect()
         try:
             rows = con.execute(sql, params).fetchall()
             cols = [d[0] for d in con.description]
             return [_row_to_dict_with_dates(zip(cols, r)) for r in rows]
         finally:
-            self._close(con)
+            self._close(gen)
 
     def get_task(self, task_id: int) -> dict:
-        con = self._connect()
+        con, gen = self._connect()
         try:
             row = con.execute("SELECT * FROM tasks WHERE id = ?", [task_id]).fetchone()
             if not row:
@@ -161,7 +159,7 @@ class TaskStore:
             cols = [d[0] for d in con.description]
             return _row_to_dict_with_dates(zip(cols, row))
         finally:
-            self._close(con)
+            self._close(gen)
 
     # ----- 创建 -----
     def create_task(
@@ -182,7 +180,7 @@ class TaskStore:
         if nature not in TaskNature.all():
             raise StoreError(f"非法性质：{nature}")
 
-        con = self._connect()
+        con, gen = self._connect()
         try:
             # 标题去重（同 md 灌库幂等用）
             if con.execute(
@@ -211,7 +209,7 @@ class TaskStore:
             new_id = int(cur.fetchone()[0])
             return self.get_task(new_id)
         finally:
-            self._close(con)
+            self._close(gen)
 
     # ----- 更新 -----
     def update_task(self, task_id: int, **fields) -> dict:
@@ -246,14 +244,14 @@ class TaskStore:
         sets = ", ".join(f"{k} = ?" for k in fields)
         sets += ", updated_at = CURRENT_TIMESTAMP"
         params = list(fields.values()) + [task_id]
-        con = self._connect()
+        con, gen = self._connect()
         try:
             cur = con.execute(f"UPDATE tasks SET {sets} WHERE id = ?", params)
             if cur.rowcount == 0:
                 raise NotFound(f"任务不存在：{task_id}")
             return self.get_task(task_id)
         finally:
-            self._close(con)
+            self._close(gen)
 
     # ----- 状态转移 -----
     def change_status(
@@ -272,7 +270,7 @@ class TaskStore:
         if not is_valid_transition(old, new_status):
             raise InvalidTransition(f"非法转移：{old} → {new_status}")
 
-        con = self._connect()
+        con, gen = self._connect()
         try:
             updates: dict = {"status": new_status}
             if new_status in (TaskStatus.COMPLETED.value, TaskStatus.MAINTENANCE.value):
@@ -287,7 +285,7 @@ class TaskStore:
             con.execute(f"UPDATE tasks SET {sets} WHERE id = ?", params)
             return self.get_task(task_id)
         finally:
-            self._close(con)
+            self._close(gen)
 
     def cancel_task(self, task_id: int) -> dict:
         return self.change_status(task_id, TaskStatus.CANCELLED.value)
@@ -295,7 +293,7 @@ class TaskStore:
     # ----- 置顶 -----
     def pin(self, task_id: int) -> dict:
         """置顶：写 pinned_at = now()。幂等：已置顶再 pin 不会改时间（保持原顺序）。"""
-        con = self._connect()
+        con, gen = self._connect()
         try:
             cur = con.execute(
                 "UPDATE tasks SET pinned_at = COALESCE(pinned_at, CURRENT_TIMESTAMP) "
@@ -306,11 +304,11 @@ class TaskStore:
                 raise NotFound(f"任务不存在：{task_id}")
             return self.get_task(task_id)
         finally:
-            self._close(con)
+            self._close(gen)
 
     def unpin(self, task_id: int) -> dict:
         """取消置顶：pinned_at = NULL。幂等：未置顶再 unpin 不报错。"""
-        con = self._connect()
+        con, gen = self._connect()
         try:
             cur = con.execute(
                 "UPDATE tasks SET pinned_at = NULL WHERE id = ? RETURNING id",
@@ -320,12 +318,12 @@ class TaskStore:
                 raise NotFound(f"任务不存在：{task_id}")
             return self.get_task(task_id)
         finally:
-            self._close(con)
+            self._close(gen)
 
     def delete_task(self, task_id: int) -> None:
         """硬删任务。手动级联删 contact_channels / work_logs / ai_records
         （DuckDB FK 不支持 CASCADE）。按子表 → 主表顺序删。"""
-        con = self._connect()
+        con, gen = self._connect()
         try:
             if not con.execute(
                 "SELECT 1 FROM tasks WHERE id = ?", [task_id]
@@ -338,7 +336,7 @@ class TaskStore:
             if cur.rowcount == 0:
                 raise NotFound(f"任务不存在：{task_id}")
         finally:
-            self._close(con)
+            self._close(gen)
 
 
 # ============================================================
@@ -352,15 +350,13 @@ class WorkLogStore:
     def __init__(self, db_path: Optional[str] = None) -> None:
         self.db_path = db_path
 
-    def _connect(self) -> duckdb.DuckDBPyConnection:
+    def _connect(self):
         gen = _open(self.db_path)
-        con = gen.__enter__()
-        self._gen = gen
-        return con
+        return gen.__enter__(), gen
 
-    def _close(self, con: duckdb.DuckDBPyConnection) -> None:
+    def _close(self, gen) -> None:
         try:
-            self._gen.__exit__(None, None, None)
+            gen.__exit__(None, None, None)
         except Exception:
             pass
 
@@ -370,7 +366,7 @@ class WorkLogStore:
         phase: Optional[str] = None,
         include_deleted: bool = False,
     ) -> list[dict]:
-        con = self._connect()
+        con, gen = self._connect()
         try:
             where = ["task_id = ?"]
             params: list = [task_id]
@@ -384,7 +380,7 @@ class WorkLogStore:
             cols = [d[0] for d in con.description]
             return [_row_to_dict_with_dates(zip(cols, r)) for r in rows]
         finally:
-            self._close(con)
+            self._close(gen)
 
     def add_log(
         self,
@@ -398,7 +394,7 @@ class WorkLogStore:
         if phase not in {LogPhase.MAIN.value, LogPhase.MAINTENANCE.value}:
             raise StoreError(f"非法 phase：{phase}")
 
-        con = self._connect()
+        con, gen = self._connect()
         try:
             # 校验任务存在
             if not con.execute(
@@ -430,12 +426,12 @@ class WorkLogStore:
             cols = [d[0] for d in con.description]
             return _row_to_dict_with_dates(zip(cols, row))
         finally:
-            self._close(con)
+            self._close(gen)
 
     # ----- 编辑 / 软删 -----
     def _get_log(self, log_id: int) -> dict:
         """单条回读；不存在抛 NotFound。"""
-        con = self._connect()
+        con, gen = self._connect()
         try:
             row = con.execute("SELECT * FROM work_logs WHERE id = ?", [log_id]).fetchone()
             if not row:
@@ -443,7 +439,7 @@ class WorkLogStore:
             cols = [d[0] for d in con.description]
             return _row_to_dict_with_dates(zip(cols, row))
         finally:
-            self._close(con)
+            self._close(gen)
 
     def update_log(
         self,
@@ -468,7 +464,7 @@ class WorkLogStore:
         }:
             raise StoreError(f"非法 phase：{phase}")
 
-        con = self._connect()
+        con, gen = self._connect()
         try:
             row = con.execute(
                 "SELECT log_date, phase, ordinal FROM work_logs WHERE id = ? AND task_id = ? AND is_deleted = FALSE",
@@ -510,7 +506,7 @@ class WorkLogStore:
             )
             return self._get_log(log_id)
         finally:
-            self._close(con)
+            self._close(gen)
 
     def delete_log(self, log_id: int, task_id: int, hard: bool = False) -> None:
         """软删（默认）/ 硬删日志。校验 log 属于 task。
@@ -521,7 +517,7 @@ class WorkLogStore:
         DuckDB 的 cursor.rowcount 在 UPDATE/DELETE 上恒为 -1，
         所以用 RETURNING 拿真实受影响行数。
         """
-        con = self._connect()
+        con, gen = self._connect()
         try:
             if hard:
                 rows = con.execute(
@@ -538,7 +534,7 @@ class WorkLogStore:
             if not rows:
                 raise NotFound(f"日志不存在或不属于此任务：log={log_id} task={task_id}")
         finally:
-            self._close(con)
+            self._close(gen)
 
 
 @dataclass
@@ -547,20 +543,18 @@ class ContactStore:
 
     db_path: Optional[str] = None
 
-    def _connect(self) -> duckdb.DuckDBPyConnection:
+    def _connect(self):
         gen = _open(self.db_path)
-        con = gen.__enter__()
-        self._gen = gen
-        return con
+        return gen.__enter__(), gen
 
-    def _close(self, con: duckdb.DuckDBPyConnection) -> None:
+    def _close(self, gen) -> None:
         try:
-            self._gen.__exit__(None, None, None)
+            gen.__exit__(None, None, None)
         except Exception:
             pass
 
     def list_contacts(self, task_id: int) -> list[dict]:
-        con = self._connect()
+        con, gen = self._connect()
         try:
             rows = con.execute(
                 """
@@ -574,7 +568,7 @@ class ContactStore:
             cols = [d[0] for d in con.description]
             return [_row_to_dict_with_dates(zip(cols, r)) for r in rows]
         finally:
-            self._close(con)
+            self._close(gen)
 
     def list_contacts_bulk(self, task_ids: list[int]) -> dict[int, list[dict]]:
         """批量取多任务的 contacts，返回 {task_id: [contact, ...]}。
@@ -583,7 +577,7 @@ class ContactStore:
         """
         if not task_ids:
             return {}
-        con = self._connect()
+        con, gen = self._connect()
         try:
             placeholders = ",".join("?" for _ in task_ids)
             rows = con.execute(
@@ -602,7 +596,7 @@ class ContactStore:
                 grouped[d["task_id"]].append(d)
             return grouped
         finally:
-            self._close(con)
+            self._close(gen)
 
     def set_contacts(self, task_id: int, contacts: list[dict]) -> list[dict]:
         """整组替换：先 DELETE 旧行，再 INSERT 新行（事务）。
@@ -624,7 +618,7 @@ class ContactStore:
             c.setdefault("target", None)
             c.setdefault("note", None)
 
-        con = self._connect()
+        con, gen = self._connect()
         try:
             con.execute("BEGIN")
             try:
@@ -655,7 +649,7 @@ class ContactStore:
                 raise
             return self.list_contacts(task_id)
         finally:
-            self._close(con)
+            self._close(gen)
 
 
 # ============================================================
@@ -669,15 +663,13 @@ class AiRecordStore:
     def __init__(self, db_path: Optional[str] = None) -> None:
         self.db_path = db_path
 
-    def _connect(self) -> duckdb.DuckDBPyConnection:
+    def _connect(self):
         gen = _open(self.db_path)
-        con = gen.__enter__()
-        self._gen = gen
-        return con
+        return gen.__enter__(), gen
 
-    def _close(self, con: duckdb.DuckDBPyConnection) -> None:
+    def _close(self, gen) -> None:
         try:
-            self._gen.__exit__(None, None, None)
+            gen.__exit__(None, None, None)
         except Exception:
             pass
 
@@ -691,9 +683,9 @@ class AiRecordStore:
         user_confirmed: bool = False,
     ) -> int:
         """写入一条审计记录，返回新 id。"""
-        if op not in {"polish", "summarize", "ask_maintenance"}:
+        if op not in {"polish", "summarize", "ask_maintenance", "chat"}:
             raise StoreError(f"非法 op：{op}")
-        con = self._connect()
+        con, gen = self._connect()
         try:
             cur = con.execute(
                 """
@@ -705,18 +697,18 @@ class AiRecordStore:
             )
             return int(cur.fetchone()[0])
         finally:
-            self._close(con)
+            self._close(gen)
 
     def confirm_record(self, record_id: int) -> None:
         """用户采纳某条 LLM 建议时回写。"""
-        con = self._connect()
+        con, gen = self._connect()
         try:
             con.execute(
                 "UPDATE ai_records SET user_confirmed = TRUE WHERE id = ?",
                 [record_id],
             )
         finally:
-            self._close(con)
+            self._close(gen)
 
 
 # ============================================================
@@ -730,20 +722,18 @@ class InsightStore:
     def __init__(self, db_path: Optional[str] = None) -> None:
         self.db_path = db_path
 
-    def _connect(self) -> duckdb.DuckDBPyConnection:
+    def _connect(self):
         gen = _open(self.db_path)
-        con = gen.__enter__()
-        self._gen = gen
-        return con
+        return gen.__enter__(), gen
 
-    def _close(self, con: duckdb.DuckDBPyConnection) -> None:
+    def _close(self, gen) -> None:
         try:
-            self._gen.__exit__(None, None, None)
+            gen.__exit__(None, None, None)
         except Exception:
             pass
 
     def stale_tasks(self, idle_days: int = 30) -> list[dict]:
-        con = self._connect()
+        con, gen = self._connect()
         try:
             rows = con.execute(
                 """
@@ -762,10 +752,10 @@ class InsightStore:
                 result.append(d)
             return result
         finally:
-            self._close(con)
+            self._close(gen)
 
     def overview(self) -> dict:
-        con = self._connect()
+        con, gen = self._connect()
         try:
             by_status = dict(
                 con.execute(
@@ -787,7 +777,7 @@ class InsightStore:
                 "total_logs": total_logs,
             }
         finally:
-            self._close(con)
+            self._close(gen)
 
 
 # ============================================================

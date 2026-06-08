@@ -22,6 +22,7 @@ from trail_app.llm_service import (
     LLMError,
     LLMNotConfigured,
     ask_maintenance,
+    chat,
     polish_text,
     summarize_main,
     summarize_maintenance,
@@ -297,3 +298,102 @@ def ask_maintenance_endpoint(
     )
 
     return AskMaintenanceOut(suggestion=text)
+
+
+# ============================================================
+# 6) 多轮对话（聊天气泡）
+# ============================================================
+
+
+class ChatMessage(BaseModel):
+    role: str = Field(..., pattern=r"^(user|assistant)$")
+    content: str = Field(..., min_length=1)
+
+
+class ChatIn(BaseModel):
+    messages: list[ChatMessage] = Field(..., min_length=1)
+
+
+class ChatOut(BaseModel):
+    text: str
+
+
+def _build_chat_context(
+    tasks: TaskStore,
+    logs: WorkLogStore,
+) -> str:
+    """构建聊天系统提示中的任务概况。
+
+    返回一段中文文本，包含任务总数、状态分布、活跃任务及最近日志摘要。
+    """
+    all_tasks = tasks.list_tasks()
+
+    # 状态分布
+    status_counts: dict[str, int] = {}
+    for t in all_tasks:
+        s = t["status"]
+        status_counts[s] = status_counts.get(s, 0) + 1
+
+    total = len(all_tasks)
+    status_str = "、".join(f"{k} {v} 项" for k, v in status_counts.items())
+
+    # 活跃任务（进行中 / 维护中），取最近 3 条日志摘要
+    active = [t for t in all_tasks if t["status"] in ("进行中", "维护中")]
+    active_lines: list[str] = []
+    for t in active[:20]:  # 上限防 token 超
+        task_logs = logs.list_logs(t["id"])
+        recent = task_logs[-3:]
+        recent_str = "; ".join(
+            f"{l['log_date']}: {l['content'][:80]}" for l in recent
+        )
+        active_lines.append(
+            f"- [{t['status']}] #{t['id']} {t['title']}"
+            f"（最近日志: {recent_str or '无'}）"
+        )
+
+    lines = [
+        f"任务总数: {total}。按状态: {status_str}。",
+        "活跃任务:",
+    ]
+    lines.extend(active_lines if active_lines else ["（无活跃任务）"])
+    return "\n".join(lines)
+
+
+@router.post("/chat", response_model=ChatOut)
+def chat_endpoint(
+    payload: ChatIn,
+    tasks: TaskStore = Depends(task_store),
+    logs: WorkLogStore = Depends(work_log_store),
+    records: AiRecordStore = Depends(ai_record_store),
+):
+    """多轮对话，注入任务上下文。
+
+    前端传入完整消息历史（user/assistant 交替），
+    后端拼入当前任务概况作为 system 提示，返回 LLM 回复。
+    """
+    context = _build_chat_context(tasks, logs)
+
+    # 转换 Pydantic 模型为普通 dict
+    messages = [{"role": m.role, "content": m.content} for m in payload.messages]
+
+    try:
+        text, prompt, raw = chat(messages, context)
+    except LLMNotConfigured as e:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(e))
+    except LLMError as e:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(e))
+
+    # 审计（异步友好，失败不阻塞）
+    try:
+        records.add_record(
+            task_id=0,  # 对话不绑定特定任务
+            log_id=None,
+            op="chat",
+            prompt=prompt,
+            response=raw,
+            user_confirmed=False,
+        )
+    except Exception:
+        pass
+
+    return ChatOut(text=text)

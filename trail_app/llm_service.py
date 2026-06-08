@@ -134,6 +134,77 @@ def _call(
     return text, prompt_text, raw
 
 
+def _call_chat(
+    system: str,
+    messages: list[dict],
+    cfg: LLMConfig,
+    client,
+) -> Tuple[str, str, str]:
+    """调 anthropic messages.create（多轮对话版）。
+
+    与 _call 对称，区别是接受 messages 数组而非单个 user 字符串。
+    """
+    # 拼接完整 prompt 用于审计
+    parts = [f"[system]\n{system}"]
+    for i, m in enumerate(messages):
+        parts.append(f"\n\n[{m['role']}]\n{m['content']}")
+    prompt_text = "".join(parts)
+
+    try:
+        msg = client.messages.create(
+            model=cfg.model,
+            max_tokens=cfg.max_tokens,
+            system=system,
+            messages=[
+                {"role": m["role"], "content": [{"type": "text", "text": m["content"]}]}
+                for m in messages
+            ],
+        )
+    except Exception as e:
+        raise LLMError(f"LLM 调用失败：{e!r}") from e
+
+    # 解析 content blocks（同 _call 逻辑）
+    text_parts: list[str] = []
+    thinking_parts: list[str] = []
+    for block in msg.content:
+        btype = getattr(block, "type", None)
+        if btype == "text":
+            text_parts.append(block.text)
+        elif btype == "thinking":
+            thinking_parts.append(getattr(block, "thinking", ""))
+        else:
+            t = getattr(block, "text", None)
+            if t:
+                text_parts.append(t)
+
+    text = "".join(text_parts).strip()
+    if not text and thinking_parts:
+        text = "\n\n".join(thinking_parts).strip()
+
+    try:
+        raw = json.dumps(msg.model_dump(), ensure_ascii=False, default=str)
+    except Exception:
+        raw = f"<unserializable: {type(msg).__name__}>"
+
+    return text, prompt_text, raw
+
+
+def chat(
+    messages: list[dict],
+    context: str,
+) -> Tuple[str, str, str]:
+    """多轮对话，注入任务上下文。
+
+    messages: [{"role": "user"|"assistant", "content": str}, ...]
+    context: 任务概况字符串，注入 system prompt
+
+    system prompt 来源：DB 设置 > 默认值（DEFAULT_CHAT_SYSTEM）。
+    """
+    client, cfg = _get_client()
+    system = cfg.chat_system_prompt.format(context=context)
+    return _call_chat(system, messages, cfg, client)
+
+
 # ============================================================
 # 公开 API
 # ============================================================

@@ -27,6 +27,7 @@ class LLMConfig:
     base_url: str
     model: str
     max_tokens: int = 1000
+    chat_system_prompt: str = ""
 
     def safe_repr(self) -> str:
         """脱敏 repr：api_key 打码，其它保留。可用于日志/调试。"""
@@ -145,9 +146,14 @@ def get_llm_config() -> Optional[LLMConfig]:
         )
     max_tokens = int(_cfg_get(llm_yaml, "max_tokens", default=_DEFAULT_MAX_TOKENS))
 
+    # 对话提示词：DB > 默认（暂不从 YAML/env 读）
+    from trail_app.prompts import DEFAULT_CHAT_SYSTEM
+    chat_system_prompt = db_settings.get("chat_system_prompt", "").strip() or DEFAULT_CHAT_SYSTEM
+
     return LLMConfig(
         api_key=api_key,
         base_url=base_url,
         model=model,
         max_tokens=max_tokens,
+        chat_system_prompt=chat_system_prompt,
     )
