@@ -365,7 +365,16 @@ class WorkLogStore:
         task_id: int,
         phase: Optional[str] = None,
         include_deleted: bool = False,
+        since_days: Optional[int] = None,
+        limit: Optional[int] = None,
     ) -> list[dict]:
+        """取任务的工作日志。
+
+        新增参数（tool use 引入）：
+        - since_days: 只取最近 N 天的（基于 log_date 字符串字典序比较，
+          'YYYY-MM-DD' 格式下字符串序与日期序一致）
+        - limit: 最多返多少条；为 None 时不限
+        """
         con, gen = self._connect()
         try:
             where = ["task_id = ?"]
@@ -375,7 +384,15 @@ class WorkLogStore:
                 params.append(phase)
             if not include_deleted:
                 where.append("is_deleted = FALSE")
+            if since_days is not None:
+                from datetime import date, timedelta
+                cutoff = (date.today() - timedelta(days=since_days)).isoformat()
+                where.append("log_date >= ?")
+                params.append(cutoff)
             sql = f"SELECT * FROM work_logs WHERE {' AND '.join(where)} ORDER BY log_date, ordinal"
+            if limit is not None:
+                sql += " LIMIT ?"
+                params.append(limit)
             rows = con.execute(sql, params).fetchall()
             cols = [d[0] for d in con.description]
             return [_row_to_dict_with_dates(zip(cols, r)) for r in rows]
@@ -702,7 +719,7 @@ class AiRecordStore:
         user_confirmed: bool = False,
     ) -> int:
         """写入一条审计记录，返回新 id。"""
-        if op not in {"polish", "summarize", "ask_maintenance", "chat"}:
+        if op not in {"polish", "summarize", "ask_maintenance", "chat", "chat_tool_use"}:
             raise StoreError(f"非法 op：{op}")
         con, gen = self._connect()
         try:
