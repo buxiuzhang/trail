@@ -1,7 +1,7 @@
 """数据模型：枚举 + dataclass。
 
-状态机见 docs/REQUIREMENTS.md §5：
-    未开始 / 进行中 / 已作废 / 已完成 / 维护中
+状态机：
+    未开始 / 进行中 / 已作废 / 已完成
 """
 from __future__ import annotations
 
@@ -21,7 +21,6 @@ class TaskStatus(str, Enum):
     NOT_STARTED = "未开始"
     IN_PROGRESS = "进行中"
     COMPLETED = "已完成"
-    MAINTENANCE = "维护中"
     CANCELLED = "已作废"
 
     @classmethod
@@ -113,16 +112,9 @@ ALLOWED_TRANSITIONS: dict[str, set[str]] = {
     TaskStatus.NOT_STARTED.value: {TaskStatus.IN_PROGRESS.value, TaskStatus.CANCELLED.value},
     TaskStatus.IN_PROGRESS.value: {
         TaskStatus.COMPLETED.value,
-        TaskStatus.MAINTENANCE.value,
         TaskStatus.CANCELLED.value,
     },
     TaskStatus.COMPLETED.value: {
-        TaskStatus.MAINTENANCE.value,
-        TaskStatus.IN_PROGRESS.value,
-        TaskStatus.CANCELLED.value,  # 已完成的任务也能事后作废
-    },
-    TaskStatus.MAINTENANCE.value: {
-        TaskStatus.COMPLETED.value,
         TaskStatus.IN_PROGRESS.value,
         TaskStatus.CANCELLED.value,
     },

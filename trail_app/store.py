@@ -143,12 +143,11 @@ class TaskStore:
                 " ORDER BY"
                 "  pinned_at DESC NULLS LAST,"
                 "  CASE status"
-                "    WHEN '维护中' THEN 0"
-                "    WHEN '进行中' THEN 1"
-                "    WHEN '未开始' THEN 2"
-                "    WHEN '已完成' THEN 3"
-                "    WHEN '已作废' THEN 4"
-                "    ELSE 5"
+                "    WHEN '进行中' THEN 0"
+                "    WHEN '未开始' THEN 1"
+                "    WHEN '已完成' THEN 2"
+                "    WHEN '已作废' THEN 3"
+                "    ELSE 4"
                 "  END,"
                 "  start_date DESC NULLS LAST,"
                 "  title"
@@ -268,13 +267,14 @@ class TaskStore:
         task_id: int,
         new_status: str,
         end_date: Optional[str] = None,
+        maintenance: bool = False,
     ) -> dict:
-        """改状态。校验合法转移。end_date 在进入已完成/维护中时建议传。"""
+        """改状态。校验合法转移。new_status==已完成时可传 maintenance=True 设性质=维护。"""
         if new_status not in TaskStatus.all():
             raise StoreError(f"非法状态：{new_status}")
         task = self.get_task(task_id)
         old = task["status"]
-        if old == new_status:
+        if old == new_status and not maintenance:
             return task
         if not is_valid_transition(old, new_status):
             raise InvalidTransition(f"非法转移：{old} → {new_status}")
@@ -282,12 +282,10 @@ class TaskStore:
         con, gen = self._connect()
         try:
             updates: dict = {"status": new_status}
-            if new_status in (TaskStatus.COMPLETED.value, TaskStatus.MAINTENANCE.value):
-                # 主体完成 / 进入维护：end_date 写"完成时间"
+            if new_status == TaskStatus.COMPLETED.value:
                 updates["end_date"] = end_date or date.today().isoformat()
-            if new_status == TaskStatus.MAINTENANCE.value:
-                # 进入维护中 → 性质自动转为"维护"
-                updates["nature"] = TaskNature.MAINTENANCE.value
+                if maintenance:
+                    updates["nature"] = TaskNature.MAINTENANCE.value
             if new_status == TaskStatus.CANCELLED.value:
                 # 作废：清空 end_date
                 updates["end_date"] = None
@@ -444,14 +442,17 @@ class WorkLogStore:
 
         con, gen = self._connect()
         try:
-            # 校验任务存在 + 已完成/已作废不可再写日志
+            # 校验任务存在 + 封版不可再写日志（已完成+维护可继续写维护日志）
             row = con.execute(
-                "SELECT status FROM tasks WHERE id = ?", [task_id]
+                "SELECT status, nature FROM tasks WHERE id = ?", [task_id]
             ).fetchone()
             if not row:
                 raise NotFound(f"任务不存在：{task_id}")
-            if row[0] in (TaskStatus.COMPLETED.value, TaskStatus.CANCELLED.value):
-                raise StoreError("已完成/已作废的任务不能添加日志")
+            task_status, task_nature = row
+            if task_status == TaskStatus.CANCELLED.value:
+                raise StoreError("已作废的任务不能添加日志")
+            if task_status == TaskStatus.COMPLETED.value and task_nature != TaskNature.MAINTENANCE.value:
+                raise StoreError("已完成的任务不能添加日志（维护期除外）")
             # 同 phase 同日期内 ordinal 自增
             row = con.execute(
                 """

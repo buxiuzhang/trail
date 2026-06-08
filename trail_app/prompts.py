@@ -90,7 +90,7 @@ ASK_MAINTENANCE_USER = (
 TOOLS_DESC = (
     "你可以使用以下工具查询本地任务与日志数据库（不要把数据库字段名硬编码进回答，按工具返的自然语言写）：\n\n"
     "1. list_tasks(status?, nature?, search?)\n"
-    "   查询任务列表。可按状态（未开始/进行中/维护中/已完成/已作废）、"
+    "   查询任务列表。可按状态（未开始/进行中/已完成/已作废）、"
     "性质（业务/技术/会议/其他）、标题模糊匹配过滤。上限 20 条。\n\n"
     "2. list_recent_logs(task_id, since_days?, limit?, phase?)\n"
     "   查某任务的近期工作日志。since_days 默认 30，limit 默认 5 最大 20，"

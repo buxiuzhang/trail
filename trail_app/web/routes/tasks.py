@@ -156,12 +156,10 @@ def change_status(
             task_id,
             payload.new_status,
             end_date=payload.end_date.isoformat() if payload.end_date else None,
+            maintenance=payload.maintenance,
         )
         # 同步写入 summary（如果传了）
-        if payload.summary is not None and payload.new_status in (
-            TaskStatus.COMPLETED.value,
-            TaskStatus.MAINTENANCE.value,
-        ):
+        if payload.summary is not None and payload.new_status == TaskStatus.COMPLETED.value:
             updated = store.update_task(task_id, summary=payload.summary)
         return _to_out(updated, contacts.list_contacts(task_id))
     except NotFound as e:

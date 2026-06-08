@@ -196,7 +196,7 @@ _VIEW_DDL: list[str] = [
         (SELECT MAX(log_date) FROM work_logs w WHERE w.task_id = t.id AND w.is_deleted = FALSE) AS last_log_date,
         CAST(CURRENT_DATE - (SELECT MAX(log_date) FROM work_logs w WHERE w.task_id = t.id AND w.is_deleted = FALSE) AS BIGINT) AS days_idle
     FROM tasks t
-    WHERE t.status IN ('进行中', '维护中')
+    WHERE t.status = '进行中'
     """,
 ]
 

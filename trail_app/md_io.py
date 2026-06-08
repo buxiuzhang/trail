@@ -493,9 +493,8 @@ def import_to_db(
 # ============================================================
 
 
-# 状态排序：维护中 → 进行中 → 未开始 → 已完成 → 已作废
+# 状态排序：进行中 → 未开始 → 已完成 → 已作废
 _STATUS_ORDER = [
-    TaskStatus.MAINTENANCE.value,
     TaskStatus.IN_PROGRESS.value,
     TaskStatus.NOT_STARTED.value,
     TaskStatus.COMPLETED.value,
@@ -574,7 +573,6 @@ def export_to_md(
 ) -> int:
     """把 DB 导出为 md 格式。返回写入的任务数。"""
     open_statuses = {
-        TaskStatus.MAINTENANCE.value,
         TaskStatus.IN_PROGRESS.value,
         TaskStatus.NOT_STARTED.value,
     }
@@ -587,12 +585,11 @@ def export_to_md(
         FROM tasks
         ORDER BY
           CASE status
-            WHEN '维护中' THEN 0
-            WHEN '进行中' THEN 1
-            WHEN '未开始' THEN 2
-            WHEN '已完成' THEN 3
-            WHEN '已作废' THEN 4
-            ELSE 5
+            WHEN '进行中' THEN 0
+            WHEN '未开始' THEN 1
+            WHEN '已完成' THEN 2
+            WHEN '已作废' THEN 3
+            ELSE 4
           END,
           start_date DESC NULLS LAST,
           title
@@ -633,7 +630,7 @@ def export_to_md(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with open(output_path, "w", encoding="utf-8") as f:
         f.write("# 个人工作情况说明\n\n")
-        f.write("任务完成状态：未开始、进行中、已作废、已完成、维护中\n\n")
+        f.write("任务完成状态：未开始、进行中、已作废、已完成\n\n")
         f.write("任务性质：长期、临时、维护\n\n")
         f.write("```\n")
         f.write("任务性质说明：\n")

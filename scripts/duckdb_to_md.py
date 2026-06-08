@@ -24,7 +24,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="把 DuckDB 数据导出为 md")
     parser.add_argument("--db", type=Path, default=None, help="duckdb 路径（默认：data/tasks.duckdb）")
     parser.add_argument("-o", "--output", type=Path, default=None, help="输出 md 路径（默认：data/export/任务需求-YYYY-MM-DD.md）")
-    parser.add_argument("--only-open", action="store_true", help="仅导进行中/未开始/维护中")
+    parser.add_argument("--only-open", action="store_true", help="仅导进行中/未开始")
     args = parser.parse_args()
 
     db_path = args.db or get_db_path()

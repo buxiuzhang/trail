@@ -76,6 +76,7 @@ class StatusChange(BaseModel):
     new_status: str = Field(..., description="目标状态")
     end_date: Optional[date] = None
     summary: Optional[str] = None  # 可选：完成时一并写入
+    maintenance: bool = False  # True=含维护期（仅 new_status=已完成 时有效，设 nature=维护）
 
 
 class TaskOut(BaseModel):

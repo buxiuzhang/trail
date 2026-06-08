@@ -268,7 +268,7 @@ TOOLS: list[dict] = [
             "properties": {
                 "status": {
                     "type": "string",
-                    "enum": ["未开始", "进行中", "维护中", "已完成", "已作废"],
+                    "enum": ["未开始", "进行中", "已完成", "已作废"],
                     "description": "按状态过滤",
                 },
                 "nature": {

@@ -261,15 +261,32 @@ def test_status_transition_invalid(client):
     assert "非法" in r.json()["detail"]
 
 
-def test_status_transition_to_maintenance(client):
+def test_status_transition_to_completed_with_maintenance(client):
+    """进行中 → 已完成（含维护期）→ status=已完成, nature=维护, end_date 自动写入。"""
     tid = client.post("/api/tasks", json={"title": "T"}).json()["id"]
     # 默认"未开始"，先转"进行中"
     client.post(f"/api/tasks/{tid}/status", json={"new_status": "进行中"})
-    r = client.post(f"/api/tasks/{tid}/status", json={"new_status": "维护中"})
+    r = client.post(f"/api/tasks/{tid}/status", json={"new_status": "已完成", "maintenance": True})
     assert r.status_code == 200
     t = r.json()
-    assert t["status"] == "维护中"
+    assert t["status"] == "已完成"
+    assert t["nature"] == "维护"
     assert t["end_date"] is not None  # end_date 是主体完成时间
+    # 已完成+维护仍可添加日志
+    r2 = client.post(f"/api/tasks/{tid}/logs", json={
+        "log_date": "2026-06-06",
+        "content": "维护日志",
+        "phase": "maintenance",
+    })
+    assert r2.status_code == 201
+
+
+def test_transition_to_maintenance_is_invalid(client):
+    """'维护中'不再是合法状态，后端应拒。"""
+    tid = client.post("/api/tasks", json={"title": "T"}).json()["id"]
+    client.post(f"/api/tasks/{tid}/status", json={"new_status": "进行中"})
+    r = client.post(f"/api/tasks/{tid}/status", json={"new_status": "维护中"})
+    assert r.status_code == 400
 
 
 def test_status_to_cancelled_clears_end_date(client):
