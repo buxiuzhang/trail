@@ -10,3 +10,4 @@ data/*.bak*
 .playwright-mcp/
 *.png
 data/.secret_key
+聊天.svg
