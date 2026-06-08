@@ -114,11 +114,20 @@ if FRONTEND_DIR and FRONTEND_DIR.exists():
     if assets_dir.exists():
         app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
 
-    # SPA 入口：非 /api/* 路径返回 index.html
+    # SPA 入口：非 /api/* 路径先查文件，不存在才回退 index.html
     @app.get("/{full_path:path}", include_in_schema=False)
     async def spa_fallback(full_path: str):
-        """前端 SPA 回退：所有非 API 路径返回 index.html 让 React Router 处理。"""
-        index_path = FRONTEND_DIR / "index.html"
+        """SPA 回退：静态文件直接返，其它返回 index.html 让 React Router 处理。"""
+
+        # 先检查 dist/ 下是否有同名文件（favicon.svg / chat.svg 等根级素材）
+        root_dir = Path(FRONTEND_DIR)
+        file_path = root_dir / full_path
+        if file_path.is_file():
+            import mimetypes
+            mt, _ = mimetypes.guess_type(str(file_path))
+            return FileResponse(file_path, media_type=mt or "application/octet-stream")
+
+        index_path = root_dir / "index.html"
         if not index_path.exists():
             return JSONResponse({"detail": "前端未构建，请先运行 npm run build"}, status_code=503)
         return FileResponse(index_path, media_type="text/html")
