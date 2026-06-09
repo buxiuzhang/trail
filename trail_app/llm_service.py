@@ -284,6 +284,28 @@ TOOLS: list[dict] = [
         },
     },
     {
+        "name": "list_logs_by_date",
+        "description": (
+            "查某天（YYYY-MM-DD）的所有工作日志，按 task 分组（带任务标题/状态/性质）。"
+            "适合'今日/今天/昨天工作内容'类问题。"
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "log_date": {
+                    "type": "string",
+                    "description": "YYYY-MM-DD，如 2026-06-09",
+                },
+                "phase": {
+                    "type": "string",
+                    "enum": ["main", "maintenance"],
+                    "description": "可选：按阶段过滤",
+                },
+            },
+            "required": ["log_date"],
+        },
+    },
+    {
         "name": "list_recent_logs",
         "description": (
             "查某任务的近期工作日志。content 字段截断 800 字。"
@@ -414,6 +436,43 @@ def _execute_tool(
             search=input_data.get("search"),
         )
         return json.dumps(tasks[:20], ensure_ascii=False, default=str)
+
+    if name == "list_logs_by_date":
+        log_date = input_data["log_date"]
+        phase = input_data.get("phase")
+        params = [log_date]
+        sql = (
+            "SELECT w.log_date, w.phase, w.ordinal, w.content, "
+            "       t.id AS task_id, t.title, t.status, t.nature "
+            "FROM work_logs w JOIN tasks t ON t.id = w.task_id "
+            "WHERE w.log_date = ? AND w.is_deleted = FALSE"
+        )
+        if phase:
+            sql += " AND w.phase = ?"
+            params.append(phase)
+        sql += " ORDER BY w.task_id, w.ordinal"
+        from trail_app.db import get_connection
+        with get_connection() as con:
+            rows = con.execute(sql, params).fetchall()
+        # 按 task 分组
+        grouped: dict[int, dict] = {}
+        for r in rows:
+            log_date_v, phase_v, ordinal, content, task_id, title, status, nature = r
+            if task_id not in grouped:
+                grouped[task_id] = {
+                    "task_id": task_id,
+                    "title": title,
+                    "status": status,
+                    "nature": nature,
+                    "logs": [],
+                }
+            grouped[task_id]["logs"].append({
+                "log_date": log_date_v,
+                "phase": phase_v,
+                "ordinal": ordinal,
+                "content": content,
+            })
+        return json.dumps(list(grouped.values()), ensure_ascii=False, default=str)
 
     if name == "list_recent_logs":
         task_id = int(input_data["task_id"])
