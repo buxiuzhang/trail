@@ -46,14 +46,10 @@ def add_log(
                 phase=payload.phase,
             )
         )
-        # 首次日志：未开始 → 进行中；同步把 processing_date 推到此条日志日期
+        # 首次日志：未开始 → 进行中
         task = task_s.get_task(task_id)
-        new_log_date = payload.log_date.isoformat()
         if task["status"] == TaskStatus.NOT_STARTED.value:
             task_s.change_status(task_id, TaskStatus.IN_PROGRESS.value)
-        # 若日志日期晚于当前 processing_date，向前推
-        if not task["processing_date"] or new_log_date > task["processing_date"]:
-            task_s.update_task(task_id, processing_date=new_log_date)
         return result
     except NotFound as e:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))

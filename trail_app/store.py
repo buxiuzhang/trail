@@ -128,7 +128,17 @@ class TaskStore:
                  TaskStatus.COMPLETED.value, TaskStatus.CANCELLED.value],
             )
 
-            sql = "SELECT * FROM tasks WHERE 1=1"
+            # 派生 last_log_date（取未软删日志的 max(log_date)），前端用此代替 processing_date
+            sql = """
+                SELECT t.*, sub.last_log_date
+                FROM tasks t
+                LEFT JOIN (
+                    SELECT task_id, MAX(log_date) AS last_log_date
+                    FROM work_logs WHERE is_deleted = FALSE
+                    GROUP BY task_id
+                ) sub ON sub.task_id = t.id
+                WHERE 1=1
+            """
             params: list = []
             if status:
                 sql += " AND status = ?"
@@ -161,7 +171,19 @@ class TaskStore:
     def get_task(self, task_id: int) -> dict:
         con, gen = self._connect()
         try:
-            row = con.execute("SELECT * FROM tasks WHERE id = ?", [task_id]).fetchone()
+            row = con.execute(
+                """
+                SELECT t.*, sub.last_log_date
+                FROM tasks t
+                LEFT JOIN (
+                    SELECT task_id, MAX(log_date) AS last_log_date
+                    FROM work_logs WHERE is_deleted = FALSE
+                    GROUP BY task_id
+                ) sub ON sub.task_id = t.id
+                WHERE t.id = ?
+                """,
+                [task_id],
+            ).fetchone()
             if not row:
                 raise NotFound(f"任务不存在：{task_id}")
             cols = [d[0] for d in con.description]

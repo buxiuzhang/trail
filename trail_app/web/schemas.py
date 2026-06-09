@@ -97,6 +97,7 @@ class TaskOut(BaseModel):
     pinned_at: Optional[str] = None
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
+    last_log_date: Optional[str] = None  # 派生：未软删日志的 max(log_date)
     contacts: list[ContactOut] = Field(default_factory=list)
 
 
