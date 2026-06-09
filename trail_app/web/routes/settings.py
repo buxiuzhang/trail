@@ -1,12 +1,18 @@
-"""LLM 设置 API：读取/保存加密配置。"""
+"""LLM 设置 + 卷首语 API：读取/保存配置。"""
 from __future__ import annotations
+
+import duckdb
 
 from fastapi import APIRouter, HTTPException
 
 from trail_app.prompts import DEFAULT_CHAT_SYSTEM, TOOLS_DESC
 from trail_app.store import LLMSettingsStore
+from trail_app.utils import get_db_path
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
+
+# 卷首语默认值（用户在 SettingsPage 可改）
+DEFAULT_MOTTO = "凡录入者，皆为正典。\n凡未录者，皆为虚构。"
 
 
 @router.get("/llm")
@@ -58,3 +64,48 @@ def save_llm_settings(data: dict):
         return {"ok": True}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"保存配置失败：{e}")
+
+
+# ============================================================
+# 卷首语（明文存 llm_settings 表，key='motto'）
+# ============================================================
+
+
+def _motto_connect():
+    return duckdb.connect(str(get_db_path()))
+
+
+@router.get("/motto")
+def get_motto():
+    """获取卷首语（侧栏底部那两行）。无值则返默认。"""
+    try:
+        con = _motto_connect()
+        try:
+            row = con.execute(
+                "SELECT value FROM llm_settings WHERE key = 'motto'"
+            ).fetchone()
+        finally:
+            con.close()
+        return {"motto": row[0] if row else DEFAULT_MOTTO}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"读取卷首语失败：{e}")
+
+
+@router.put("/motto")
+def save_motto(data: dict):
+    """保存卷首语。空值 = 恢复默认。"""
+    raw = (data.get("motto") or "").strip()
+    con = _motto_connect()
+    try:
+        if not raw:
+            con.execute("DELETE FROM llm_settings WHERE key = 'motto'")
+            return {"ok": True, "motto": DEFAULT_MOTTO}
+        con.execute(
+            "INSERT OR REPLACE INTO llm_settings (key, value) VALUES ('motto', ?)",
+            [raw],
+        )
+        return {"ok": True, "motto": raw}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"保存卷首语失败：{e}")
+    finally:
+        con.close()
