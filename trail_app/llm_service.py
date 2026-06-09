@@ -401,17 +401,32 @@ class _BlockBuilder:
 
 
 def _render_chat_system(user_prompt: str) -> str:
-    """用户自定义 chat system prompt 拼上 {tools_desc} 描述。
+    """用户自定义 chat system prompt 拼上 {tools_desc} 描述 + 注入当前日期。
 
     双轨：
     - 用户 prompt 含 {tools_desc} 占位符 → 替换
     - 不含 → 末尾追加（兜底，避免用户漏写导致 LLM 不知道有工具可用）
+
+    顶部拼"当前时间"块：让 LLM 在用户问"今天/今日/昨天"时直接用 {today}，
+    避免 LLM 自己猜错日期。
     """
+    from datetime import date, timedelta
     from trail_app.prompts import TOOLS_DESC
 
+    today = date.today()
+    yesterday = today - timedelta(days=1)
+    weekday_cn = ["一", "二", "三", "四", "五", "六", "日"][today.weekday()]
+    now_block = (
+        f"当前时间信息（请直接用以下日期，不要自己猜测）：\n"
+        f"- 今天：{today.isoformat()}（星期{weekday_cn}）\n"
+        f"- 昨天：{yesterday.isoformat()}\n\n"
+    )
+
     if "{tools_desc}" in user_prompt:
-        return user_prompt.format(tools_desc=TOOLS_DESC)
-    return user_prompt.rstrip() + "\n\n" + TOOLS_DESC
+        rendered = user_prompt.format(tools_desc=TOOLS_DESC)
+    else:
+        rendered = user_prompt.rstrip() + "\n\n" + TOOLS_DESC
+    return now_block + rendered
 
 
 def _execute_tool(
