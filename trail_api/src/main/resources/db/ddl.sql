@@ -93,6 +93,7 @@ CREATE TABLE IF NOT EXISTS attachments (
     byte_size     INTEGER NOT NULL,
     sha256        TEXT    NOT NULL,                                       -- 去重键
     original_name TEXT,                                                   -- 用户原始文件名（可空）
+    display_size  INTEGER NOT NULL DEFAULT 100,                           -- 展示宽度百分比 1-100（编辑时改这个调缩放）
     created_at    TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 

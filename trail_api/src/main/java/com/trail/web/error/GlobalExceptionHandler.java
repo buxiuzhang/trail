@@ -53,6 +53,11 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("detail", e.getMessage()));
     }
 
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<Map<String, Object>> illegalArgument(IllegalArgumentException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("detail", e.getMessage()));
+    }
+
     /** SQLite 锁错误（busy / locked）→ 503 */
     @ExceptionHandler(java.sql.SQLException.class)
     public ResponseEntity<Map<String, Object>> sql(java.sql.SQLException e) {

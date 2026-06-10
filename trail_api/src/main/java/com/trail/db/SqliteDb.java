@@ -190,6 +190,13 @@ public class SqliteDb {
                     s.execute(t);
                 }
             }
+            // M10+: 已有 attachments 表补 display_size 列(IF NOT EXISTS 不支持 ALTER,这里容错)
+            if (tableExists("attachments") && !columnExists("attachments", "display_size")) {
+                try (Statement s = c.createStatement()) {
+                    s.execute("ALTER TABLE attachments ADD COLUMN display_size INTEGER NOT NULL DEFAULT 100");
+                    log.info("M10 迁移: attachments.display_size 列已添加");
+                }
+            }
             log.info("ensureSchema 完成");
         } catch (Exception e) {
             throw new RuntimeException("ensureSchema 失败: " + e.getMessage(), e);
