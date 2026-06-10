@@ -4,92 +4,75 @@
 
 ## 项目
 
-Trail v2 —— **任务填报 + 大模型辅助的 Web 工具**。
+Trail v2 —— **任务填报 + 大模型辅助的 Web 工具**。双后端架构。
 
-形态：Web（FastAPI + 原生 HTML/JS）。数据存 DuckDB 单文件。
+不做：GUI 悬浮窗 / 桌面机器人 / 主动推送通知（旧版已放弃）。
+大模型只做**操作流内**辅助（润色日志 / 总结 / 询问维护阶段），不主动推送。
 
-## 方向
+详细方向 `docs/REQUIREMENTS.md`、表结构 `docs/SCHEMA.md`、聊天 tool use 协议 `docs/CHAT_TOOLS.md`。
 
-- **不要**做 GUI 悬浮窗 / 桌面机器人 / 主动推送通知（旧版已放弃）。
-- 用户**主动**填任务基本信息 + 每天工作日志。
-- 大模型**在操作流内**做辅助：润色日志、生成总结、询问是否进入维护阶段。
-- "维护阶段"是任务完成后偶有零星调整的状态，由用户**当场**选，不主动推送。
+## 技术栈
 
-完整方向见 `docs/REQUIREMENTS.md`，表结构见 `docs/SCHEMA.md`。
+- **后端（当前）**：`trail_api/`——Java 17 + Spring Boot 3.2 + SQLite（JDBC）。数据目录 `~/.trail/data/`（`db/tasks.sqlite` + `attachments/`）。18 个非 LLM 端点已实现。
+- **后端（遗留）**：`trail_app/`——Python 3.12 + FastAPI + DuckDB。LLM 端点在此实现但当前未使用（Java 后端接管端口 8765 后 Python 需先停避免 DuckDB 锁冲突）。
+- **前端**：`trail_web/`（Vite + React + TS，独立 npm 包 + 独立 git 仓库，主仓库以 gitlink 记录）。`prototype/` 是早期静态 demo，**已废弃**。前端专属指令见 `trail_web/CLAUDE.md`。
+- **DB**：Java 后端用 **SQLite**；Python 遗留用 **DuckDB**。同机不能同时起（DuckDB 单进程独占，SQLite WAL 也建议单进程）。建表 DDL 在 `trail_api/src/main/resources/db/ddl.sql`。
+- **配置**：`data/config.yaml`（git 忽略），含 `llm:` 和 `db:` 段。优先级 env > yaml > 内置默认。Java 端另有 `application.yml`。
 
-## 常用命令
+## 启动 / 常用命令
 
 ```bash
-# 安装
-pip install -r requirements.txt
-pip install -e .
+# === Java 后端（当前主路） ===
+cd trail_api
+mvn clean package -DskipTests   # 编译
+java -jar target/trail-api.jar  # 启动（端口 8765，数据 ~/.trail/data/）
+# 启动前先停 Python（避免 DuckDB 锁冲突）: lsof -i :8765
 
-# 数据：md ↔ DuckDB
-python scripts/md_to_duckdb.py                # md 灌库（按 id 幂等跳过）
-python scripts/md_to_duckdb.py --recreate     # 清空重建
-python scripts/duckdb_to_md.py                # 导出 md 到 data/export/
-python scripts/duckdb_to_md.py --only-open    # 仅导进行中/未开始/维护中
+# 前端（Vite dev，proxy /api → 8765）
+cd trail_web && pnpm dev       # http://localhost:5173
 
-# 启动 Web（M2 之后才有）
-python -m trail_app.web                      # 默认 http://127.0.0.1:8765
+# === Python 后端（遗留，LLM 参考） ===
+pip install -r requirements.txt && pip install -e .
+python -m trail_app.web        # 默认 http://127.0.0.1:8765
+# 前端默认加载 trail_web/dist/；用 Vite dev 另起：cd trail_web && pnpm dev
+
+# 数据：md ↔ DuckDB（Python 端工具，SQLite 不可用）
+python scripts/md_to_duckdb.py [--recreate]   # 灌库（按 id 幂等；--recreate 清空）
+python scripts/duckdb_to_md.py  [--only-open]  # 导出 md 到 data/export/
 
 # 测试
-pytest
-pytest tests/test_md_io.py
-```
-
-## 数据位置
-
-- 库：`data/tasks.duckdb`（首次运行自动创建，git 忽略）
-- 配置文件：`data/config.yaml`（git 忽略）
-- 导出 md：`data/export/任务需求-YYYY-MM-DD.md`
-
-## 代码布局
-
-```
-trail_app/
-├── __init__.py
-├── utils.py         # 数据目录路径
-├── models.py        # dataclass + 枚举（5 状态、ChannelKind/Platform）
-├── db.py            # DuckDB 连接 + schema + 旧版一次性迁移
-├── store.py         # TaskStore / WorkLogStore / ContactStore / AiRecordStore / InsightStore
-├── md_io.py         # md ↔ DB 转换（含任务对接多行解析）
-├── config.py        # YAML + 环境变量（LLM 配置：ANTHROPIC_*_URL / _API_KEY / _DEFAULT_*_MODEL）
-├── llm_service.py   # anthropic SDK 封装：polish / summarize_main / summarize_maintenance / ask_maintenance
-├── prompts.py       # 4 套 prompt 模板（polish / summarize_main / summarize_maintenance / ask_maintenance）
-├── web/             # FastAPI
-│   ├── main.py
-│   ├── schemas.py   # Pydantic：TaskCreate/Update/Out、ContactIn/Out
-│   ├── deps.py
-│   └── routes/      # tasks / logs / insights
-└── __main__.py      # python -m trail_app.web 入口
-
-scripts/
-├── md_to_duckdb.py
-└── duckdb_to_md.py
-
-tests/
-├── conftest.py
-├── test_md_io.py
-└── test_web_api.py
+pytest                                           # Python 端
+mvn test -Dtest="AttachmentControllerTest"       # Java 端单项
 ```
 
 ## 关键不变量
 
-- **任务 ID = DB 自增 BIGINT**（`nextval('tasks_id_seq')`），**永不变**——改名、编辑都不换 id。
-- **对接渠道 = 独立子表 `contact_channels`**（两维度：`kind` × `channel`）。任务不再有 `contact` 字段。
-- **任务别名 = `alias VARCHAR`**（可空，口头沟通用）。
-- **work_logs 可编辑、可软删**（content / log_date / phase 三字段允许 PUT；DELETE 走软删 `is_deleted=TRUE`，列表默认过滤）。`ai_records` 仍 append-only。
-- **ai_records append-only**（M3）：所有 LLM 调用的 prompt + response 落库；`user_confirmed` 字段记录用户是否采纳。
-- **LLM 永不直写库**——所有写入用户显式确认。LLM endpoint 只返回文本，前端弹窗让用户点确认后才调 PUT/POST 落 DB。
-- **API key 不入 DB / 不入 prompt / 不入 ai_records**——只从 env（`ANTHROPIC_API_KEY` / `ANTHROPIC_BASE_URL` / `ANTHROPIC_DEFAULT_HAIKU_MODEL`）或 `data/config.yaml` 读。
+- **任务 ID = DB 自增 BIGINT**，永不变（改名/编辑/迁移都不换 id）。
+- **状态 4 态**：`未开始 / 进行中 / 已完成 / 已作废`。`TaskStatus.all()` 列出，转移合法性在 `store.change_status` 校验。
+- **状态由行为驱动，不让用户手选**——前端无 status 切换按钮。
+- **性质 `nature` 3 类**（`长期/临时/维护`），**由系统按行为自动判断**，前端无 nature 字段。
+- **对接渠道 = 子表 `contact_channels`**（`kind × channel` 两维），任务表不再有 `contact` 字段。
+- **`work_logs` 可编辑、可软删**（`content / log_date / phase` PUT；DELETE 走 `is_deleted=TRUE`，列表默认过滤）。`ai_records` append-only。
+- **维护期 = `work_logs.phase='maintenance'`**（不是任务状态）。日志阶段 main / maintenance 二选一，与"已完成"独立。
+- **LLM 永不直写库**——所有写入用户显式确认；LLM endpoint 只返文本，前端弹窗确认后才调 PUT/POST 落 DB。
+- **API key 不入 DB / 不入 prompt / 不入 ai_records**。LLM 配置走 **Fernet 对称加密**存于 DuckDB（`trail_app/crypto.py`，密钥文件 `data/.secret_key` 首次自动生成），读写在 `LLMSettingsStore`（`store.py`）。
 - **DuckDB FK 不支持 CASCADE**：`TaskStore.delete_task` 手动按子表 → 主表顺序删。
-- **状态机**：`未开始 / 进行中 / 已作废 / 已完成 / 维护中`，后端校验合法转移。
-- **LLM 永不直写库**——所有写入用户显式确认。
-- **API key 不入 DB**——只在 config.yaml 或环境变量。
+- **DB 路径可配置 + 切需重启**：`data/config.yaml` 的 `db:` 段控制 backend + 路径；`backend=mysql` 时 `get_db_path()` 返 `None`，`web/main.py` lifespan 直接 `RuntimeError` 拒启动（MySQL 驱动未实现）。前端 `GET/PUT /api/settings/db`（`routes/database.py`）。
+- **前端构建产物**默认 `trail_web/dist/`（`web/main.py:34`）；用 `TRAIL_FRONTEND_DIR` 环境变量可指向任意位置。
 
-## 维护期约定（M3 时落实）
+## LLM
 
-- 状态从 `进行中` 走完成流程时，弹窗问"含维护 / 不再维护"。
-- 维护期日志 `phase = 'maintenance'`，主体日志 `phase = 'main'`。
-- 维护期总结写到 `tasks.maintenance_summary`（v1 追加式）。
+⚠ **当前状态**：Java 后端 LLM 端点尚未实现（阶段 2/3 待实施），前端已通过 `LLM_AVAILABLE = false` 禁用：
+- 润色按钮（TaskForm / LogCompose）→ disabled + tooltip "LLM 暂未接入新后端"
+- 聊天入口（ChatBubble / ChatWindow）→ 已注释
+- SettingsPage 的 LLM 配置仍可使用（走 Java `LlmSettingsController`）
+
+Python 端 LLM 实现参考（等 Java 补完后移除）：
+- 4 个同步函数（`llm_service.py`）：`polish` / `summarize_main` / `summarize_maintenance` / `ask_maintenance`。Prompt 模板在 `prompts.py`。
+- **聊天走 Anthropic 协议原生 tool use 多轮循环**（`chat_stream_with_tools` / `_call_chat_tools`）；工具定义与协议见 `docs/CHAT_TOOLS.md`。SSE 端点 `POST /api/llm/chat/stream`。
+- 工具调用审计落 `ai_records`，`op='chat_tool_use'`。
+- `op` 白名单在 `store.py` 维护，扩 op 要同步改白名单。
+
+## 测试
+
+`tests/conftest.py` 提供 `client`（FastAPI TestClient）/ 临时 DuckDB / 临时 data 目录 fixtures。新增路由测试直接 `def test_xxx(client): ...`。
