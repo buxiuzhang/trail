@@ -1,0 +1,34 @@
+server:
+  port: 8765
+  error:
+    include-message: always
+
+spring:
+  application:
+    name: trail-api
+  datasource:
+    # SqliteDb 自行建 DataSource；此处占位防 Spring 自动配置报错
+    # 真实 url 由 DataDirService 运行时拼成 jdbc:sqlite:<dataDir>/tasks.sqlite
+    url: "jdbc:sqlite:"
+    driver-class-name: org.sqlite.JDBC
+    hikari:
+      maximum-pool-size: 1
+      minimum-idle: 1
+      pool-name: trail-sqlite
+  servlet:
+    multipart:
+      enabled: true
+      # M10：描述位截图粘贴。10MB 单图上限；前端不需切片
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+trail:
+  # M8：数据目录由 DataDirService 运行时决定（env > user config > 未配置模式）
+  # 这里保留占位，ApplicationRunner 阶段 DataDirService 会用
+  data-dir: ${TRAIL_DATA_DIR:}
+
+logging:
+  level:
+    root: INFO
+    com.trail: DEBUG
+    org.springframework.web: INFO
