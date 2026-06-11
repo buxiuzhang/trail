@@ -33,7 +33,8 @@ public class LlmController {
     /** 落档前润色 */
     @PostMapping("/llm/polish")
     public LlmPolishResponse polish(@RequestBody LlmPolishRequest req) {
-        String polished = llmService.polish(req.content(), req.task_id());
+        String type = req.type() != null ? req.type() : "log";
+        String polished = llmService.polish(req.content(), req.task_id(), type);
         return new LlmPolishResponse(polished, false);
     }
 

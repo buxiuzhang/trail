@@ -31,6 +31,7 @@ public class LlmSettingsController {
                 // Prompt 模板
                 all.getOrDefault("chat_system_prompt", Prompts.DEFAULT_CHAT_SYSTEM),
                 all.getOrDefault("polish_system_prompt", Prompts.POLISH_SYSTEM),
+                all.getOrDefault("polish_todo_system_prompt", Prompts.POLISH_TODO_SYSTEM),
                 all.getOrDefault("summarize_system_prompt", Prompts.SUMMARIZE_MAIN_SYSTEM),
                 all.getOrDefault("summarize_maintenance_prompt", Prompts.SUMMARIZE_MAINTENANCE_SYSTEM),
                 all.getOrDefault("ask_maintenance_prompt", Prompts.ASK_MAINTENANCE_SYSTEM),
@@ -55,6 +56,11 @@ public class LlmSettingsController {
             String p = data.get("polish_system_prompt");
             if (p == null || p.isBlank()) store.delete("polish_system_prompt");
             else store.save("polish_system_prompt", p);
+        }
+        if (data.containsKey("polish_todo_system_prompt")) {
+            String p = data.get("polish_todo_system_prompt");
+            if (p == null || p.isBlank()) store.delete("polish_todo_system_prompt");
+            else store.save("polish_todo_system_prompt", p);
         }
         if (data.containsKey("summarize_system_prompt")) {
             String p = data.get("summarize_system_prompt");

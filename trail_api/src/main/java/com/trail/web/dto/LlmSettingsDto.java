@@ -6,9 +6,10 @@ public record LlmSettingsDto(
         String baseUrl,
         String model,
         String maxTokens,
-        // Prompt 模板（移到独立配置）
+        // Prompt 模板
         String chatSystemPrompt,
         String polishSystemPrompt,
+        String polishTodoSystemPrompt,
         String summarizeSystemPrompt,
         String summarizeMaintenancePrompt,
         String askMaintenancePrompt,

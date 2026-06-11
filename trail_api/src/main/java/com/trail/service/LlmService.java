@@ -50,6 +50,7 @@ public class LlmService {
 
     // Prompt 缓存（启动时加载）
     private volatile String cachedPolishPrompt;
+    private volatile String cachedPolishTodoPrompt;
     private volatile String cachedSummarizePrompt;
     private volatile String cachedSummarizeMaintenancePrompt;
     private volatile String cachedAskMaintenancePrompt;
@@ -72,6 +73,7 @@ public class LlmService {
     private void loadPrompts() {
         Map<String, String> settings = settingsStore.getAll();
         cachedPolishPrompt = getOrDefault(settings, "polish_system_prompt", Prompts.POLISH_SYSTEM);
+        cachedPolishTodoPrompt = getOrDefault(settings, "polish_todo_system_prompt", Prompts.POLISH_TODO_SYSTEM);
         cachedSummarizePrompt = getOrDefault(settings, "summarize_system_prompt", Prompts.SUMMARIZE_MAIN_SYSTEM);
         cachedSummarizeMaintenancePrompt = getOrDefault(settings, "summarize_maintenance_prompt", Prompts.SUMMARIZE_MAINTENANCE_SYSTEM);
         cachedAskMaintenancePrompt = getOrDefault(settings, "ask_maintenance_prompt", Prompts.ASK_MAINTENANCE_SYSTEM);
@@ -114,9 +116,10 @@ public class LlmService {
     // 润色
     // ============================================================
 
-    public String polish(String content, Long taskId) {
+    /** 润色文本，支持日志和待办两种类型 */
+    public String polish(String content, Long taskId, String type) {
         LlmConfig cfg = getConfig();
-        String system = cachedPolishPrompt;
+        String system = "todo".equals(type) ? cachedPolishTodoPrompt : cachedPolishPrompt;
         String user = Prompts.POLISH_USER.replace("{content}", content);
 
         AnthropicResponse resp = callAnthropic(cfg, system, List.of(userMessage(user)));
@@ -124,6 +127,11 @@ public class LlmService {
         aiRecordStore.addRecord(taskId, null, "polish", promptText, resp.raw(), false);
 
         return resp.text();
+    }
+
+    /** 兼容旧接口：日志润色 */
+    public String polish(String content, Long taskId) {
+        return polish(content, taskId, "log");
     }
 
     // ============================================================
