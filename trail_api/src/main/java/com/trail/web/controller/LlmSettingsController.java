@@ -1,6 +1,7 @@
 package com.trail.web.controller;
 
 import com.trail.llm.Prompts;
+import com.trail.service.LlmService;
 import com.trail.store.LLMSettingsStore;
 import com.trail.web.dto.LlmSettingsDto;
 import org.springframework.web.bind.annotation.*;
@@ -12,9 +13,11 @@ import java.util.Map;
 public class LlmSettingsController {
 
     private final LLMSettingsStore store;
+    private final LlmService llmService;
 
-    public LlmSettingsController(LLMSettingsStore store) {
+    public LlmSettingsController(LLMSettingsStore store, LlmService llmService) {
         this.store = store;
+        this.llmService = llmService;
     }
 
     @GetMapping
@@ -27,10 +30,10 @@ public class LlmSettingsController {
                 all.getOrDefault("max_tokens", "1000"),
                 // Prompt 模板
                 all.getOrDefault("chat_system_prompt", Prompts.DEFAULT_CHAT_SYSTEM),
-                all.getOrDefault("polish_system_prompt", ""),
-                all.getOrDefault("summarize_system_prompt", ""),
-                all.getOrDefault("summarize_maintenance_prompt", ""),
-                all.getOrDefault("ask_maintenance_prompt", ""),
+                all.getOrDefault("polish_system_prompt", Prompts.POLISH_SYSTEM),
+                all.getOrDefault("summarize_system_prompt", Prompts.SUMMARIZE_MAIN_SYSTEM),
+                all.getOrDefault("summarize_maintenance_prompt", Prompts.SUMMARIZE_MAINTENANCE_SYSTEM),
+                all.getOrDefault("ask_maintenance_prompt", Prompts.ASK_MAINTENANCE_SYSTEM),
                 all.getOrDefault("tools_desc", "")
         );
     }
@@ -68,6 +71,8 @@ public class LlmSettingsController {
             if (p == null || p.isBlank()) store.delete("ask_maintenance_prompt");
             else store.save("ask_maintenance_prompt", p);
         }
+        // 刷新 LlmService 的 prompt 缓存
+        llmService.refreshPrompts();
         return Map.of("ok", true);
     }
 }

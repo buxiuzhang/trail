@@ -31,6 +31,7 @@ import java.util.concurrent.Executors;
 /**
  * LLM 服务层
  * 封装 Anthropic API 调用逻辑
+ * Prompt 模板在启动时从数据库加载到内存
  */
 @Service
 public class LlmService {
@@ -47,6 +48,13 @@ public class LlmService {
     private final ObjectMapper mapper;
     private final ExecutorService executor;
 
+    // Prompt 缓存（启动时加载）
+    private volatile String cachedPolishPrompt;
+    private volatile String cachedSummarizePrompt;
+    private volatile String cachedSummarizeMaintenancePrompt;
+    private volatile String cachedAskMaintenancePrompt;
+    private volatile String cachedChatPrompt;
+
     public LlmService(LLMSettingsStore settingsStore, TaskStore taskStore,
                       WorkLogStore workLogStore, AiRecordStore aiRecordStore) {
         this.settingsStore = settingsStore;
@@ -55,6 +63,30 @@ public class LlmService {
         this.aiRecordStore = aiRecordStore;
         this.mapper = new ObjectMapper();
         this.executor = Executors.newCachedThreadPool();
+
+        // 启动时加载 prompt 到内存
+        loadPrompts();
+    }
+
+    /** 从数据库加载 prompt 到内存缓存 */
+    private void loadPrompts() {
+        Map<String, String> settings = settingsStore.getAll();
+        cachedPolishPrompt = getOrDefault(settings, "polish_system_prompt", Prompts.POLISH_SYSTEM);
+        cachedSummarizePrompt = getOrDefault(settings, "summarize_system_prompt", Prompts.SUMMARIZE_MAIN_SYSTEM);
+        cachedSummarizeMaintenancePrompt = getOrDefault(settings, "summarize_maintenance_prompt", Prompts.SUMMARIZE_MAINTENANCE_SYSTEM);
+        cachedAskMaintenancePrompt = getOrDefault(settings, "ask_maintenance_prompt", Prompts.ASK_MAINTENANCE_SYSTEM);
+        cachedChatPrompt = getOrDefault(settings, "chat_system_prompt", Prompts.DEFAULT_CHAT_SYSTEM);
+        log.info("Prompt 模板已加载到内存");
+    }
+
+    /** 刷新 prompt 缓存（设置保存后调用） */
+    public void refreshPrompts() {
+        loadPrompts();
+    }
+
+    private String getOrDefault(Map<String, String> settings, String key, String defaultValue) {
+        String value = settings.get(key);
+        return (value == null || value.isBlank()) ? defaultValue : value;
     }
 
     // ============================================================
@@ -84,7 +116,7 @@ public class LlmService {
 
     public String polish(String content, Long taskId) {
         LlmConfig cfg = getConfig();
-        String system = getPrompt("polish_system_prompt", Prompts.POLISH_SYSTEM);
+        String system = cachedPolishPrompt;
         String user = Prompts.POLISH_USER.replace("{content}", content);
 
         AnthropicResponse resp = callAnthropic(cfg, system, List.of(userMessage(user)));
@@ -111,7 +143,7 @@ public class LlmService {
         String dateRange = buildDateRange(logs);
         String logsText = buildLogsText(logs);
 
-        String system = getPrompt("summarize_system_prompt", Prompts.SUMMARIZE_MAIN_SYSTEM);
+        String system = cachedSummarizePrompt;
         String user = Prompts.SUMMARIZE_MAIN_USER
                 .replace("{title}", title)
                 .replace("{date_range}", dateRange)
@@ -141,7 +173,7 @@ public class LlmService {
         String dateRange = buildDateRange(logs);
         String logsText = buildLogsText(logs);
 
-        String system = getPrompt("summarize_maintenance_prompt", Prompts.SUMMARIZE_MAINTENANCE_SYSTEM);
+        String system = cachedSummarizeMaintenancePrompt;
         String user = Prompts.SUMMARIZE_MAINTENANCE_USER
                 .replace("{title}", title)
                 .replace("{date_range}", dateRange)
@@ -171,7 +203,7 @@ public class LlmService {
 
         String logsText = buildLogsText(logs);
 
-        String system = getPrompt("ask_maintenance_prompt", Prompts.ASK_MAINTENANCE_SYSTEM);
+        String system = cachedAskMaintenancePrompt;
         String user = Prompts.ASK_MAINTENANCE_USER
                 .replace("{title}", title)
                 .replace("{status}", status)
@@ -294,10 +326,7 @@ public class LlmService {
     }
 
     private String buildChatSystemPrompt() {
-        String customPrompt = settingsStore.getAll().getOrDefault("chat_system_prompt", "");
-        if (customPrompt == null || customPrompt.isBlank()) {
-            customPrompt = Prompts.DEFAULT_CHAT_SYSTEM;
-        }
+        String customPrompt = cachedChatPrompt;
         // 注入当前日期
         LocalDate today = LocalDate.now();
         LocalDate yesterday = today.minusDays(1);
@@ -387,15 +416,6 @@ public class LlmService {
             "role", "user",
             "content", List.of(Map.of("type", "text", "text", text))
         );
-    }
-
-    /** 从设置读取 prompt，若为空则使用默认值 */
-    private String getPrompt(String key, String defaultValue) {
-        String value = settingsStore.getAll().get(key);
-        if (value == null || value.isBlank()) {
-            return defaultValue;
-        }
-        return value;
     }
 
     private String buildDateRange(List<Map<String, Object>> logs) {
