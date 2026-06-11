@@ -3,6 +3,8 @@ package com.trail.web.error;
 import com.trail.store.exception.DataDirNotConfiguredException;
 import com.trail.store.exception.DuplicateException;
 import com.trail.store.exception.InvalidTransitionException;
+import com.trail.store.exception.LlmApiException;
+import com.trail.store.exception.LlmNotConfiguredException;
 import com.trail.store.exception.NotFoundException;
 import com.trail.store.exception.StoreError;
 import org.springframework.core.io.FileSystemResource;
@@ -51,6 +53,20 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(StoreError.class)
     public ResponseEntity<Map<String, Object>> store(StoreError e) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("detail", e.getMessage()));
+    }
+
+    /** LLM 未配置 → 503 */
+    @ExceptionHandler(LlmNotConfiguredException.class)
+    public ResponseEntity<Map<String, Object>> llmNotConfigured(LlmNotConfiguredException e) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(Map.of("detail", e.getMessage()));
+    }
+
+    /** LLM API 调用失败 → 502 */
+    @ExceptionHandler(LlmApiException.class)
+    public ResponseEntity<Map<String, Object>> llmApi(LlmApiException e) {
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                .body(Map.of("detail", e.getMessage()));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
