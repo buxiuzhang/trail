@@ -84,7 +84,7 @@ public class LlmService {
 
     public String polish(String content, Long taskId) {
         LlmConfig cfg = getConfig();
-        String system = Prompts.POLISH_SYSTEM;
+        String system = getPrompt("polish_system_prompt", Prompts.POLISH_SYSTEM);
         String user = Prompts.POLISH_USER.replace("{content}", content);
 
         AnthropicResponse resp = callAnthropic(cfg, system, List.of(userMessage(user)));
@@ -111,7 +111,7 @@ public class LlmService {
         String dateRange = buildDateRange(logs);
         String logsText = buildLogsText(logs);
 
-        String system = Prompts.SUMMARIZE_MAIN_SYSTEM;
+        String system = getPrompt("summarize_system_prompt", Prompts.SUMMARIZE_MAIN_SYSTEM);
         String user = Prompts.SUMMARIZE_MAIN_USER
                 .replace("{title}", title)
                 .replace("{date_range}", dateRange)
@@ -141,7 +141,7 @@ public class LlmService {
         String dateRange = buildDateRange(logs);
         String logsText = buildLogsText(logs);
 
-        String system = Prompts.SUMMARIZE_MAINTENANCE_SYSTEM;
+        String system = getPrompt("summarize_maintenance_prompt", Prompts.SUMMARIZE_MAINTENANCE_SYSTEM);
         String user = Prompts.SUMMARIZE_MAINTENANCE_USER
                 .replace("{title}", title)
                 .replace("{date_range}", dateRange)
@@ -171,7 +171,7 @@ public class LlmService {
 
         String logsText = buildLogsText(logs);
 
-        String system = Prompts.ASK_MAINTENANCE_SYSTEM;
+        String system = getPrompt("ask_maintenance_prompt", Prompts.ASK_MAINTENANCE_SYSTEM);
         String user = Prompts.ASK_MAINTENANCE_USER
                 .replace("{title}", title)
                 .replace("{status}", status)
@@ -259,7 +259,7 @@ public class LlmService {
                                     fullText.append(text);
                                     // 转发给前端
                                     String chunk = mapper.writeValueAsString(Map.of("delta", text));
-                                    emitter.send(SseEmitter.event().data("data: " + chunk + "\n\n"));
+                                    emitter.send(SseEmitter.event().data(chunk));
                                 }
                             } else if ("message_stop".equals(eventType)) {
                                 break;
@@ -269,8 +269,8 @@ public class LlmService {
                 }
 
                 // 发送结束标记
-                emitter.send(SseEmitter.event().data("data: {\"done\":true}\n\n"));
-                emitter.send(SseEmitter.event().data("data: [DONE]\n\n"));
+                emitter.send(SseEmitter.event().data("{\"done\":true}"));
+                emitter.send(SseEmitter.event().data("[DONE]"));
                 emitter.complete();
 
                 // 记录审计
@@ -278,13 +278,13 @@ public class LlmService {
 
             } catch (LlmNotConfiguredException e) {
                 try {
-                    emitter.send(SseEmitter.event().data("{\"error\":\"LLM 未配置\"}\n\n"));
+                    emitter.send(SseEmitter.event().data("{\"error\":\"LLM 未配置\"}"));
                     emitter.complete();
                 } catch (Exception ignored) {}
             } catch (Exception e) {
                 log.error("Chat stream error", e);
                 try {
-                    emitter.send(SseEmitter.event().data("{\"error\":\"" + e.getMessage() + "\"}\n\n"));
+                    emitter.send(SseEmitter.event().data("{\"error\":\"" + e.getMessage() + "\"}"));
                     emitter.completeWithError(e);
                 } catch (Exception ignored) {}
             }
@@ -387,6 +387,15 @@ public class LlmService {
             "role", "user",
             "content", List.of(Map.of("type", "text", "text", text))
         );
+    }
+
+    /** 从设置读取 prompt，若为空则使用默认值 */
+    private String getPrompt(String key, String defaultValue) {
+        String value = settingsStore.getAll().get(key);
+        if (value == null || value.isBlank()) {
+            return defaultValue;
+        }
+        return value;
     }
 
     private String buildDateRange(List<Map<String, Object>> logs) {
