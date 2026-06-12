@@ -38,8 +38,14 @@ public class WebConfig implements WebMvcConfigurer {
                 .addResolver(new PathResourceResolver() {
                     @Override
                     protected Resource getResource(String resourcePath, Resource location) throws IOException {
-                        if (resourcePath != null && resourcePath.startsWith("api/")) {
-                            return null;  // 业务 API 路径不参与 SPA fallback
+                        // 业务 API 路径和 OpenAPI 文档路径不参与 SPA fallback
+                        if (resourcePath != null && (
+                                resourcePath.startsWith("api/") ||
+                                resourcePath.startsWith("v3/") ||
+                                resourcePath.equals("swagger-ui.html") ||
+                                resourcePath.startsWith("swagger-ui/")
+                        )) {
+                            return null;
                         }
                         Resource requested = location.createRelative(resourcePath);
                         if (requested.exists() && requested.isReadable()) return requested;
