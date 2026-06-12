@@ -38,7 +38,9 @@ public class LlmSettingsController {
                 all.getOrDefault("tools_desc", Prompts.TOOLS_DESC),
                 // 日报/周报模板
                 all.getOrDefault("daily_report_template", Prompts.DEFAULT_DAILY_REPORT_TEMPLATE),
-                all.getOrDefault("weekly_report_template", Prompts.DEFAULT_WEEKLY_REPORT_TEMPLATE)
+                all.getOrDefault("weekly_report_template", Prompts.DEFAULT_WEEKLY_REPORT_TEMPLATE),
+                // 语音输入时长，默认 10 秒
+                all.getOrDefault("speech_duration", "10")
         );
     }
 
@@ -95,6 +97,12 @@ public class LlmSettingsController {
             String p = data.get("weekly_report_template");
             if (p == null || p.isBlank()) store.delete("weekly_report_template");
             else store.save("weekly_report_template", p);
+        }
+        // 语音输入时长
+        if (data.containsKey("speech_duration")) {
+            String d = data.get("speech_duration");
+            if (d == null || d.isBlank()) store.delete("speech_duration");
+            else store.save("speech_duration", d);
         }
         // 刷新 LlmService 的 prompt 缓存
         llmService.refreshPrompts();

@@ -8,6 +8,9 @@ import com.trail.web.dto.TaskCreateRequest;
 import com.trail.web.dto.TaskMapper;
 import com.trail.web.dto.TaskResponse;
 import com.trail.web.dto.TaskUpdateRequest;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -18,6 +21,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/tasks")
+@Tag(name = "任务管理", description = "任务的增删改查、状态变更、置顶等操作")
 public class TaskController {
 
     private final TaskStore tasks;
@@ -28,18 +32,25 @@ public class TaskController {
         this.contacts = contacts;
     }
 
+    @Operation(summary = "查询任务列表", description = "根据条件筛选任务，支持按状态、性质、关键词模糊匹配。返回所有任务的基本信息。")
     @GetMapping
     public List<TaskResponse> list(
+            @Parameter(description = "按状态筛选：未开始、进行中、已完成、已作废")
             @RequestParam(required = false) String status,
+            @Parameter(description = "按性质筛选：长期、临时、维护")
             @RequestParam(required = false) String nature,
+            @Parameter(description = "标题关键词模糊匹配")
             @RequestParam(required = false) String search) {
         return tasks.listTasks(status, nature, search).stream()
                 .map(this::withContacts)
                 .toList();
     }
 
+    @Operation(summary = "创建新任务", description = "创建一个新的任务。需要提供标题，其他字段可选。")
     @PostMapping
-    public ResponseEntity<TaskResponse> create(@RequestBody TaskCreateRequest req) {
+    public ResponseEntity<TaskResponse> create(
+            @Parameter(description = "任务创建信息，包含标题、性质、别名、描述、开始日期等")
+            @RequestBody TaskCreateRequest req) {
         var created = tasks.createTask(
                 req.title(), req.nature(), req.alias(), req.description(),
                 req.startDate(), req.processingDate(), req.status(), req.tags());
@@ -52,13 +63,21 @@ public class TaskController {
         return ResponseEntity.status(HttpStatus.CREATED).body(withContacts(created));
     }
 
+    @Operation(summary = "获取任务详情", description = "根据任务 ID 获取任务的完整信息，包括标题、状态、性质、日期、摘要、标签、对接人等。")
     @GetMapping("/{id}")
-    public TaskResponse get(@PathVariable long id) {
+    public TaskResponse get(
+            @Parameter(description = "任务 ID")
+            @PathVariable long id) {
         return withContacts(tasks.getTask(id));
     }
 
+    @Operation(summary = "更新任务信息", description = "更新任务的各种属性，如标题、描述、日期、摘要等。如果要改变状态，建议使用 /{id}/status 接口。")
     @PutMapping("/{id}")
-    public TaskResponse update(@PathVariable long id, @RequestBody TaskUpdateRequest req) {
+    public TaskResponse update(
+            @Parameter(description = "任务 ID")
+            @PathVariable long id,
+            @Parameter(description = "要更新的字段")
+            @RequestBody TaskUpdateRequest req) {
         Map<String, Object> result;
         if (req.status() != null && !req.status().isBlank()) {
             // status 转移路径
@@ -97,8 +116,13 @@ public class TaskController {
         return withContacts(result);
     }
 
+    @Operation(summary = "变更任务状态", description = "将任务状态改为新状态（进行中→已完成→已作废等）。如果改为已完成，可以同时填写总结。")
     @PostMapping("/{id}/status")
-    public TaskResponse changeStatus(@PathVariable long id, @RequestBody StatusChangeRequest req) {
+    public TaskResponse changeStatus(
+            @Parameter(description = "任务 ID")
+            @PathVariable long id,
+            @Parameter(description = "状态变更请求，包含新状态、结束日期、是否进入维护期、总结等")
+            @RequestBody StatusChangeRequest req) {
         var result = tasks.changeStatus(id, req.newStatus(), req.endDate(),
                 Boolean.TRUE.equals(req.maintenance()));
         // 同步 summary（如果传了）
@@ -108,24 +132,36 @@ public class TaskController {
         return withContacts(result);
     }
 
+    @Operation(summary = "作废任务", description = "将任务标记为已作废状态。适用于任务不再需要继续的情况。")
     @PostMapping("/{id}/cancel")
-    public TaskResponse cancel(@PathVariable long id) {
+    public TaskResponse cancel(
+            @Parameter(description = "任务 ID")
+            @PathVariable long id) {
         return withContacts(tasks.cancelTask(id));
     }
 
+    @Operation(summary = "删除任务", description = "永久删除任务及其关联的工作日志、待办、联系人等所有数据。此操作不可恢复，谨慎使用。")
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable long id) {
+    public ResponseEntity<Void> delete(
+            @Parameter(description = "任务 ID")
+            @PathVariable long id) {
         tasks.deleteTask(id);
         return ResponseEntity.noContent().build();
     }
 
+    @Operation(summary = "置顶任务", description = "将任务置顶到列表首位，方便快速访问。")
     @PostMapping("/{id}/pin")
-    public TaskResponse pin(@PathVariable long id) {
+    public TaskResponse pin(
+            @Parameter(description = "任务 ID")
+            @PathVariable long id) {
         return withContacts(tasks.pin(id));
     }
 
+    @Operation(summary = "取消置顶", description = "取消任务的置顶状态，恢复到正常排序位置。")
     @PostMapping("/{id}/unpin")
-    public TaskResponse unpin(@PathVariable long id) {
+    public TaskResponse unpin(
+            @Parameter(description = "任务 ID")
+            @PathVariable long id) {
         return withContacts(tasks.unpin(id));
     }
 

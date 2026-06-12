@@ -18,9 +18,28 @@ def get_data_dir() -> Path:
     return data_dir
 
 
-def get_db_path() -> Path:
-    """DuckDB 数据库文件路径。"""
-    return get_data_dir() / "tasks.duckdb"
+def get_db_path() -> Path | None:
+    """当前激活数据库的 DuckDB 文件路径。
+
+    - backend=duckdb：用 db.duckdb.path（绝对路径直用；相对路径相对 <项目根>/data/）
+    - backend=mysql：返 None（调用方应识别后报错；web 启动时由 lifespan 拦下）
+    - 配置缺失 / 解析失败：兜底 DuckDB + data/tasks.duckdb
+
+    旧用户（YAML 无 db: 段）走默认路径 = 旧绝对路径，**零迁移**。
+    相对路径以 <项目根>/data/ 为基准（与旧 get_data_dir() 行为一致）。
+    """
+    # 函数内 import 避免与 config 的循环依赖（config 顶层 import utils）
+    from trail_app.config import get_db_settings
+    try:
+        s = get_db_settings()
+    except Exception:
+        return get_data_dir() / "tasks.duckdb"
+
+    if s.backend != "duckdb":
+        return None
+
+    p = Path(s.duckdb_path)
+    return p if p.is_absolute() else get_data_dir() / p
 
 
 def get_config_path() -> Path:

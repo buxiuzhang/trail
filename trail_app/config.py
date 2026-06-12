@@ -35,6 +35,23 @@ class LLMConfig:
         return f"LLMConfig(model={self.model!r}, base_url={self.base_url!r}, api_key={masked!r}, max_tokens={self.max_tokens})"
 
 
+@dataclass
+class DbSettings:
+    """数据源配置。
+
+    backend: "duckdb" | "mysql"（本期仅 duckdb 实际生效）
+    duckdb_path: 相对 <项目根>/data/ 解析；绝对路径直用
+    mysql: 字段占位（host/port/user/password/database），本期不写盘
+    """
+
+    backend: str = "duckdb"
+    duckdb_path: str = "data/tasks.duckdb"
+    mysql: dict | None = None
+
+
+_DEFAULT_DUCKDB_PATH = "tasks.duckdb"
+
+
 _DEFAULT_BASE_URL = "https://api.anthropic.com"
 _DEFAULT_MINIMAX_BASE_URL = "https://api.minimaxi.com/anthropic"
 _DEFAULT_MODEL = "claude-haiku-4-5"
@@ -157,3 +174,46 @@ def get_llm_config() -> Optional[LLMConfig]:
         max_tokens=max_tokens,
         chat_system_prompt=chat_system_prompt,
     )
+
+
+# ============================================================
+# 数据源配置（M3+ 增强：用户可在设置页切 DuckDB/MySQL）
+# ============================================================
+
+
+def get_db_settings() -> DbSettings:
+    """读 db: 段。
+
+    容错：YAML 缺失 / 解析失败 / db 段缺失 / 各键缺失 → 全走默认 DuckDB + data/tasks.duckdb。
+    backend 非法值（既不是 duckdb 也不是 mysql）→ 兜底 duckdb，不抛错。
+    """
+    cfg = _load_yaml()
+    db = _cfg_get(cfg, "db", default={}) or {}
+    if not isinstance(db, dict):
+        db = {}
+
+    backend = str(_cfg_get(db, "backend", default="duckdb") or "duckdb").strip().lower()
+    if backend not in ("duckdb", "mysql"):
+        backend = "duckdb"
+
+    duck_yaml = _cfg_get(db, "duckdb", default={}) or {}
+    if not isinstance(duck_yaml, dict):
+        duck_yaml = {}
+    duckdb_path = (
+        str(_cfg_get(duck_yaml, "path", default=_DEFAULT_DUCKDB_PATH) or _DEFAULT_DUCKDB_PATH)
+        .strip()
+        or _DEFAULT_DUCKDB_PATH
+    )
+
+    mysql_yaml = _cfg_get(db, "mysql", default={}) or {}
+    if not isinstance(mysql_yaml, dict):
+        mysql_yaml = {}
+    mysql = {
+        "host":     str(_cfg_get(mysql_yaml, "host", default="127.0.0.1")),
+        "port":     int(_cfg_get(mysql_yaml, "port", default=3306)),
+        "user":     str(_cfg_get(mysql_yaml, "user", default="")),
+        "password": str(_cfg_get(mysql_yaml, "password", default="")),
+        "database": str(_cfg_get(mysql_yaml, "database", default="")),
+    }
+
+    return DbSettings(backend=backend, duckdb_path=duckdb_path, mysql=mysql)

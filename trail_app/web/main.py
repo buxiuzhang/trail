@@ -1,6 +1,7 @@
 """FastAPI 应用入口。"""
 from __future__ import annotations
 
+import logging
 import os
 import re
 from contextlib import asynccontextmanager
@@ -10,6 +11,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from trail_app.config import get_db_settings
 from trail_app.db import (
     ensure_schema,
     get_connection,
@@ -18,7 +20,9 @@ from trail_app.db import (
     recreate_schema,
 )
 from trail_app.utils import get_db_path
-from trail_app.web.routes import insights, llm, logs, settings, tasks
+from trail_app.web.routes import database, insights, llm, logs, settings, tasks
+
+logger = logging.getLogger("trail")
 
 
 # 前端构建产物目录（React Vite build）
@@ -37,8 +41,23 @@ async def lifespan(app: FastAPI):
 
     若检测到旧 schema（tasks.id 是 VARCHAR / 旧 contact 列还在 / 没有 contact_channels 表），
     按用户要求"不保留现有数据"——备份原文件，删掉重建。
+
+    配置 db.backend=mysql 时：本期 MySQL 驱动未实现，直接拒启动（让用户在设置页切回）。
     """
+    db_cfg = get_db_settings()
+    if db_cfg.backend == "mysql":
+        msg = (
+            "配置文件中 db.backend=mysql，但 MySQL 驱动尚未实现。"
+            "请通过设置页切回 DuckDB，或手动编辑 data/config.yaml 后重启。"
+        )
+        logger.error(msg)
+        raise RuntimeError(msg)
+
     db_path = get_db_path()
+    if db_path is None:
+        # 理论上不会到这里（backend != duckdb 已被上面拦下），但兜底防 None
+        raise RuntimeError("无法解析数据库路径，请检查 data/config.yaml 的 db: 段。")
+
     if db_path.exists():
         with get_connection() as con:
             if needs_legacy_migration(con):
@@ -96,6 +115,7 @@ app.include_router(logs.router)
 app.include_router(insights.router)
 app.include_router(llm.router)
 app.include_router(settings.router)
+app.include_router(database.router)
 
 
 @app.get("/api/health")

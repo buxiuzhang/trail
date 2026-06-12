@@ -23,6 +23,23 @@ public class InsightStore {
             idleDays);
     }
 
+    public List<Map<String, Object>> recentTasks(int days) {
+        return db.query(
+            """
+            SELECT
+                t.id, t.title, t.status, t.nature,
+                MAX(w.log_date) AS last_log_date,
+                COUNT(w.id) AS log_count
+            FROM tasks t
+            JOIN work_logs w ON w.task_id = t.id AND w.is_deleted = 0
+            WHERE w.log_date >= date('now', '-' || ? || ' days')
+              AND t.status = '进行中'
+            GROUP BY t.id
+            ORDER BY log_count DESC
+            """,
+            days);
+    }
+
     public Map<String, Object> overview() {
         List<Map<String, Object>> taskRows = db.query("SELECT status, COUNT(*) AS n FROM tasks GROUP BY status");
         List<Map<String, Object>> natureRows = db.query("SELECT nature, COUNT(*) AS n FROM tasks GROUP BY nature");

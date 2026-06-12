@@ -1,5 +1,6 @@
 package com.trail.web.controller;
 
+import com.trail.service.ChatWithToolsService;
 import com.trail.service.LlmService;
 import com.trail.store.WorkLogStore;
 import com.trail.store.exception.NotFoundException;
@@ -19,10 +20,12 @@ import java.util.Map;
 public class LlmController {
 
     private final LlmService llmService;
+    private final ChatWithToolsService chatWithToolsService;
     private final WorkLogStore workLogStore;
 
-    public LlmController(LlmService llmService, WorkLogStore workLogStore) {
+    public LlmController(LlmService llmService, ChatWithToolsService chatWithToolsService, WorkLogStore workLogStore) {
         this.llmService = llmService;
+        this.chatWithToolsService = chatWithToolsService;
         this.workLogStore = workLogStore;
     }
 
@@ -93,5 +96,22 @@ public class LlmController {
                 .map(m -> Map.of("role", m.role(), "content", m.content()))
                 .toList();
         return llmService.chatStream(messages);
+    }
+
+    // ============================================================
+    // SSE 流式聊天（Tool Use）
+    // ============================================================
+
+    /**
+     * 多轮 Tool Use 流式聊天（SSE）
+     * 新增端点，支持 LLM 调用工具查询数据
+     */
+    @PostMapping(value = "/chat/tools/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter chatStreamWithTools(@RequestBody ChatRequest req) {
+        // 转换消息格式
+        List<Map<String, String>> messages = req.messages().stream()
+                .map(m -> Map.of("role", m.role(), "content", m.content()))
+                .toList();
+        return chatWithToolsService.chatStreamWithTools(messages);
     }
 }

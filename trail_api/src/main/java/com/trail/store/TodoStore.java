@@ -165,4 +165,29 @@ public class TodoStore {
         if (n == 0)
             throw new NotFoundException("待办不存在或不属于此任务：todo=" + todoId + " task=" + taskId);
     }
+
+    /**
+     * 查询所有未完成的待办（跨任务）。
+     * 返回待办及其所属任务信息，按任务 id 和待办创建时间排序。
+     * 排除已作废任务的待办。
+     */
+    public List<Map<String, Object>> listIncompleteTodos() {
+        return db.query("""
+            SELECT
+                todo.id AS todo_id,
+                todo.title AS todo_title,
+                todo.description AS todo_description,
+                todo.created_at AS todo_created_at,
+                t.id AS task_id,
+                t.title AS task_title,
+                t.status AS task_status,
+                t.nature AS task_nature
+            FROM todos todo
+            JOIN tasks t ON t.id = todo.task_id
+            WHERE todo.is_completed = 0
+              AND todo.is_abandoned = 0
+              AND t.status != '已作废'
+            ORDER BY t.id ASC, todo.created_at ASC
+            """);
+    }
 }

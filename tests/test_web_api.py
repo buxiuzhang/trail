@@ -21,10 +21,18 @@ from trail_app.web.main import app
 def client(tmp_path: Path, monkeypatch) -> TestClient:
     """用临时 DB 跑 API。"""
     db = tmp_path / "test.duckdb"
+    cfg = tmp_path / "config.yaml"
 
     # 让所有 store / util / db 走临时路径
     monkeypatch.setattr("trail_app.utils.get_db_path", lambda: db)
     monkeypatch.setattr("trail_app.db.get_db_path", lambda: db)
+    # 让 config 读写也走临时文件（避免测试污染项目根 data/config.yaml）
+    monkeypatch.setattr("trail_app.utils.get_config_path", lambda: cfg)
+    monkeypatch.setattr("trail_app.utils.get_config_path_or_none", lambda: cfg if cfg.exists() else None)
+    # config.py 顶层 from trail_app.utils import get_config_path_or_none 是局部引用，
+    # 必须 patch 目标模块内的名字才会生效
+    monkeypatch.setattr("trail_app.config.get_config_path_or_none", lambda: cfg if cfg.exists() else None)
+    monkeypatch.setattr("trail_app.web.routes.database.get_config_path", lambda: cfg)
     # 重建空 schema
     con = duckdb.connect(str(db))
     try:
@@ -849,4 +857,82 @@ def test_chat_tool_use_minimal_payload(client, mock_chat_stream):
                     seen_done = True
                     break
         assert seen_done
+
+
+# ============================================================
+# 数据源配置（M3+：用户可在设置页切 DuckDB/MySQL）
+# ============================================================
+
+
+def test_get_db_settings_default(client):
+    """GET /api/settings/db 默认返 duckdb + tasks.duckdb（相对 <项目根>/data/>）。"""
+    r = client.get("/api/settings/db")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["backend"] == "duckdb"
+    assert data["duckdb"]["path"] == "tasks.duckdb"
+    assert data["defaults"]["duckdb_path"] == "tasks.duckdb"
+    # absolute_path 应为 <项目根>/data/tasks.duckdb
+    assert data["duckdb"]["absolute_path"].endswith("/data/tasks.duckdb")
+    # mysql 段占位齐全
+    for k in ("host", "port", "user", "password", "database"):
+        assert k in data["mysql"]
+
+
+def test_save_db_duckdb_path(client):
+    """PUT 后 GET 反映新路径。"""
+    new_path = "/tmp/custom-trail.duckdb"
+    r = client.put("/api/settings/db", json={
+        "backend": "duckdb",
+        "duckdb": {"path": new_path},
+    })
+    assert r.status_code == 200, r.text
+    assert r.json()["ok"] is True
+    assert r.json()["next_startup_path"] == new_path
+
+    r2 = client.get("/api/settings/db")
+    assert r2.status_code == 200
+    assert r2.json()["duckdb"]["path"] == new_path
+
+
+def test_save_db_mysql_rejected(client):
+    """PUT mysql 返 409，不写盘。"""
+    r = client.put("/api/settings/db", json={
+        "backend": "mysql",
+        "mysql": {"host": "x", "port": 3306, "user": "u", "password": "p", "database": "d"},
+    })
+    assert r.status_code == 409
+    # 不写盘：再 GET 应仍是默认
+    r2 = client.get("/api/settings/db")
+    assert r2.json()["backend"] == "duckdb"
+    assert r2.json()["duckdb"]["path"] == "tasks.duckdb"
+
+
+def test_save_db_preserves_llm(client):
+    """保存 db 段不应损坏 llm: 段。"""
+    # 先写一个含 llm: 段的 config.yaml
+    from trail_app.web.routes.database import get_config_path
+    import yaml
+
+    cfg = get_config_path()
+    cfg.write_text(
+        "llm:\n  api_key: 'sk-test-keep-me'\n  base_url: 'https://api.test'\n  model: 'test-model'\n",
+        encoding="utf-8",
+    )
+
+    # 保存 db 段
+    r = client.put("/api/settings/db", json={
+        "backend": "duckdb",
+        "duckdb": {"path": "data/tasks.duckdb"},
+    })
+    assert r.status_code == 200, r.text
+
+    # 重新解析，llm: 段仍在
+    raw = yaml.safe_load(cfg.read_text(encoding="utf-8"))
+    assert "llm" in raw
+    assert raw["llm"]["api_key"] == "sk-test-keep-me"
+    assert raw["llm"]["base_url"] == "https://api.test"
+    assert "db" in raw
+    assert raw["db"]["backend"] == "duckdb"
+    assert raw["db"]["duckdb"]["path"] == "data/tasks.duckdb"
 

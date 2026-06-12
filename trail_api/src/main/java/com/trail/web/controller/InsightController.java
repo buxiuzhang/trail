@@ -1,63 +1,47 @@
 package com.trail.web.controller;
 
 import com.trail.store.InsightStore;
-import com.trail.web.dto.OverviewResponse;
-import com.trail.web.dto.StaleTaskResponse;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 统计与洞察
+ */
 @RestController
 @RequestMapping("/api/insights")
+@Tag(name = "统计洞察", description = "任务统计、闲置任务、近期活跃等数据概览")
 public class InsightController {
 
-    private final InsightStore store;
+    private final InsightStore insights;
 
-    public InsightController(InsightStore store) {
-        this.store = store;
+    public InsightController(InsightStore insights) {
+        this.insights = insights;
     }
 
+    @Operation(summary = "任务统计概览", description = "返回任务总数、按状态分组计数、按性质分组计数等统计信息。")
     @GetMapping("/overview")
-    public OverviewResponse overview() {
-        var o = store.overview();
-        @SuppressWarnings("unchecked")
-        Map<String, Integer> byStatus = (Map<String, Integer>) o.getOrDefault("by_status", new HashMap<>());
-        @SuppressWarnings("unchecked")
-        Map<String, Integer> byNature = (Map<String, Integer>) o.getOrDefault("by_nature", new HashMap<>());
-        return new OverviewResponse(
-                (int) o.getOrDefault("total_tasks", 0),
-                byStatus,
-                byNature,
-                (int) o.getOrDefault("total_logs", 0)
-        );
+    public Map<String, Object> overview() {
+        return insights.overview();
     }
 
+    @Operation(summary = "闲置任务列表", description = "返回超过指定天数未更新日志的任务，默认 7 天。用于发现长期未推进的任务。")
     @GetMapping("/stale")
-    public List<StaleTaskResponse> stale(@RequestParam(defaultValue = "30") int idleDays) {
-        return store.staleTasks(idleDays).stream().map(r -> new StaleTaskResponse(
-                ((Number) r.get("id")).longValue(),
-                (String) r.get("title"),
-                (String) r.get("status"),
-                (String) r.get("nature"),
-                toLocalDate(r.get("last_log_date")),
-                r.get("days_idle") == null ? null : ((Number) r.get("days_idle")).intValue()
-        )).toList();
+    public List<Map<String, Object>> stale(
+            @Parameter(description = "闲置天数阈值，默认 7 天")
+            @RequestParam(defaultValue = "7") int days) {
+        return insights.staleTasks(days);
     }
 
-    private static java.time.LocalDate toLocalDate(Object o) {
-        if (o == null) return null;
-        if (o instanceof java.time.LocalDate ld) return ld;
-        if (o instanceof java.sql.Date d) return d.toLocalDate();
-        String s = o.toString();
-        try { return java.time.LocalDate.parse(s); }
-        catch (java.time.format.DateTimeParseException ignored) {}
-        try { return java.time.LocalDate.parse(s.length() >= 10 ? s.substring(0, 10) : s); }
-        catch (java.time.format.DateTimeParseException ignored) {}
-        return null;
+    @Operation(summary = "近期活跃任务", description = "返回最近 N 天内有日志更新的任务，按活跃度排序。")
+    @GetMapping("/recent")
+    public List<Map<String, Object>> recent(
+            @Parameter(description = "最近 N 天，默认 7 天")
+            @RequestParam(defaultValue = "7") int days) {
+        return insights.recentTasks(days);
     }
 }

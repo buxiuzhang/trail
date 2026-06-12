@@ -28,6 +28,9 @@ def main() -> int:
     args = parser.parse_args()
 
     db_path = args.db or get_db_path()
+    if db_path is None:
+        print("❌ 当前 backend=mysql；脚本仅支持 DuckDB。请用 --db 显式指定 .duckdb 路径。", file=sys.stderr)
+        return 2
     if not db_path.exists():
         print(f"❌ 数据库不存在：{db_path}", file=sys.stderr)
         return 2

@@ -72,7 +72,10 @@ def save_llm_settings(data: dict):
 
 
 def _motto_connect():
-    return duckdb.connect(str(get_db_path()))
+    p = get_db_path()
+    if p is None:
+        raise HTTPException(503, "当前数据后端不是 DuckDB，卷首语接口暂不可用。")
+    return duckdb.connect(str(p))
 
 
 @router.get("/motto")

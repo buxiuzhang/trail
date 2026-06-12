@@ -16,5 +16,7 @@ public record LlmSettingsDto(
         String toolsDesc,
         // 日报/周报模板
         String dailyReportTemplate,
-        String weeklyReportTemplate
+        String weeklyReportTemplate,
+        // 语音输入时长（秒）
+        String speechDuration
 ) {}

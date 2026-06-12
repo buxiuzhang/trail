@@ -6,6 +6,9 @@ import com.trail.web.dto.LogCreateRequest;
 import com.trail.web.dto.LogMapper;
 import com.trail.web.dto.LogResponse;
 import com.trail.web.dto.LogUpdateRequest;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -14,6 +17,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/tasks/{taskId}/logs")
+@Tag(name = "工作日志", description = "任务下的工作日志（日报）管理，包括添加、编辑、删除日志")
 public class WorkLogController {
 
     private final WorkLogStore logs;
@@ -24,16 +28,26 @@ public class WorkLogController {
         this.tasks = tasks;
     }
 
+    @Operation(summary = "查询任务的工作日志", description = "获取指定任务的所有工作日志，可按阶段筛选，可选择是否包含已删除的日志。")
     @GetMapping
-    public List<LogResponse> list(@PathVariable long taskId,
-                                  @RequestParam(required = false) String phase,
-                                  @RequestParam(defaultValue = "false") boolean includeDeleted) {
+    public List<LogResponse> list(
+            @Parameter(description = "任务 ID")
+            @PathVariable long taskId,
+            @Parameter(description = "按阶段筛选：main（主体阶段）或 maintenance（维护阶段）")
+            @RequestParam(required = false) String phase,
+            @Parameter(description = "是否包含已删除的日志")
+            @RequestParam(defaultValue = "false") boolean includeDeleted) {
         return logs.listLogs(taskId, phase, includeDeleted, null, null).stream()
                 .map(LogMapper::toResponse).toList();
     }
 
+    @Operation(summary = "添加工作日志（日报）", description = "为指定任务添加一条工作日志。如果是该任务的第一条日志，任务状态会自动从「未开始」变为「进行中」。")
     @PostMapping
-    public ResponseEntity<LogResponse> add(@PathVariable long taskId, @RequestBody LogCreateRequest req) {
+    public ResponseEntity<LogResponse> add(
+            @Parameter(description = "任务 ID")
+            @PathVariable long taskId,
+            @Parameter(description = "日志内容，包含 log_date（日期 YYYY-MM-DD）、content（日志内容）、phase（阶段，默认 main）")
+            @RequestBody LogCreateRequest req) {
         String phase = req.phase() == null ? "main" : req.phase();
         var created = logs.addLog(taskId, req.logDate(), req.content(), phase);
         // 首日志：未开始 → 进行中
@@ -44,15 +58,27 @@ public class WorkLogController {
         return ResponseEntity.status(HttpStatus.CREATED).body(LogMapper.toResponse(created));
     }
 
+    @Operation(summary = "编辑工作日志", description = "修改已有工作日志的内容、日期或阶段。")
     @PutMapping("/{logId}")
-    public LogResponse update(@PathVariable long taskId, @PathVariable long logId,
-                              @RequestBody LogUpdateRequest req) {
+    public LogResponse update(
+            @Parameter(description = "任务 ID")
+            @PathVariable long taskId,
+            @Parameter(description = "日志 ID")
+            @PathVariable long logId,
+            @Parameter(description = "要修改的字段，包含 content（内容）、log_date（日期）、phase（阶段）")
+            @RequestBody LogUpdateRequest req) {
         return LogMapper.toResponse(logs.updateLog(logId, taskId, req.content(), req.logDate(), req.phase()));
     }
 
+    @Operation(summary = "删除工作日志", description = "删除指定的工作日志。默认软删除（标记为已删除），hard=true 时永久删除。")
     @DeleteMapping("/{logId}")
-    public ResponseEntity<Void> delete(@PathVariable long taskId, @PathVariable long logId,
-                                       @RequestParam(defaultValue = "false") boolean hard) {
+    public ResponseEntity<Void> delete(
+            @Parameter(description = "任务 ID")
+            @PathVariable long taskId,
+            @Parameter(description = "日志 ID")
+            @PathVariable long logId,
+            @Parameter(description = "是否硬删除（永久删除），默认 false 为软删除")
+            @RequestParam(defaultValue = "false") boolean hard) {
         logs.deleteLog(logId, taskId, hard);
         return ResponseEntity.noContent().build();
     }
