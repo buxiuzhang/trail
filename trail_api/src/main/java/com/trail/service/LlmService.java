@@ -225,6 +225,25 @@ public class LlmService {
     }
 
     // ============================================================
+    // 通用对话（用于日报/周报导出）
+    // ============================================================
+
+    /**
+     * 通用对话方法，用于日报/周报生成等场景
+     * @param prompt 用户 prompt（包含模板和数据）
+     * @return LLM 生成的文本
+     */
+    public String chat(String prompt) {
+        LlmConfig cfg = getConfig();
+        String system = "你是中文工作日报生成助手。根据用户提供的模板和数据，生成格式规范的 Markdown 日报/周报内容。严格遵循模板结构，只输出最终内容，不要解释或包裹。";
+
+        AnthropicResponse resp = callAnthropic(cfg, system, List.of(userMessage(prompt)));
+        aiRecordStore.addRecord(null, null, "chat", prompt, resp.raw(), false);
+
+        return resp.text();
+    }
+
+    // ============================================================
     // SSE 流式聊天
     // ============================================================
 
@@ -258,9 +277,10 @@ public class LlmService {
                         .header("Content-Type", "application/json")
                         .POST(HttpRequest.BodyPublishers.ofString(jsonBody));
 
-                // MiniMax 兼容
+                // MiniMax 兼容：使用 Bearer 认证，但保留 anthropic-version header
                 if (cfg.baseUrl().toLowerCase().contains("minimax")) {
                     reqBuilder.header("Authorization", "Bearer " + cfg.apiKey());
+                    reqBuilder.header("anthropic-version", ANTHROPIC_VERSION);
                 } else {
                     reqBuilder.header("x-api-key", cfg.apiKey())
                               .header("anthropic-version", ANTHROPIC_VERSION);
@@ -379,9 +399,10 @@ public class LlmService {
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(jsonBody));
 
-            // MiniMax 兼容
+            // MiniMax 兼容：使用 Bearer 认证，但保留 anthropic-version header
             if (cfg.baseUrl().toLowerCase().contains("minimax")) {
                 reqBuilder.header("Authorization", "Bearer " + cfg.apiKey());
+                reqBuilder.header("anthropic-version", ANTHROPIC_VERSION);
             } else {
                 reqBuilder.header("x-api-key", cfg.apiKey())
                           .header("anthropic-version", ANTHROPIC_VERSION);

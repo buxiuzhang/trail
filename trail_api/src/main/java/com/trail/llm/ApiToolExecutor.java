@@ -1,6 +1,7 @@
 package com.trail.llm;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.trail.db.SqliteDb;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -9,13 +10,15 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
  * API 工具执行器
- * 执行 get_api_docs 和 call_api 两个工具
+ * 执行 get_api_docs、call_api、export_daily_report、export_weekly_report 工具
  */
 @Component
 public class ApiToolExecutor {
@@ -23,11 +26,13 @@ public class ApiToolExecutor {
     private static final Logger log = LoggerFactory.getLogger(ApiToolExecutor.class);
 
     private final OpenApiService openApiService;
+    private final SqliteDb db;
     private final ObjectMapper mapper;
     private final HttpClient client;
 
-    public ApiToolExecutor(OpenApiService openApiService, ObjectMapper mapper) {
+    public ApiToolExecutor(OpenApiService openApiService, SqliteDb db, ObjectMapper mapper) {
         this.openApiService = openApiService;
+        this.db = db;
         this.mapper = mapper;
         this.client = HttpClient.newHttpClient();
     }
@@ -40,6 +45,8 @@ public class ApiToolExecutor {
             Object result = switch (name) {
                 case "get_api_docs" -> executeGetApiDocs(input);
                 case "call_api" -> executeCallApi(input);
+                case "export_daily_report" -> executeExportDailyReport(input);
+                case "export_weekly_report" -> executeExportWeeklyReport(input);
                 default -> throw new IllegalArgumentException("未知工具：" + name);
             };
             return toJson(result);
@@ -191,6 +198,80 @@ public class ApiToolExecutor {
             log.error("API call failed: {} {}", method, path, e);
             return Map.of("error", "API 调用失败：" + e.getMessage());
         }
+    }
+
+    // ============================================================
+    // 日报/周报导出工具
+    // ============================================================
+
+    /**
+     * 导出今日日报
+     * 返回下载链接，用户点击后触发下载
+     */
+    private Map<String, Object> executeExportDailyReport(Map<String, Object> input) {
+        // 检查是否配置了模板
+        List<Map<String, Object>> settingsRows = db.query(
+            "SELECT value FROM llm_settings WHERE key = 'daily_report_template'");
+        if (settingsRows.isEmpty() || settingsRows.get(0).get("value") == null) {
+            return Map.of("error", "请先在系统设置中配置「今日工作模板」");
+        }
+
+        // 解析日期参数
+        String dateStr = (String) input.get("date");
+        LocalDate date;
+        if (dateStr == null || dateStr.isBlank()) {
+            date = LocalDate.now();
+        } else {
+            date = LocalDate.parse(dateStr);
+        }
+
+        String url = "/api/reports/daily?date=" + date;
+        String filename = "日报_" + date + ".md";
+        return Map.of(
+            "url", url,
+            "filename", filename,
+            "message", "日报已准备好，[点击下载](" + url + ")"
+        );
+    }
+
+    /**
+     * 导出本周周报
+     * 返回下载链接，用户点击后触发下载
+     */
+    private Map<String, Object> executeExportWeeklyReport(Map<String, Object> input) {
+        // 检查是否配置了模板
+        List<Map<String, Object>> settingsRows = db.query(
+            "SELECT value FROM llm_settings WHERE key = 'weekly_report_template'");
+        if (settingsRows.isEmpty() || settingsRows.get(0).get("value") == null) {
+            return Map.of("error", "请先在系统设置中配置「本周工作模板」");
+        }
+
+        // 解析日期参数
+        String startStr = (String) input.get("start_date");
+        String endStr = (String) input.get("end_date");
+
+        LocalDate start;
+        LocalDate end;
+
+        if (startStr == null || startStr.isBlank()) {
+            start = LocalDate.now().with(DayOfWeek.MONDAY);
+        } else {
+            start = LocalDate.parse(startStr);
+        }
+
+        if (endStr == null || endStr.isBlank()) {
+            end = LocalDate.now();
+        } else {
+            end = LocalDate.parse(endStr);
+        }
+
+        String url = String.format("/api/reports/weekly?start=%s&end=%s", start, end);
+        String filename = String.format("周报_%s_%s.md", start, end);
+        return Map.of(
+            "url", url,
+            "filename", filename,
+            "message", "周报已准备好，[点击下载](" + url + ")"
+        );
     }
 
     // ============================================================

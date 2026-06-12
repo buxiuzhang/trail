@@ -181,4 +181,34 @@ public class WorkLogStore {
             if (n == 0) throw new NotFoundException("日志不存在或不属于此任务：log=" + logId + " task=" + taskId);
         }
     }
+
+    // ============================================================
+    // 日报/周报导出查询
+    // ============================================================
+
+    /** 查询指定日期的所有日志（关联任务信息） */
+    public List<Map<String, Object>> getByDate(LocalDate date) {
+        return db.query("""
+            SELECT
+                w.id, w.task_id, w.log_date, w.phase, w.ordinal, w.content, w.polished_content,
+                t.title AS task_title, t.alias AS task_alias, t.status, t.nature
+            FROM work_logs w
+            JOIN tasks t ON t.id = w.task_id
+            WHERE w.log_date = ? AND w.is_deleted = 0
+            ORDER BY t.title, w.ordinal
+            """, date);
+    }
+
+    /** 查询日期范围内的所有日志（关联任务信息） */
+    public List<Map<String, Object>> getByDateRange(LocalDate start, LocalDate end) {
+        return db.query("""
+            SELECT
+                w.id, w.task_id, w.log_date, w.phase, w.ordinal, w.content, w.polished_content,
+                t.title AS task_title, t.alias AS task_alias, t.status, t.nature
+            FROM work_logs w
+            JOIN tasks t ON t.id = w.task_id
+            WHERE w.log_date >= ? AND w.log_date <= ? AND w.is_deleted = 0
+            ORDER BY w.log_date, t.title, w.ordinal
+            """, start, end);
+    }
 }

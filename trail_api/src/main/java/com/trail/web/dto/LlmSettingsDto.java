@@ -13,5 +13,8 @@ public record LlmSettingsDto(
         String summarizeSystemPrompt,
         String summarizeMaintenancePrompt,
         String askMaintenancePrompt,
-        String toolsDesc
+        String toolsDesc,
+        // 日报/周报模板
+        String dailyReportTemplate,
+        String weeklyReportTemplate
 ) {}

@@ -20,7 +20,9 @@ public class ToolRegistry {
         this.mapper = mapper;
         this.tools = List.of(
             getApiDocs(),
-            callApi()
+            callApi(),
+            exportDailyReport(),
+            exportWeeklyReport()
         );
     }
 
@@ -81,6 +83,41 @@ public class ToolRegistry {
             "call_api",
             "执行 API 调用。GET 请求直接执行，POST/PUT 需要用户确认后才能执行。",
             new Tool.InputSchema("object", props, List.of("method", "path"))
+        );
+    }
+
+    /**
+     * 导出今日日报
+     */
+    private Tool exportDailyReport() {
+        ObjectNode props = mapper.createObjectNode();
+        props.set("date", mapper.createObjectNode()
+            .put("type", "string")
+            .put("description", "日期，格式 YYYY-MM-DD，默认今天"));
+
+        return new Tool(
+            "export_daily_report",
+            "导出今日工作日报，返回下载链接。",
+            new Tool.InputSchema("object", props, null)
+        );
+    }
+
+    /**
+     * 导出本周周报
+     */
+    private Tool exportWeeklyReport() {
+        ObjectNode props = mapper.createObjectNode();
+        props.set("start_date", mapper.createObjectNode()
+            .put("type", "string")
+            .put("description", "起始日期，格式 YYYY-MM-DD，默认本周一"));
+        props.set("end_date", mapper.createObjectNode()
+            .put("type", "string")
+            .put("description", "结束日期，格式 YYYY-MM-DD，默认今天"));
+
+        return new Tool(
+            "export_weekly_report",
+            "导出本周工作周报，返回下载链接。",
+            new Tool.InputSchema("object", props, null)
         );
     }
 }

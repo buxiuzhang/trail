@@ -35,7 +35,10 @@ public class LlmSettingsController {
                 all.getOrDefault("summarize_system_prompt", Prompts.SUMMARIZE_MAIN_SYSTEM),
                 all.getOrDefault("summarize_maintenance_prompt", Prompts.SUMMARIZE_MAINTENANCE_SYSTEM),
                 all.getOrDefault("ask_maintenance_prompt", Prompts.ASK_MAINTENANCE_SYSTEM),
-                all.getOrDefault("tools_desc", "")
+                all.getOrDefault("tools_desc", Prompts.TOOLS_DESC),
+                // 日报/周报模板
+                all.getOrDefault("daily_report_template", Prompts.DEFAULT_DAILY_REPORT_TEMPLATE),
+                all.getOrDefault("weekly_report_template", Prompts.DEFAULT_WEEKLY_REPORT_TEMPLATE)
         );
     }
 
@@ -76,6 +79,22 @@ public class LlmSettingsController {
             String p = data.get("ask_maintenance_prompt");
             if (p == null || p.isBlank()) store.delete("ask_maintenance_prompt");
             else store.save("ask_maintenance_prompt", p);
+        }
+        if (data.containsKey("tools_desc")) {
+            String p = data.get("tools_desc");
+            if (p == null || p.isBlank()) store.delete("tools_desc");
+            else store.save("tools_desc", p);
+        }
+        // 日报/周报模板
+        if (data.containsKey("daily_report_template")) {
+            String p = data.get("daily_report_template");
+            if (p == null || p.isBlank()) store.delete("daily_report_template");
+            else store.save("daily_report_template", p);
+        }
+        if (data.containsKey("weekly_report_template")) {
+            String p = data.get("weekly_report_template");
+            if (p == null || p.isBlank()) store.delete("weekly_report_template");
+            else store.save("weekly_report_template", p);
         }
         // 刷新 LlmService 的 prompt 缓存
         llmService.refreshPrompts();
