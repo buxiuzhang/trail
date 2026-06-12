@@ -117,6 +117,9 @@ public class TaskStore {
             throw new DuplicateException("任务已存在：" + title);
         }
 
+        // start_date 默认为今天
+        LocalDate effectiveStartDate = (startDate != null) ? startDate : LocalDate.now();
+
         // SQLite AUTOINCREMENT 自动生成 id；RETURNING id 仍可用（3.35+）
         Long newId = db.insertReturningId("""
             INSERT INTO tasks (
@@ -128,7 +131,7 @@ public class TaskStore {
             title.trim(),
             (alias == null || alias.isBlank()) ? null : alias.trim(),
             description,
-            startDate,
+            effectiveStartDate,
             processingDate,
             status,
             nature,
