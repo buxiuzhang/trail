@@ -34,6 +34,11 @@ public final class TaskMapper {
                 asInstant(row.get("created_at")),
                 asInstant(row.get("updated_at")),
                 asLocalDate(row.get("last_log_date")),
+                asInt(row.get("todo_active_count")),
+                asInt(row.get("todo_completed_count")),
+                asInt(row.get("todo_abandoned_count")),
+                asInt(row.get("log_count")),
+                asInt(row.get("log_main_count")),
                 contacts == null ? List.of() : contacts
         );
     }
@@ -53,6 +58,7 @@ public final class TaskMapper {
     }
 
     private static Long asLong(Object o) { return o == null ? null : ((Number) o).longValue(); }
+    private static int asInt(Object o) { return o == null ? 0 : ((Number) o).intValue(); }
     private static String asString(Object o) { return o == null ? null : o.toString(); }
     private static LocalDate asLocalDate(Object o) {
         if (o == null) return null;
