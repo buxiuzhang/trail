@@ -10,3 +10,10 @@ data/*.bak*
 .playwright-mcp/
 *.png
 data/.secret_key
+
+# 敏感文件模式
+*.pem
+*.key
+credentials.json
+secrets.yaml
+secrets.yml

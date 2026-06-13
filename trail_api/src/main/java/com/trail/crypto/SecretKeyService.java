@@ -23,8 +23,9 @@ import java.util.Set;
  * 32 字节 AES key 管理（M8 懒初始化版）。
  *
  * - 启动期不读 key；首次访问 dataDir 时（DataDirService.openConnection 之后）才 init
- * - 文件不存在 / 大小 ≠ 32：派生新 key（PBKDF2 + 固定盐 + hostname），写盘到 <dataDir>/.secret_key
+ * - 文件不存在 / 大小 ≠ 32：派生新 key（PBKDF2 + 可配置盐 + hostname），写盘到 <dataDir>/.secret_key
  * - 路径不再来自配置 yaml，**完全由 DataDirService 决定**（即 <dataDir>/.secret_key）
+ * - 盐值从 config.yaml 的 trail.crypto.salt 读取，支持环境变量覆盖
  */
 @Component
 public class SecretKeyService {
@@ -81,7 +82,7 @@ public class SecretKeyService {
 
     private byte[] derive() throws NoSuchAlgorithmException, InvalidKeySpecException {
         String host = hostname();
-        String salt = DEFAULT_SALT;
+        String salt = getSalt();
         int iter = DEFAULT_ITERATIONS;
         if (props != null) {
             // 可选从 AppProperties 覆盖（暂未在 application.yml 暴露；保留口子）
@@ -90,6 +91,14 @@ public class SecretKeyService {
                 host.toCharArray(), salt.getBytes(), iter, KEY_LENGTH_BYTES * 8);
         SecretKeyFactory skf = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
         return skf.generateSecret(spec).getEncoded();
+    }
+
+    /** 从配置获取盐值，支持 config.yaml 的 trail.crypto.salt */
+    private String getSalt() {
+        if (props != null && props.crypto() != null && props.crypto().salt() != null) {
+            return props.crypto().salt();
+        }
+        return DEFAULT_SALT;
     }
 
     private String hostname() {

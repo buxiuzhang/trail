@@ -30,5 +30,5 @@ trail:
 logging:
   level:
     root: INFO
-    com.trail: DEBUG
+    com.trail: INFO
     org.springframework.web: INFO
