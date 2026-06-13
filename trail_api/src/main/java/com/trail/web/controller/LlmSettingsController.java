@@ -1,5 +1,6 @@
 package com.trail.web.controller;
 
+import com.trail.crypto.RsaKeyService;
 import com.trail.llm.Prompts;
 import com.trail.service.LlmService;
 import com.trail.store.LLMSettingsStore;
@@ -8,23 +9,39 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
+/**
+ * LLM 配置 API。
+ *
+ * GET  /api/settings/llm - 获取配置
+ * PUT  /api/settings/llm - 保存配置（apiKey 支持 RSA 加密传输）
+ */
 @RestController
 @RequestMapping("/api/settings/llm")
 public class LlmSettingsController {
 
     private final LLMSettingsStore store;
     private final LlmService llmService;
+    private final RsaKeyService rsaKeyService;
 
-    public LlmSettingsController(LLMSettingsStore store, LlmService llmService) {
+    public LlmSettingsController(LLMSettingsStore store, LlmService llmService, RsaKeyService rsaKeyService) {
         this.store = store;
         this.llmService = llmService;
+        this.rsaKeyService = rsaKeyService;
     }
 
+    /**
+     * 获取 LLM 配置。
+     *
+     * - apiKeyMasked: 遮蔽值（用于显示）
+     * - apiKeyEncrypted: RSA 加密后的完整值（用于前端请求解密端点显示明文）
+     */
     @GetMapping
     public LlmSettingsDto get() {
         Map<String, String> all = store.getAll();
+        String apiKey = all.getOrDefault("api_key", "");
         return new LlmSettingsDto(
-                all.getOrDefault("api_key", ""),
+                maskApiKey(apiKey),                            // 遮蔽值
+                rsaKeyService.encryptForFrontend(apiKey),       // 私钥加密，前端用公钥解密
                 all.getOrDefault("base_url", ""),
                 all.getOrDefault("model", ""),
                 all.getOrDefault("max_tokens", "1000"),
@@ -44,10 +61,27 @@ public class LlmSettingsController {
         );
     }
 
+    /**
+     * 保存 LLM 配置。
+     *
+     * api_key_encrypted: RSA 加密后的 API Key
+     */
     @PutMapping
     public Map<String, Object> save(@RequestBody Map<String, String> data) {
+        // API Key 加密传输
+        if (data.containsKey("api_key_encrypted")) {
+            String encrypted = data.get("api_key_encrypted");
+            if (encrypted != null && !encrypted.isBlank()) {
+                String decrypted = rsaKeyService.decrypt(encrypted);
+                store.save("api_key", decrypted);
+            }
+        }
+        // 明文 api_key（兼容旧版本，但不推荐）
+        if (data.containsKey("api_key") && !data.containsKey("api_key_encrypted")) {
+            store.save("api_key", data.get("api_key") == null ? "" : data.get("api_key"));
+        }
+
         // 连接配置
-        if (data.containsKey("api_key")) store.save("api_key", data.get("api_key") == null ? "" : data.get("api_key"));
         if (data.containsKey("base_url")) store.save("base_url", data.get("base_url") == null ? "" : data.get("base_url"));
         if (data.containsKey("model")) store.save("model", data.get("model") == null ? "" : data.get("model"));
         if (data.containsKey("max_tokens")) store.save("max_tokens", data.get("max_tokens") == null ? "" : data.get("max_tokens"));
@@ -107,5 +141,15 @@ public class LlmSettingsController {
         // 刷新 LlmService 的 prompt 缓存
         llmService.refreshPrompts();
         return Map.of("ok", true);
+    }
+
+    /**
+     * 遮蔽 API Key。
+     * 格式：前4位****后4位
+     */
+    private String maskApiKey(String key) {
+        if (key == null || key.isEmpty()) return "";
+        if (key.length() <= 8) return "****";
+        return key.substring(0, 4) + "****" + key.substring(key.length() - 4);
     }
 }

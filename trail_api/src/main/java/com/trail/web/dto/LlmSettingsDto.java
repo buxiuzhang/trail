@@ -1,8 +1,14 @@
 package com.trail.web.dto;
 
-/** LLM 配置响应。apiKey 解密后明文返回。 */
+/**
+ * LLM 配置响应。
+ *
+ * - apiKeyMasked: 遮蔽值（格式：前4位****后4位）
+ * - apiKeyEncrypted: RSA 加密后的完整值（前端请求解密端点显示明文）
+ */
 public record LlmSettingsDto(
-        String apiKey,
+        String apiKeyMasked,
+        String apiKeyEncrypted,
         String baseUrl,
         String model,
         String maxTokens,

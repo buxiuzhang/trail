@@ -8,3 +8,18 @@ target/
 build/
 *.log
 .DS_Store
+
+# 密钥文件（加密传输用）
+trail_private.key
+.secret_key
+
+# 数据库文件
+*.sqlite
+db/
+
+# 日志目录
+logs/
+
+# 环境变量
+.env
+.env.*
