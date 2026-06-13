@@ -3,6 +3,7 @@ package com.trail.web.controller;
 import com.trail.store.ContactStore;
 import com.trail.store.TaskStore;
 import com.trail.web.dto.ContactDto;
+import com.trail.web.dto.PagedResponse;
 import com.trail.web.dto.StatusChangeRequest;
 import com.trail.web.dto.TaskCreateRequest;
 import com.trail.web.dto.TaskMapper;
@@ -32,18 +33,46 @@ public class TaskController {
         this.contacts = contacts;
     }
 
-    @Operation(summary = "查询任务列表", description = "根据条件筛选任务，支持按状态、性质、关键词模糊匹配。返回所有任务的基本信息。")
+    @Operation(summary = "查询任务列表", description = "根据条件筛选任务，支持按状态、性质、月份、标签、关键词模糊匹配。默认分页 limit=5；不传 limit 时返回全量（向后兼容）。")
     @GetMapping
-    public List<TaskResponse> list(
+    public PagedResponse<TaskResponse> list(
             @Parameter(description = "按状态筛选：未开始、进行中、已完成、已作废")
             @RequestParam(required = false) String status,
             @Parameter(description = "按性质筛选：长期、临时、维护")
             @RequestParam(required = false) String nature,
             @Parameter(description = "标题关键词模糊匹配")
-            @RequestParam(required = false) String search) {
-        return tasks.listTasks(status, nature, search).stream()
-                .map(this::withContacts)
+            @RequestParam(required = false) String search,
+            @Parameter(description = "按月份筛选：YYYY-MM，匹配 processing_date || start_date")
+            @RequestParam(required = false) String month,
+            @Parameter(description = "按标签筛选：JSON 字符串包含匹配")
+            @RequestParam(required = false) String tag,
+            @Parameter(description = "每页条数（不传则 999999，向后兼容全量）")
+            @RequestParam(required = false) Integer limit,
+            @Parameter(description = "偏移量（默认 0）")
+            @RequestParam(required = false) Integer offset) {
+        int effectiveLimit = (limit == null) ? Integer.MAX_VALUE : limit;
+        int effectiveOffset = (offset == null) ? 0 : offset;
+
+        List<Map<String, Object>> rows = tasks.listTasksPaged(
+                status, nature, search, month, tag, effectiveLimit, effectiveOffset);
+        long total = tasks.countTasks(status, nature, search, month, tag);
+
+        // 一次 IN 批量查 contacts，替代 N+1
+        List<Long> ids = rows.stream()
+                .map(r -> ((Number) r.get("id")).longValue())
                 .toList();
+        Map<Long, List<Map<String, Object>>> contactsByTask = contacts.listContactsBulk(ids);
+
+        List<TaskResponse> items = rows.stream()
+                .map(r -> {
+                    long id = ((Number) r.get("id")).longValue();
+                    List<ContactDto> cs = contactsByTask.getOrDefault(id, List.of()).stream()
+                            .map(TaskMapper::contactToDto)
+                            .toList();
+                    return TaskMapper.toResponse(r, cs);
+                })
+                .toList();
+        return new PagedResponse<>(items, total);
     }
 
     @Operation(summary = "创建新任务", description = "创建一个新的任务。需要提供标题，其他字段可选。")
