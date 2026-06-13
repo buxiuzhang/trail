@@ -70,23 +70,27 @@ public class WebConfig implements WebMvcConfigurer {
 
         // 2. 发布包模式：JAR 同级的 static/ 目录
         try {
-            Path jarPath = Paths.get(getClass().getProtectionDomain().getCodeSource().getLocation().toURI());
-            System.out.println("[WebConfig] JAR path: " + jarPath);
-            if (jarPath.toString().endsWith(".jar")) {
-                Path staticDir = jarPath.getParent().resolve("static");
-                System.out.println("[WebConfig] Checking static dir: " + staticDir + " exists=" + java.nio.file.Files.exists(staticDir));
-                if (java.nio.file.Files.exists(staticDir)) {
-                    return staticDir;
-                }
-                // 尝试 app 目录下的 static（jpackage 可能放在这里）
-                Path appStaticDir = jarPath.getParent().getParent().resolve("app/static");
-                System.out.println("[WebConfig] Checking app/static dir: " + appStaticDir + " exists=" + java.nio.file.Files.exists(appStaticDir));
-                if (java.nio.file.Files.exists(appStaticDir)) {
-                    return appStaticDir;
+            // 获取当前工作目录，检查是否有 static/ 子目录
+            Path workDir = Paths.get("").toAbsolutePath();
+            Path staticDir = workDir.resolve("static");
+            System.out.println("[WebConfig] Work dir: " + workDir);
+            System.out.println("[WebConfig] Checking static dir: " + staticDir + " exists=" + Files.exists(staticDir));
+            if (Files.exists(staticDir) && Files.isDirectory(staticDir)) {
+                return staticDir;
+            }
+
+            // 尝试从 JAR 所在目录查找
+            Path jarDir = getJarDirectory();
+            if (jarDir != null) {
+                Path jarStaticDir = jarDir.resolve("static");
+                System.out.println("[WebConfig] JAR dir: " + jarDir);
+                System.out.println("[WebConfig] Checking JAR static dir: " + jarStaticDir + " exists=" + Files.exists(jarStaticDir));
+                if (Files.exists(jarStaticDir) && Files.isDirectory(jarStaticDir)) {
+                    return jarStaticDir;
                 }
             }
         } catch (Exception e) {
-            System.out.println("[WebConfig] Error resolving JAR path: " + e.getMessage());
+            System.out.println("[WebConfig] Error resolving static path: " + e.getMessage());
         }
 
         // 3. 开发模式：相对项目根的 trail_web/dist
@@ -94,5 +98,28 @@ public class WebConfig implements WebMvcConfigurer {
         Path resolved = devDist.isAbsolute() ? devDist : devDist.toAbsolutePath();
         System.out.println("[WebConfig] Dev mode dist: " + resolved);
         return resolved;
+    }
+
+    /**
+     * 获取 JAR 文件所在目录
+     */
+    private Path getJarDirectory() {
+        try {
+            // 方法1：通过 ProtectionDomain
+            var codeSource = getClass().getProtectionDomain().getCodeSource();
+            if (codeSource != null) {
+                Path path = Paths.get(codeSource.getLocation().toURI());
+                if (path.toString().endsWith(".jar")) {
+                    return path.getParent();
+                }
+                if (Files.isDirectory(path)) {
+                    // 开发模式下是 classes 目录
+                    return null;
+                }
+            }
+        } catch (Exception e) {
+            // 忽略，尝试其他方法
+        }
+        return null;
     }
 }
