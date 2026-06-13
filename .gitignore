@@ -17,3 +17,9 @@ data/.secret_key
 credentials.json
 secrets.yaml
 secrets.yml
+
+# 构建产物
+build/
+trail_api/target/
+trail_web/dist/
+trail_web/node_modules/

@@ -54,10 +54,31 @@ public class WebConfig implements WebMvcConfigurer {
                 });
     }
 
+    /**
+     * 解析前端 dist 目录。
+     * 优先级：env TRAIL_FRONTEND_DIR > static/ (发布包模式) > ../trail_web/dist (开发模式)
+     */
     private Path resolveDist() {
+        // 1. 环境变量优先
         String env = System.getenv("TRAIL_FRONTEND_DIR");
-        String dir = (env != null && !env.isBlank()) ? env : "../trail_web/dist";
-        Path p = Paths.get(dir);
-        return p.isAbsolute() ? p : p.toAbsolutePath();
+        if (env != null && !env.isBlank()) {
+            Path p = Paths.get(env);
+            return p.isAbsolute() ? p : p.toAbsolutePath();
+        }
+
+        // 2. 发布包模式：JAR 同级的 static/ 目录
+        try {
+            Path jarPath = Paths.get(getClass().getProtectionDomain().getCodeSource().getLocation().toURI());
+            if (jarPath.toString().endsWith(".jar")) {
+                Path staticDir = jarPath.getParent().resolve("static");
+                if (Files.exists(staticDir)) {
+                    return staticDir;
+                }
+            }
+        } catch (Exception ignored) {}
+
+        // 3. 开发模式：相对项目根的 trail_web/dist
+        Path devDist = Paths.get("../trail_web/dist");
+        return devDist.isAbsolute() ? devDist : devDist.toAbsolutePath();
     }
 }
