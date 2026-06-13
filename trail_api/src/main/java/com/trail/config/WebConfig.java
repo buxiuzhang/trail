@@ -108,6 +108,7 @@ public class WebConfig implements WebMvcConfigurer {
             var codeSource = getClass().getProtectionDomain().getCodeSource();
             if (codeSource != null) {
                 Path path = Paths.get(codeSource.getLocation().toURI());
+                System.out.println("[WebConfig] CodeSource location: " + path);
                 if (path.toString().endsWith(".jar")) {
                     return path.getParent();
                 }
@@ -117,8 +118,24 @@ public class WebConfig implements WebMvcConfigurer {
                 }
             }
         } catch (Exception e) {
-            // 忽略，尝试其他方法
+            System.out.println("[WebConfig] CodeSource method failed: " + e.getMessage());
         }
+
+        // 方法2：通过 classpath 查找（jpackage 打包后的场景）
+        String classPath = System.getProperty("java.class.path");
+        if (classPath != null) {
+            String[] paths = classPath.split(System.getProperty("path.separator"));
+            for (String p : paths) {
+                if (p.endsWith("trail-api.jar")) {
+                    Path jarPath = Paths.get(p);
+                    if (Files.exists(jarPath)) {
+                        System.out.println("[WebConfig] Found JAR via classpath: " + jarPath);
+                        return jarPath.getParent();
+                    }
+                }
+            }
+        }
+
         return null;
     }
 }
