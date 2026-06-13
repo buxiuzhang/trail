@@ -59,6 +59,12 @@ jobs:
           if ($version -eq "") { $version = "${{ github.ref_name }}" }
           $version = $version -replace '^v', ''
 
+          # jpackage 要求版本号不能以 0 开头，自动转换
+          if ($version -match '^0\.') {
+            $version = "1." + $version.Substring(2)
+            Write-Host "Version adjusted to $version (jpackage requirement)"
+          }
+
           jpackage `
             --name "Trail" `
             --app-version "$version" `
@@ -127,6 +133,12 @@ jobs:
           version="${{ github.event.inputs.version }}"
           if [ -z "$version" ]; then version="${{ github.ref_name }}"; fi
           version="${version#v}"
+
+          # jpackage 要求版本号不能以 0 开头，自动转换
+          if [[ "$version" =~ ^0\. ]]; then
+            version="1.${version:2}"
+            echo "Version adjusted to $version (jpackage requirement)"
+          fi
 
           jpackage \
             --name "Trail" \
