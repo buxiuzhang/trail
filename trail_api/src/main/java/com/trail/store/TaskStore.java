@@ -36,7 +36,21 @@ public class TaskStore {
     // 查询
     // ============================================================
 
+    /** 旧签名保留（向后兼容）：无 month/tag，无分页。 */
     public List<Map<String, Object>> listTasks(String status, String nature, String search) {
+        return listTasksPaged(status, nature, search, null, null, null, null);
+    }
+
+    /**
+     * 完整筛选 + 分页 + 5 聚合字段：
+     *   todo_active_count / todo_completed_count / todo_abandoned_count
+     *   log_count / log_main_count
+     * 派生自 LEFT JOIN 子查询（与现有 last_log_date 派生风格一致）。
+     */
+    public List<Map<String, Object>> listTasksPaged(
+            String status, String nature, String search,
+            String month, String tag,
+            Integer limit, Integer offset) {
         // 1) 自动升级：临时任务超过 30 天未完成 → 长期
         db.update(
             "UPDATE tasks SET nature = ?, updated_at = CURRENT_TIMESTAMP"
@@ -44,18 +58,83 @@ public class TaskStore {
           + " AND start_date IS NOT NULL AND start_date < date('now', '-30 days')",
             "长期", "临时", "已完成", "已作废");
 
-        // 2) 派生 last_log_date
+        // 2) 主 SQL：派生 last_log_date + 5 聚合
         StringBuilder sql = new StringBuilder("""
-            SELECT t.*, sub.last_log_date
+            SELECT t.*, sub.last_log_date,
+              COALESCE(todo_sub.todo_active_count, 0) AS todo_active_count,
+              COALESCE(todo_sub.todo_completed_count, 0) AS todo_completed_count,
+              COALESCE(todo_sub.todo_abandoned_count, 0) AS todo_abandoned_count,
+              COALESCE(log_sub.log_count, 0) AS log_count,
+              COALESCE(log_sub.log_main_count, 0) AS log_main_count
             FROM tasks t
             LEFT JOIN (
                 SELECT task_id, MAX(log_date) AS last_log_date
                 FROM work_logs WHERE is_deleted = 0
                 GROUP BY task_id
             ) sub ON sub.task_id = t.id
+            LEFT JOIN (
+                SELECT task_id,
+                  SUM(CASE WHEN is_completed = 0 AND is_abandoned = 0 THEN 1 ELSE 0 END) AS todo_active_count,
+                  SUM(CASE WHEN is_completed = 1 THEN 1 ELSE 0 END) AS todo_completed_count,
+                  SUM(CASE WHEN is_abandoned = 1 THEN 1 ELSE 0 END) AS todo_abandoned_count
+                FROM todos
+                GROUP BY task_id
+            ) todo_sub ON todo_sub.task_id = t.id
+            LEFT JOIN (
+                SELECT task_id,
+                  SUM(CASE WHEN is_deleted = 0 THEN 1 ELSE 0 END) AS log_count,
+                  SUM(CASE WHEN is_deleted = 0 AND phase = 'main' THEN 1 ELSE 0 END) AS log_main_count
+                FROM work_logs
+                GROUP BY task_id
+            ) log_sub ON log_sub.task_id = t.id
             WHERE 1=1
             """);
         List<Object> params = new java.util.ArrayList<>();
+        buildWhereSql(sql, params, status, nature, search, month, tag);
+        // SQLite 不支持 NULLS LAST → 改 CASE WHEN x IS NULL THEN 1 ELSE 0 END, x DESC
+        sql.append("""
+            ORDER BY
+              CASE WHEN t.pinned_at IS NULL THEN 1 ELSE 0 END, t.pinned_at DESC,
+              CASE t.status
+                WHEN '进行中' THEN 0
+                WHEN '未开始' THEN 1
+                WHEN '已完成' THEN 2
+                WHEN '已作废' THEN 3
+                ELSE 4
+              END,
+              CASE WHEN t.start_date IS NULL THEN 1 ELSE 0 END, t.start_date DESC,
+              t.title
+            """);
+        if (limit != null) {
+            sql.append(" LIMIT ?");
+            params.add(limit);
+        }
+        if (offset != null) {
+            sql.append(" OFFSET ?");
+            params.add(offset);
+        }
+        return db.query(sql.toString(), params.toArray());
+    }
+
+    /** 与 listTasksPaged 共享 WHERE 条件；total 与 items 过滤一致。 */
+    public long countTasks(String status, String nature, String search, String month, String tag) {
+        StringBuilder sql = new StringBuilder("SELECT COUNT(*) AS cnt FROM tasks t WHERE 1=1");
+        List<Object> params = new java.util.ArrayList<>();
+        buildWhereSql(sql, params, status, nature, search, month, tag);
+        List<Map<String, Object>> rows = db.query(sql.toString(), params.toArray());
+        if (rows.isEmpty()) return 0L;
+        Object v = rows.get(0).get("cnt");
+        return v == null ? 0L : ((Number) v).longValue();
+    }
+
+    /**
+     * 共享 WHERE 条件拼装。listTasksPaged / countTasks 都用，保证 total 与 items 过滤一致。
+     *   month: COALESCE(processing_date, start_date) 严格等价前端 || 短路
+     *   tag:   tags 列存 JSON 字符串如 ["a","b"]，用 "tag" 包裹匹配（tag 名含 " 或 \ 的边界不严谨）
+     */
+    private void buildWhereSql(StringBuilder sql, List<Object> params,
+                                String status, String nature, String search,
+                                String month, String tag) {
         if (status != null && !status.isBlank()) {
             sql.append(" AND t.status = ?");
             params.add(status);
@@ -68,32 +147,45 @@ public class TaskStore {
             sql.append(" AND t.title LIKE ?");
             params.add("%" + search + "%");
         }
-        // SQLite 不支持 NULLS LAST → 改 CASE WHEN x IS NULL THEN 1 ELSE 0 END, x DESC
-        sql.append("""
-            ORDER BY
-              CASE WHEN t.pinned_at IS NULL THEN 1 ELSE 0 END, t.pinned_at DESC,
-              CASE t.status
-                WHEN '进行中' THEN 0
-                WHEN '未开始' THEN 1
-                WHEN '已完成' THEN 2
-                WHEN '已作废' THEN 3
-                ELSE 4
-              END,
-              CASE WHEN start_date IS NULL THEN 1 ELSE 0 END, start_date DESC,
-              title
-            """);
-        return db.query(sql.toString(), params.toArray());
+        if (month != null && !month.isBlank()) {
+            sql.append(" AND strftime('%Y-%m', COALESCE(t.processing_date, t.start_date)) = ?");
+            params.add(month);
+        }
+        if (tag != null && !tag.isBlank()) {
+            sql.append(" AND t.tags LIKE ?");
+            params.add("%\"" + tag + "\"%");
+        }
     }
 
     public Map<String, Object> getTask(long taskId) {
         List<Map<String, Object>> rows = db.query("""
-            SELECT t.*, sub.last_log_date
+            SELECT t.*, sub.last_log_date,
+              COALESCE(todo_sub.todo_active_count, 0) AS todo_active_count,
+              COALESCE(todo_sub.todo_completed_count, 0) AS todo_completed_count,
+              COALESCE(todo_sub.todo_abandoned_count, 0) AS todo_abandoned_count,
+              COALESCE(log_sub.log_count, 0) AS log_count,
+              COALESCE(log_sub.log_main_count, 0) AS log_main_count
             FROM tasks t
             LEFT JOIN (
                 SELECT task_id, MAX(log_date) AS last_log_date
                 FROM work_logs WHERE is_deleted = 0
                 GROUP BY task_id
             ) sub ON sub.task_id = t.id
+            LEFT JOIN (
+                SELECT task_id,
+                  SUM(CASE WHEN is_completed = 0 AND is_abandoned = 0 THEN 1 ELSE 0 END) AS todo_active_count,
+                  SUM(CASE WHEN is_completed = 1 THEN 1 ELSE 0 END) AS todo_completed_count,
+                  SUM(CASE WHEN is_abandoned = 1 THEN 1 ELSE 0 END) AS todo_abandoned_count
+                FROM todos
+                GROUP BY task_id
+            ) todo_sub ON todo_sub.task_id = t.id
+            LEFT JOIN (
+                SELECT task_id,
+                  SUM(CASE WHEN is_deleted = 0 THEN 1 ELSE 0 END) AS log_count,
+                  SUM(CASE WHEN is_deleted = 0 AND phase = 'main' THEN 1 ELSE 0 END) AS log_main_count
+                FROM work_logs
+                GROUP BY task_id
+            ) log_sub ON log_sub.task_id = t.id
             WHERE t.id = ?
             """, taskId);
         if (rows.isEmpty()) throw new NotFoundException("任务不存在：" + taskId);
