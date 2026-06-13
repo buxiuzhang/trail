@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useDataDir } from '../../api/settings'
 import styles from './DataDirGate.module.css'
 
@@ -38,7 +38,7 @@ export function DataDirGate({ children }: { children: React.ReactNode }) {
         <span className={styles.bannerText}>
           系统已准备默认数据目录 <strong>~/.trail/data</strong>，请确认后开始使用。
         </span>
-        <a className={styles.bannerLink} href="#/settings">去确认 →</a>
+        <Link className={styles.bannerLink} to="/settings">去确认 →</Link>
       </div>
     </>
   )
