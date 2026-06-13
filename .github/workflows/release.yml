@@ -55,6 +55,8 @@ jobs:
           copy trail_api\target\trail-api.jar bundle\
           mkdir bundle\static
           xcopy trail_web\dist\* bundle\static\ /E /I
+          dir bundle
+          dir bundle\static
 
       - name: Create Windows Installer
         run: |

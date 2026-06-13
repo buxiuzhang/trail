@@ -63,22 +63,36 @@ public class WebConfig implements WebMvcConfigurer {
         String env = System.getenv("TRAIL_FRONTEND_DIR");
         if (env != null && !env.isBlank()) {
             Path p = Paths.get(env);
-            return p.isAbsolute() ? p : p.toAbsolutePath();
+            Path resolved = p.isAbsolute() ? p : p.toAbsolutePath();
+            System.out.println("[WebConfig] TRAIL_FRONTEND_DIR: " + resolved);
+            return resolved;
         }
 
         // 2. 发布包模式：JAR 同级的 static/ 目录
         try {
             Path jarPath = Paths.get(getClass().getProtectionDomain().getCodeSource().getLocation().toURI());
+            System.out.println("[WebConfig] JAR path: " + jarPath);
             if (jarPath.toString().endsWith(".jar")) {
                 Path staticDir = jarPath.getParent().resolve("static");
-                if (Files.exists(staticDir)) {
+                System.out.println("[WebConfig] Checking static dir: " + staticDir + " exists=" + java.nio.file.Files.exists(staticDir));
+                if (java.nio.file.Files.exists(staticDir)) {
                     return staticDir;
                 }
+                // 尝试 app 目录下的 static（jpackage 可能放在这里）
+                Path appStaticDir = jarPath.getParent().getParent().resolve("app/static");
+                System.out.println("[WebConfig] Checking app/static dir: " + appStaticDir + " exists=" + java.nio.file.Files.exists(appStaticDir));
+                if (java.nio.file.Files.exists(appStaticDir)) {
+                    return appStaticDir;
+                }
             }
-        } catch (Exception ignored) {}
+        } catch (Exception e) {
+            System.out.println("[WebConfig] Error resolving JAR path: " + e.getMessage());
+        }
 
         // 3. 开发模式：相对项目根的 trail_web/dist
         Path devDist = Paths.get("../trail_web/dist");
-        return devDist.isAbsolute() ? devDist : devDist.toAbsolutePath();
+        Path resolved = devDist.isAbsolute() ? devDist : devDist.toAbsolutePath();
+        System.out.println("[WebConfig] Dev mode dist: " + resolved);
+        return resolved;
     }
 }
