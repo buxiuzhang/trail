@@ -11,6 +11,9 @@ on:
         required: false
         default: '0.3.0'
 
+permissions:
+  contents: write
+
 jobs:
   # ============================================================
   # 构建 Windows 安装包
