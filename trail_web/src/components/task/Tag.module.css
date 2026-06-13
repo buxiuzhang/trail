@@ -1,0 +1,7 @@
+.tag {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--ink-ghost);
+  letter-spacing: 0.04em;
+}

@@ -1,0 +1,19 @@
+.badge {
+  display: inline-block;
+  font-family: var(--serif-sc);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  padding: 2px 10px;
+  border: 0.5px solid currentColor;
+  opacity: 0.8;
+}
+.badge::before {
+  content: "◆";
+  font-size: 7px;
+  margin-right: 5px;
+  vertical-align: middle;
+}
+
+.lt { color: var(--ink-soft); }
+.tp { color: var(--ink-faded); }
+.mt { color: var(--gold); }

@@ -1,0 +1,73 @@
+/* ============================================================
+   DescriptionEditorWithMode · 预览/源码切换包装
+   ============================================================ */
+
+.wrapper {
+  position: relative;
+  width: 100%;
+}
+
+/* ---- 纯 icon · mode 切换按钮 (基础样式) -----
+   无框、无底色,只显示 icon 本身。
+   icon 浅色 (--ink-faded),hover 加深一档 (--ink-soft) 提示可点。
+   icon 颜色由父级 color 控制 (currentColor 来自 IconPreview / IconSource)。
+   默认无定位 — 父级容器决定位置(DescriptionEditorWithMode 内 overlay / 外置 inline)。 */
+
+.modeBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  background: transparent;
+  border: none;
+  color: var(--ink-faded);   /* 浅色 icon 染色 */
+  cursor: pointer;
+  transition: color 0.15s ease;
+  line-height: 0;
+}
+
+.modeBtn:hover {
+  color: var(--ink-soft);    /* hover 时 icon 深一档 */
+}
+
+.modeBtn:focus-visible {
+  outline: 1px solid var(--ink-faded);
+  outline-offset: 1px;
+  border-radius: 2px;
+}
+
+/* overlay 修饰:在 DescriptionEditor 内部右上角浮层时叠加 */
+.modeBtnOverlay {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 3;
+}
+
+.modeBtnIcon {
+  display: block;
+}
+
+/* ---- 源码编辑模式的纯 textarea ----- */
+
+.sourceTextarea {
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  font-family: var(--body);
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--ink);
+  resize: vertical;
+  outline: none;
+  /* 给右上角纯 icon 按钮让位,避免光标贴到 icon 旁 */
+  padding-right: 44px;
+  box-sizing: border-box;
+}
+
+.sourceTextarea::placeholder {
+  color: var(--rule-soft);
+  font-family: var(--body);
+  font-style: italic;
+}

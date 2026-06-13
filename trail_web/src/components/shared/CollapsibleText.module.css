@@ -1,0 +1,84 @@
+/**
+ * CollapsibleText 样式
+ */
+
+.content {
+  position: relative;
+  overflow: hidden;
+}
+
+/* 收起时底部渐变遮罩 + 展开按钮居中 */
+.fade {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 48px;
+  background: linear-gradient(transparent, var(--card));
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 展开按钮：无框无背景，居中于渐变遮罩 */
+.expandBtn {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: var(--ink-faded);
+  cursor: pointer;
+  transition: color 150ms, transform 150ms;
+}
+
+.expandBtn:hover {
+  color: var(--ink);
+  transform: scale(1.1);
+}
+
+.expandBtn img {
+  width: 16px;
+  height: 16px;
+  opacity: 0.5;
+}
+
+.expandBtn:hover img {
+  opacity: 0.85;
+}
+
+/* 收起按钮：无框无背景，居中 */
+.collapseBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin-top: 8px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: var(--ink-faded);
+  cursor: pointer;
+  transition: color 150ms, transform 150ms;
+}
+
+.collapseBtn:hover {
+  color: var(--ink);
+}
+
+.collapseBtn img {
+  width: 16px;
+  height: 16px;
+  opacity: 0.5;
+  transition: transform 150ms;
+}
+
+.collapseBtn:hover img {
+  opacity: 0.85;
+  transform: scale(1.1);
+}

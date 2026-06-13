@@ -1,0 +1,348 @@
+/* —— 对话窗口容器 —— */
+.window {
+  position: fixed;
+  bottom: 80px;
+  right: 28px;
+  z-index: 1050;
+  width: 340px;
+  max-height: calc(100vh - 120px);
+  display: flex;
+  flex-direction: column;
+  background: var(--card);
+  border: 0.5px solid var(--rule);
+  box-shadow:
+    0 1px 0 rgba(26, 22, 18, 0.06),
+    0 24px 48px -20px rgba(60, 40, 15, 0.35);
+  animation: chatIn 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+
+/* 顶部虚线装饰 */
+.window::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: repeating-linear-gradient(
+    to right,
+    var(--rule) 0,
+    var(--rule) 2px,
+    transparent 2px,
+    transparent 5px
+  );
+  opacity: 0.45;
+}
+
+/* —— 头部 —— */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px 10px;
+  border-bottom: 0.5px solid var(--rule-soft);
+}
+
+.title {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-faded);
+}
+
+.close {
+  background: none;
+  border: none;
+  font-family: var(--body);
+  font-size: 16px;
+  color: var(--ink-ghost);
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  transition: color 150ms ease;
+}
+.close:hover {
+  color: var(--ink);
+}
+
+/* —— 消息列表 —— */
+.body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+}
+
+/* 滚动条 */
+.body::-webkit-scrollbar {
+  width: 4px;
+}
+.body::-webkit-scrollbar-track {
+  background: transparent;
+}
+.body::-webkit-scrollbar-thumb {
+  background: var(--rule-soft);
+}
+
+/* —— 单条消息行 —— */
+.msg {
+  display: flex;
+  max-width: 90%;
+}
+.msgUser {
+  align-self: flex-end;
+}
+.msgAssistant {
+  align-self: flex-start;
+}
+
+.msgBubble {
+  position: relative;
+  padding: 8px 12px;
+}
+
+.msgUser .msgBubble {
+  background: var(--paper-warm);
+}
+.msgAssistant .msgBubble {
+  background: var(--card-soft);
+}
+
+.msgRole {
+  display: block;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--ink-ghost);
+  margin-bottom: 3px;
+}
+
+.msgContent {
+  margin: 0;
+  font-family: var(--body);
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--ink-soft);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* 复制按钮 */
+.copyBtn {
+  position: absolute;
+  bottom: 4px;
+  right: 8px;
+  opacity: 0;
+  transition: opacity 150ms ease;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--ink-ghost);
+  font-size: 12px;
+  padding: 2px 4px;
+}
+
+.msgBubble:hover .copyBtn {
+  opacity: 1;
+}
+
+.copyBtn:hover {
+  color: var(--ink-soft);
+}
+
+/* —— 输入中动画 —— */
+.typing {
+  align-self: flex-start;
+  display: flex;
+  gap: 4px;
+  padding: 6px 12px;
+  background: var(--card-soft);
+}
+.typingDot {
+  width: 4px;
+  height: 4px;
+  background: var(--ink-ghost);
+  animation: typingBounce 1.2s ease infinite;
+}
+.typingDot:nth-child(2) { animation-delay: 0.15s; }
+.typingDot:nth-child(3) { animation-delay: 0.3s; }
+
+@keyframes typingBounce {
+  0%, 60%, 100% { opacity: 0.2; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-2px); }
+}
+
+/* —— 工具调用状态 —— */
+.toolStatus {
+  align-self: flex-start;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--card-soft);
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-faded);
+}
+
+.toolIcon {
+  opacity: 0.7;
+}
+
+.toolText {
+  color: var(--ink-soft);
+}
+
+.toolStatus .iteration {
+  color: var(--ink-ghost);
+  font-size: 10px;
+  margin-left: 4px;
+}
+
+/* —— 输入区 —— */
+.inputRow {
+  display: flex;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 0.5px solid var(--rule);
+}
+
+.input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  border-bottom: 0.5px solid var(--rule);
+  padding: 5px 2px;
+  font-family: var(--body);
+  font-size: 13.5px;
+  color: var(--ink);
+  outline: none;
+  transition: border-color 200ms ease;
+}
+.input::placeholder {
+  font-style: italic;
+  color: var(--ink-ghost);
+  font-size: 13px;
+}
+.input:focus {
+  border-bottom-color: var(--ink);
+}
+.input:disabled {
+  opacity: 0.5;
+}
+
+.sendBtn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  background: transparent;
+  border: 0.5px solid var(--rule);
+  color: var(--ink-faded);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 200ms ease, color 200ms ease, border-color 200ms ease;
+}
+.sendBtn:hover:not(:disabled) {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+}
+.sendBtn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* —— 语音输入按钮 —— */
+.micWrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.micBtn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
+  background: transparent;
+  border: none;
+  color: var(--ink-faded);
+  cursor: pointer;
+  transition: color 200ms ease;
+}
+
+.micBtn:hover {
+  color: var(--ink);
+}
+
+.micBtnActive {
+  composes: micBtn;
+  color: var(--oxblood-soft);
+  animation: micBlink 1s ease-in-out infinite;
+}
+
+/* 录音状态：简单闪烁 */
+@keyframes micBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* 进度条（在按钮外，不受闪烁影响） */
+.micProgress {
+  width: 24px;
+  height: 2px;
+  background: var(--rule-soft);
+  border-radius: 1px;
+  overflow: hidden;
+  margin-top: 2px;
+}
+
+.micProgressFill {
+  height: 100%;
+  background: var(--oxblood-soft);
+}
+
+/* —— 入场动画 —— */
+@keyframes chatIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* —— 响应式 —— */
+@media (max-width: 920px) {
+  .window {
+    width: calc(100vw - 32px);
+    right: 16px;
+    bottom: 68px;
+    max-height: calc(100vh - 96px);
+  }
+  .body {
+    padding: 12px 14px;
+  }
+  .header {
+    padding: 10px 14px 8px;
+  }
+  .inputRow {
+    padding: 8px 12px;
+  }
+}

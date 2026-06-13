@@ -1,0 +1,271 @@
+/* ============================================================
+   任务卡：仿图书馆卡片目录 / Bibliographic Card
+   ============================================================ */
+
+/* 外层包装容器 —— 用于定位左上角的置顶按钮 */
+.cardWrap {
+  position: relative;
+  margin-bottom: var(--space-md);
+}
+
+.card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 140px 1fr 140px;
+  gap: var(--space-xl);
+  padding: var(--space-lg) var(--space-xl);
+  background: var(--card);
+  border: 0.5px solid var(--rule);
+  box-shadow:
+    inset 0 0 60px rgba(26, 22, 18, 0.015),
+    var(--shadow-lg);
+  cursor: pointer;
+  transition: transform 240ms cubic-bezier(0.2, 0.6, 0.2, 1),
+              box-shadow 240ms ease,
+              border-color 240ms ease;
+  text-align: left;
+  width: 100%;
+  font: inherit;
+  color: inherit;
+  border-radius: 0;
+}
+
+/* 三孔装订 —— 上孔 */
+.card::before {
+  content: "";
+  position: absolute;
+  left: 12px;
+  top: 22%;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--ink-ghost);
+  opacity: 0.35;
+  box-shadow: inset 0 1px 1px rgba(0,0,0,0.1);
+}
+
+.card:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    inset 0 0 60px rgba(26, 22, 18, 0.015),
+    var(--shadow-xl);
+  border-color: var(--ink-faded);
+}
+.card:hover .title { color: var(--green-ink); }
+
+.isPinned {
+  border-left: 3px solid var(--green);
+}
+
+/* 左列：编目号 */
+.cat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-right: 18px;
+  border-right: 0.5px solid var(--rule);
+  position: relative;
+}
+
+/* 三孔装订 —— 中孔（挂在 .cat 上） */
+.cat::before {
+  content: "";
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--ink-ghost);
+  opacity: 0.35;
+  box-shadow: inset 0 1px 1px rgba(0,0,0,0.1);
+}
+.catNo {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--ink-faded);
+  text-transform: uppercase;
+  font-feature-settings: "tnum";
+  white-space: nowrap;
+}
+.catNo strong {
+  color: var(--ink-faded);
+  font-weight: 500;
+  font-family: var(--mono);
+  font-size: 11px;
+}
+.catLabel {
+  font-family: var(--body);
+  font-style: italic;
+  font-size: 11.5px;
+  color: var(--ink-ghost);
+  letter-spacing: 0.03em;
+  margin-top: 2px;
+}
+
+/* 待办三态：标题「待办事项」+ 三行 dash 列表（与详情页 TodoSection 口径一致） */
+.todoBlock {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.todoTitle {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-faded);
+}
+.todoList {
+  list-style: none;
+  margin: 0;
+  padding-left: 6px;            /* 整体轻微缩进，与 title 形成层次 */
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.02em;
+  color: var(--ink-ghost);
+  font-feature-settings: "tnum";
+  white-space: nowrap;
+}
+
+/* 置顶按钮 —— 位于卡片左上角 */
+.pinBtn {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.35;
+  transition: opacity 0.15s, transform 0.15s;
+  padding: 0;
+  z-index: 10;
+}
+.pinBtn:hover { opacity: 0.9; transform: scale(1.15); }
+.pinOn { opacity: 1; }
+
+/* 中列：主体 */
+.body {
+  min-width: 0;
+  position: relative;
+}
+
+/* 三孔装订 —— 下孔（挂在 .body 上） */
+.body::before {
+  content: "";
+  position: absolute;
+  left: calc(-1 * var(--space-xl) - 12px); /* 回到左边界 + 12px */
+  top: 78%;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--ink-ghost);
+  opacity: 0.35;
+  box-shadow: inset 0 1px 1px rgba(0,0,0,0.1);
+}
+
+.topline {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.title {
+  font-family: var(--serif-sc);
+  font-weight: 500;
+  font-size: 21px;
+  line-height: 1.18;
+  letter-spacing: 0.005em;
+  color: var(--ink);
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 0.5px solid var(--rule);
+  transition: color 240ms ease;
+}
+.desc {
+  font-family: var(--body);
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ink-faded);
+  white-space: pre-line;
+}
+.tags {
+  display: flex; gap: 8px; flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+/* 右列：旁注 (dl) */
+.margin {
+  padding-left: 16px;
+  border-left: 0.5px solid var(--rule);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+}
+.margin dt {
+  font-family: var(--mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-ghost);
+  margin-top: 6px;
+}
+.margin dt::before {
+  content: "§ ";
+  color: var(--ink-ghost);
+  opacity: 0.6;
+}
+.margin dt:first-child { margin-top: 0; }
+.margin dd {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-feature-settings: "tnum";
+  color: var(--ink-soft);
+  margin-left: 0;
+  white-space: nowrap;
+}
+.marginSep {
+  height: 0.5px;
+  background: var(--rule);
+  margin: 4px 0;
+}
+
+/* 卡片内标签样式覆盖 */
+.tags .tag {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.02em;
+  background: var(--card-deep);
+  border: 0.5px solid var(--rule-soft);
+  padding: 2px 8px;
+  border-radius: 2px;
+}
+
+@media (max-width: 920px) {
+  .card {
+    grid-template-columns: 1fr;
+    gap: 14px;
+    padding: 18px 16px 20px;
+  }
+  .cat, .margin { padding: 0; border: none; }
+  .margin { flex-direction: row; flex-wrap: wrap; gap: 12px; }
+  .margin dt { margin-top: 0; }
+  .marginSep { display: none; }
+  /* 响应式下隐藏三孔装订 */
+  .card::before,
+  .cat::before,
+  .body::before {
+    display: none;
+  }
+}

@@ -1,0 +1,122 @@
+.formPage {
+  animation: fadeUp 0.5s ease backwards;
+}
+
+.formCard {
+  background: var(--card);
+  border: 0.5px solid var(--rule);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-xl) var(--space-2xl);
+}
+.hd {
+  margin-bottom: 32px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--ink);
+  display: flex; align-items: baseline; justify-content: space-between;
+}
+.title {
+  font-family: var(--display);
+  font-weight: 380;
+  font-size: 34px;
+  letter-spacing: -0.015em;
+  font-variation-settings: "SOFT" 80, "opsz" 144;
+  line-height: 1;
+  color: var(--ink-soft);
+}
+.titleZh {
+  font-family: var(--serif-sc);
+  font-size: 32px;
+  font-weight: 500;
+}
+.no {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--ink-ghost);
+}
+
+/* 身份栏：状态印章 + 性质徽章 */
+.identityBar {
+  padding-bottom: 18px;
+  margin-bottom: 28px;
+  border-bottom: 0.5px solid var(--rule);
+}
+.identityRow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 8px;
+}
+.identityDot {
+  font-family: var(--body);
+  font-size: 16px;
+  color: var(--ink-ghost);
+  user-select: none;
+}
+.identityHint {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: var(--body);
+  font-size: 12px;
+  color: var(--ink-ghost);
+  font-style: italic;
+  flex-wrap: wrap;
+}
+
+/* 表单导航 */
+.foot {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-top: 32px;
+  padding-top: 18px;
+  border-top: 0.5px solid var(--rule);
+}
+.footSig {
+  font-family: var(--body);
+  font-style: italic;
+  font-size: 12.5px;
+  color: var(--ink-ghost);
+}
+
+/* 对接渠道 */
+.contactsBlock {
+  display: flex; flex-direction: column; gap: 8px;
+}
+.contactsAddBtn {
+  align-self: flex-start;
+  margin-top: 4px;
+}
+
+/* 润色按钮 */
+.polishBtn {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 150ms;
+}
+.polishBtn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+.polishIcon {
+  width: 16px;
+  height: 16px;
+  opacity: 0.4;
+  transition: opacity 150ms;
+}
+.polishIcon:hover {
+  opacity: 0.7;
+}
+.polishIconActive {
+  opacity: 0.85;
+}
+
+@media (max-width: 920px) {
+  .formCard { padding: 24px 20px; }
+  .title { font-size: 28px; }
+  .titleZh { font-size: 26px; }
+}

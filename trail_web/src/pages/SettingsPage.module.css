@@ -1,0 +1,237 @@
+.page {
+  animation: fadeUp 0.5s ease backwards;
+  max-width: 680px;
+}
+
+.header {
+  margin-bottom: 36px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--ink);
+}
+.title {
+  font-family: var(--display);
+  font-weight: 380;
+  font-size: 34px;
+  letter-spacing: -0.015em;
+  font-variation-settings: "SOFT" 80, "opsz" 144;
+  color: var(--ink);
+  line-height: 1.1;
+}
+.sub {
+  display: block;
+  margin-top: 4px;
+  font-family: var(--body);
+  font-style: italic;
+  font-size: 13px;
+  color: var(--ink-ghost);
+  letter-spacing: 0.04em;
+}
+
+.section {
+  position: relative;
+  margin-bottom: var(--space-2xl);
+  padding: var(--space-xl);
+  background: var(--card);
+  border: 0.5px solid var(--rule);
+  box-shadow: var(--shadow-lg);
+}
+.sectionTitle {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--ink-faded);
+  margin-bottom: var(--space-lg);
+  padding-bottom: var(--space-md);
+  border-bottom: 0.5px solid var(--rule);
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+.sectionTitle::before {
+  content: "§";
+  font-family: var(--display);
+  font-size: 14px;
+  color: var(--ink-ghost);
+}
+.sectionHint {
+  font-family: var(--body);
+  font-style: italic;
+  font-size: 13.5px;
+  color: var(--ink-ghost);
+  padding: 8px 0;
+}
+
+/* —— Prompt 字段样式（档案风） —— */
+.promptField {
+  margin-bottom: var(--space-xl);
+}
+.promptField:last-of-type {
+  margin-bottom: 0;
+}
+.promptLabel {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: var(--space-sm);
+}
+.promptName {
+  font-family: var(--serif-sc);
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--ink);
+  letter-spacing: 0.02em;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.resetBtn {
+  background: none;
+  border: none;
+  color: var(--ink-ghost);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0;
+  cursor: pointer;
+  transition: color 150ms ease;
+}
+.resetBtn:hover {
+  color: var(--ink-faded);
+}
+.promptDesc {
+  font-family: var(--body);
+  font-size: 12px;
+  font-style: italic;
+  color: var(--ink-ghost);
+  margin-top: 2px;
+}
+
+/* —— 模式切换按钮 —— */
+.modeToggle {
+  background: none;
+  border: none;
+  color: var(--ink-ghost);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  padding: 0;
+  cursor: pointer;
+  transition: color 150ms ease;
+}
+.modeToggle:hover {
+  color: var(--ink-faded);
+}
+
+/* —— 数据源配置（M3+） —— */
+
+.backendTabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.backendTab {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: var(--paper-warm);
+  border: 0.5px solid var(--rule);
+  cursor: pointer;
+  font-family: var(--serif-sc);
+  font-size: 14.5px;
+  color: var(--ink-faded);
+  transition: all 180ms ease;
+}
+.backendTab:hover { border-color: var(--ink-faded); color: var(--ink-soft); }
+.backendTab input[type="radio"] { margin: 0; accent-color: var(--ink); }
+.backendTabActive {
+  border-color: var(--ink);
+  background: var(--card-soft);
+  color: var(--ink);
+  box-shadow: inset 0 0 0 0.5px var(--ink);
+}
+.backendTabName { font-weight: 500; }
+.backendTabHint {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-ghost);
+  margin-left: auto;
+}
+.backendTabActive .backendTabHint { color: var(--amber); }
+
+.mysqlNote {
+  background: var(--amber-bg);
+  border-left: 2px solid var(--amber);
+  padding: 12px 16px;
+  font-family: var(--serif-sc);
+  font-size: 14px;
+  color: var(--ink-soft);
+  line-height: 1.7;
+  margin-bottom: 16px;
+}
+.mysqlNote strong { color: var(--amber); font-weight: 600; }
+
+.fieldHint {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--ink-ghost);
+  letter-spacing: 0.06em;
+  margin-top: 8px;
+}
+
+.statusLine {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  align-items: baseline;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-faded);
+  letter-spacing: 0.05em;
+  margin-top: 8px;
+  padding: 10px 14px;
+  background: var(--card-deep);
+  border: 0.5px solid var(--rule-soft);
+}
+.statusValue { color: var(--ink); font-feature-settings: "tnum"; }
+.statusMono { font-size: 10.5px; }
+
+/* —— 滑块样式 —— */
+.slider {
+  width: 100%;
+  height: 4px;
+  background: var(--rule-soft);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+  -webkit-appearance: none;
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  background: var(--ink);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform 150ms ease;
+}
+
+.slider::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+}
+
+.slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: var(--ink);
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+}

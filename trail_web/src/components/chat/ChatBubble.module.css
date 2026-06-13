@@ -1,0 +1,47 @@
+.bubble {
+  position: fixed;
+  bottom: 28px;
+  right: 28px;
+  z-index: 1050;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  animation: fadeUp 0.3s ease backwards;
+  transition: opacity 200ms ease, transform 200ms ease;
+  user-select: none;
+  opacity: 0.5;
+}
+
+.bubble:hover {
+  opacity: 0.8;
+  transform: scale(1.1);
+}
+
+.bubble:active {
+  transform: scale(0.95);
+}
+
+.icon {
+  width: 32px;
+  height: 32px;
+  color: var(--ink);
+}
+
+@media (max-width: 920px) {
+  .bubble {
+    bottom: 20px;
+    right: 20px;
+    width: 32px;
+    height: 32px;
+  }
+  .icon {
+    width: 28px;
+    height: 28px;
+  }
+}

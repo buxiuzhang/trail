@@ -1,0 +1,106 @@
+/* ============================================================
+   MarkdownRenderer · 只读 markdown 渲染样式
+   ============================================================ */
+
+.renderer {
+  width: 100%;
+}
+
+/* 与 field__textarea 字体一致 */
+.renderer :global(.milkdown) {
+  font-family: var(--body);
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: var(--ink);
+  background: transparent;
+  padding: 0;
+}
+
+.renderer :global(.milkdown .ProseMirror) {
+  outline: none;
+  padding: 0;
+  cursor: default;
+  user-select: text;
+}
+
+/* 标题 */
+.renderer :global(.milkdown .ProseMirror h1),
+.renderer :global(.milkdown .ProseMirror h2),
+.renderer :global(.milkdown .ProseMirror h3),
+.renderer :global(.milkdown .ProseMirror h4),
+.renderer :global(.milkdown .ProseMirror h5),
+.renderer :global(.milkdown .ProseMirror h6) {
+  font-family: var(--serif-sc);
+  color: var(--ink);
+  margin: 0.5em 0 0.25em;
+}
+
+/* 段落 */
+.renderer :global(.milkdown p) {
+  margin: 0.15em 0;
+  line-height: 1.6;
+}
+
+/* 列表 */
+.renderer :global(.milkdown ul),
+.renderer :global(.milkdown ol) {
+  margin: 0.25em 0;
+  padding-left: 0.5em;
+}
+
+.renderer :global(.milkdown li) {
+  margin: 0.1em 0;
+}
+
+/* 加粗 */
+.renderer :global(.milkdown strong) {
+  font-weight: 700;
+}
+
+/* 斜体 */
+.renderer :global(.milkdown em) {
+  font-style: italic;
+}
+
+/* 链接 */
+.renderer :global(.milkdown a) {
+  color: var(--green-ink);
+  text-decoration: none;
+  pointer-events: auto;
+}
+
+.renderer :global(.milkdown a:hover) {
+  text-decoration: underline;
+}
+
+/* 图片 */
+.renderer :global(.milkdown img) {
+  max-width: 100%;
+  border-radius: 4px;
+}
+
+/* 代码 */
+.renderer :global(.milkdown code) {
+  font-family: var(--mono);
+  font-size: 13px;
+  background: var(--card-deep);
+  padding: 1px 4px;
+  border-radius: 2px;
+}
+
+.renderer :global(.milkdown pre) {
+  font-family: var(--mono);
+  font-size: 13px;
+  background: var(--card-deep);
+  padding: 8px 12px;
+  border-radius: 4px;
+  overflow-x: auto;
+}
+
+/* 引用 */
+.renderer :global(.milkdown blockquote) {
+  border-left: 2px solid var(--rule);
+  padding-left: 8px;
+  margin: 0.5em 0;
+  color: var(--ink-faded);
+}

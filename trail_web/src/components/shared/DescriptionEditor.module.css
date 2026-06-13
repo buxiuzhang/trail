@@ -1,0 +1,313 @@
+/* ============================================================
+   DescriptionEditor · 基于 Milkdown Crepe 的 Markdown WYSIWYG
+
+   关键层级：
+     .editorBox         相对定位容器，挂 minHeight 与 field__textarea 视觉
+     .milkdownContainer Milkdown Crepe 挂载点 + 字体度量对齐
+     .hiddenTaMirror    视觉隐藏的 textarea 镜像（兼容 .logbook textarea 选择器）
+     .imgToolbar        Portal 浮层工具条（25/50/75/100 + 🗑）
+
+   注意：textareaClassName="field__textarea" 被透传到 .editorBox 上，
+   下方 `.editorBox.field__textarea` 选择器为容器提供 textarea 风格视觉。
+   ============================================================ */
+
+.editorBox {
+  position: relative;
+  width: 100%;
+}
+
+/* ---- Milkdown 容器：字体度量严格对齐 .field__textarea ----- */
+
+.milkdownContainer {
+  font-family: var(--body);
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--ink);
+  caret-color: var(--ink);
+}
+
+/* 覆写 Crepe 默认主题（继承自 MilkdownEditor.module.css） */
+.milkdownContainer :global(.milkdown) {
+  font-family: var(--body) !important;
+  font-size: 16px !important;
+  line-height: 1.6 !important;
+  color: var(--ink) !important;
+  background: transparent !important;
+  outline: none !important;
+  padding: 8px 12px !important;
+  caret-color: var(--ink) !important;
+  text-align: left !important;
+}
+
+.milkdownContainer :global(.milkdown .ProseMirror) {
+  min-height: 150px;
+  outline: none;
+  caret-color: var(--ink) !important;
+  text-align: left !important;
+  padding: 0 !important;
+}
+
+.milkdownContainer :global(.milkdown .ProseMirror-focused) {
+  outline: none;
+}
+
+.milkdownContainer :global(.milkdown .ProseMirror ::selection) {
+  background: var(--ink-faded) !important;
+}
+
+.milkdownContainer :global(.milkdown .ProseMirror-dropcursor) {
+  background: var(--oxblood) !important;
+}
+
+/* 标题 / 段落 / 列表左对齐
+   注意：Crepe 在 .milkdown .ProseMirror h1/h2/h3 上挂 font-family: Georgia,
+   特异性 (0,2,1)，我们的覆盖必须**至少**匹配同样深度并加 !important */
+.milkdownContainer :global(.milkdown .ProseMirror h1),
+.milkdownContainer :global(.milkdown .ProseMirror h2),
+.milkdownContainer :global(.milkdown .ProseMirror h3),
+.milkdownContainer :global(.milkdown .ProseMirror h4),
+.milkdownContainer :global(.milkdown .ProseMirror h5),
+.milkdownContainer :global(.milkdown .ProseMirror h6) {
+  font-family: var(--serif-sc) !important;
+  color: var(--ink) !important;
+  margin: 1em 0 0.5em !important;
+  text-align: left !important;
+}
+
+.milkdownContainer :global(.milkdown p) {
+  margin: 0.15em 0 !important;
+  text-align: left !important;
+  line-height: 1.6 !important;
+}
+
+/* 强制覆盖 Crepe 内置的 p line-height + padding
+   ⚠ Crepe 在 .milkdown .ProseMirror p 上挂 padding: 4px 0 —— 这才是段落上下间距大头,
+   不是 margin！只调 margin 看起来"没效果"就是因为这层 padding 还在 */
+.milkdownContainer :global(.milkdown .ProseMirror p) {
+  line-height: 1.6 !important;
+  padding: 0 !important;
+}
+
+.milkdownContainer :global(.milkdown ul),
+.milkdownContainer :global(.milkdown ol) {
+  margin: 0.25em 0 !important;
+  padding-left: 0.5em !important;
+  text-align: left !important;
+  list-style-position: outside !important;
+}
+
+.milkdownContainer :global(.milkdown li) {
+  margin: 0.1em 0 !important;
+  text-align: left !important;
+}
+
+.milkdownContainer :global(.milkdown li p) {
+  margin: 0 !important;
+}
+
+.milkdownContainer :global(.milkdown ul) {
+  list-style-type: disc !important;
+}
+
+.milkdownContainer :global(.milkdown ol) {
+  list-style-type: decimal !important;
+}
+
+/* 代码 / 引用 / 链接 / 图片 / 水平线
+   Crepe 默认 .milkdown .ProseMirror code 用 var(--crepe-font-code),特异性 (0,2,1)
+   我们这里同样匹配 .ProseMirror 路径，确保覆盖生效 */
+.milkdownContainer :global(.milkdown .ProseMirror code) {
+  font-family: var(--mono) !important;
+  background: var(--ink-ghost) !important;
+  color: var(--ink) !important;
+  padding: 2px 6px !important;
+  border-radius: 2px !important;
+}
+
+.milkdownContainer :global(.milkdown .ProseMirror pre) {
+  background: var(--ink-faded) !important;
+  padding: 12px !important;
+  border-radius: 4px !important;
+  overflow-x: auto;
+  text-align: left !important;
+}
+
+.milkdownContainer :global(.milkdown .ProseMirror pre code) {
+  background: transparent !important;
+  padding: 0 !important;
+}
+
+.milkdownContainer :global(.milkdown blockquote) {
+  border-left: 3px solid var(--ink-faded) !important;
+  margin: 1em 0 !important;
+  padding-left: 1em !important;
+  color: var(--ink-soft) !important;
+  text-align: left !important;
+}
+
+.milkdownContainer :global(.milkdown a) {
+  color: var(--green-ink) !important;
+  text-decoration: underline !important;
+}
+
+.milkdownContainer :global(.milkdown img) {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+  margin: 8px 0;
+  display: block;
+}
+
+/* 粗体 / 斜体
+   ⚠ Fraunces 是可变字体,wght 轴由 font-variation-settings 控制——
+   父级 .milkdown 设了 'opsz' 14, 'SOFT' 50,这是继承属性,strong 会继承下来,
+   导致单纯 font-weight: 600 不一定推动 wght 轴。必须显式覆写 font-variation-settings。
+   选择器加深到 .ProseMirror strong 匹配 Crepe 的深度. */
+.milkdownContainer :global(.milkdown .ProseMirror strong) {
+  font-weight: 700 !important;
+  font-variation-settings: 'opsz' 14, 'SOFT' 50, 'wght' 700 !important;
+}
+
+.milkdownContainer :global(.milkdown .ProseMirror em) {
+  font-style: italic !important;
+}
+
+.milkdownContainer :global(.milkdown hr) {
+  border: none !important;
+  border-top: 1px solid var(--ink-faded) !important;
+  margin: 1.5em 0 !important;
+}
+
+/* ---- Crepe 列表项缩进覆写 -----
+   Crepe 内置 .label-wrapper { width: 24px } + .list-item { gap: 10px }
+   缩进太多，砍一半：width: gap: 5px
+*/
+
+.milkdownContainer :global(.milkdown .milkdown-list-item-block .list-item) {
+  gap: 3px !important; /* 默认 10px */
+  align-items: baseline !important;
+}
+
+.milkdownContainer :global(.milkdown .milkdown-list-item-block .list-item .label-wrapper) {
+  width: 10px !important; /* 默认 24px */
+  height: 20px !important; /* ⚠ Crepe 默认 height: 32px,撑大列表行高,必须覆盖 */
+  min-height: 20px !important;
+}
+
+.milkdownContainer :global(.milkdown .milkdown-list-item-block .list-item .label-wrapper .label) {
+  width: 10px !important;
+  height: 20px !important; /* 同步 .label-wrapper,默认 32px */
+  padding: 0 !important;   /* 默认 padding: 4px 0 */
+  font-size: 16px !important;
+  line-height: 1.7 !important;
+}
+
+/* ---- Modal 弹窗内 ::before 干扰修复 -----
+   App.css 里 .modal__bd li::before 给所有 Modal 子树内的 <li>
+   加一个 "—" 伪元素作为列表 marker。Milkdown 内部用 ProseMirror 渲染
+   的 <li> 也命中这条规则，导致"1. kkkk"前多出一个 —。
+   解决方案：在 .milkdownContainer 作用域内同时：
+     1) li::before content 清掉，去掉 Modal 注入的 em-dash
+     2) li 设 list-style: none，去掉浏览器默认 decimal marker
+        （Crepe 自身的 marker 由 .milkdown-icon.label / .list-item 结构提供） */
+
+.milkdownContainer :global(li) {
+  list-style: none !important;
+}
+.milkdownContainer :global(li)::before,
+.milkdownContainer :global(li)::after {
+  content: none !important;
+}
+
+/* ---- field__textarea 视觉强覆写 --------------------------
+   consumer（如 TaskForm）默认传 textareaClassName="field__textarea"，
+   我们把它应用到 .editorBox 上；下方选择器让容器 + Milkdown 编辑器
+   视觉对齐 textarea 下划线风格。focus-within 让编辑器获焦时下划线加深。 */
+
+.editorBox.field__textarea {
+  border-bottom: 0.5px solid var(--rule);
+  padding: 8px 0;
+  transition: border-bottom-color 200ms ease;
+}
+
+.editorBox.field__textarea:focus-within {
+  border-bottom-color: var(--ink);
+}
+
+/* ---- Crepe placeholder 文字颜色 -----
+   编辑器为空时显示的提示文字,用更浅的颜色(--rule-soft) */
+
+.milkdownContainer :global(.crepe-placeholder) {
+  color: var(--rule-soft) !important;
+}
+
+.milkdownContainer :global(.crepe-placeholder)::before {
+  color: var(--rule-soft) !important;
+}
+
+/* ---- 隐藏的 textarea 镜像：兼容全局 .logbook textarea 选择器 */
+
+.hiddenTaMirror {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ---- 图片 hover 浮层工具条（Portal 到 body） ----------- */
+
+.imgToolbar {
+  display: flex;
+  gap: 2px;
+  background: var(--paper);
+  border: 0.5px solid var(--rule);
+  border-radius: 2px;
+  padding: 2px 4px;
+  font: var(--mono);
+  box-shadow: 0 1px 3px rgba(26, 22, 18, 0.08);
+}
+
+.sizeBtn {
+  font: var(--mono);
+  font-size: 10.5px;
+  padding: 2px 6px;
+  color: var(--ink-faded);
+  background: transparent;
+  border: none;
+  border-radius: 1px;
+  cursor: pointer;
+  transition: color 0.12s ease, background 0.12s ease;
+}
+
+.sizeBtn:hover {
+  color: var(--ink);
+}
+
+.sizeBtnActive {
+  color: var(--oxblood);
+  background: var(--oxblood-bg);
+}
+
+.delBtn {
+  font-size: 11px;
+  padding: 2px 6px;
+  color: var(--ink-ghost);
+  background: transparent;
+  border: none;
+  border-left: 0.5px solid var(--rule);
+  margin-left: 2px;
+  padding-left: 6px;
+  cursor: pointer;
+  transition: color 0.12s ease;
+}
+
+.delBtn:hover {
+  color: var(--oxblood);
+}

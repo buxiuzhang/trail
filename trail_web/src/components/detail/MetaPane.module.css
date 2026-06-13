@@ -1,0 +1,95 @@
+.pane {
+  padding-top: 4px;
+  position: relative;
+  transition: width 250ms ease;
+}
+
+/* 折叠切换按钮 */
+.toggle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  padding: 4px 6px;
+  cursor: pointer;
+  color: var(--ink-ghost);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  transition: color 150ms;
+}
+.toggle:hover { color: var(--ink); }
+.toggleIcon { font-size: 10px; line-height: 1; }
+.toggleLabel {
+  writing-mode: vertical-rl;
+  letter-spacing: 0.15em;
+}
+
+/* 折叠态 */
+.collapsed {
+  min-width: 32px;
+  width: 32px;
+}
+.collapsed .toggle {
+  position: static;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 0;
+}
+
+.title {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-faded);
+  margin-bottom: 18px;
+  padding-bottom: 8px;
+  padding-right: 40px;
+  border-bottom: 0.5px solid var(--rule);
+}
+
+.row {
+  display: flex; align-items: baseline; gap: 12px;
+  margin-bottom: 10px;
+  font-size: 13.5px;
+}
+.rowLabel {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  color: var(--ink-ghost);
+  text-transform: uppercase;
+  min-width: 64px;
+}
+.rowValue {
+  font-family: var(--body);
+  color: var(--ink-soft);
+}
+.rowValueMono {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-feature-settings: "tnum";
+}
+
+.rowContacts {
+  flex-direction: column;
+  gap: 6px;
+}
+.rowValueContacts {
+  display: flex; flex-direction: column; gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.actions {
+  display: flex; flex-direction: column; gap: 8px;
+  margin-top: 24px;
+  padding-top: 18px;
+  border-top: 0.5px solid var(--rule);
+}

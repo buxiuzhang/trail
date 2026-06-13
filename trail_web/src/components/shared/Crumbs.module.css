@@ -1,0 +1,13 @@
+.crumbs {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--ink-ghost);
+  margin-bottom: 20px;
+}
+.crumbs a {
+  color: var(--ink-faded);
+  text-decoration: none;
+}
+.crumbs a:hover { color: var(--ink); }
+.sep { color: var(--ink-ghost); margin: 0 8px; }

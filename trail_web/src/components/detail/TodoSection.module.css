@@ -1,0 +1,204 @@
+/* ============================================================
+   待办事项 / TodoSection
+   详情页 header 下方全宽区块 · 列表 + 行内展开
+   添加按钮在 header 行末（点 → 父级弹窗）
+   ============================================================ */
+.section {
+  margin: 0 0 32px 0;
+}
+
+/* head 标题 */
+.head {
+  display: flex; align-items: baseline; gap: 16px;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 0.5px solid var(--rule);
+}
+.title {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-faded);
+}
+.count {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  color: var(--ink-ghost);
+  text-transform: uppercase;
+  flex: 1;
+}
+.addBtn {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  line-height: 0;
+  transition: opacity 200ms ease;
+}
+.addBtn:hover {
+  opacity: 0.65;
+}
+.addIcon {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+
+/* 封版提示 */
+.closedHint {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--ink-faded);
+  text-align: center;
+  padding: 16px 0;
+  border: 0.5px dashed var(--rule);
+  margin-bottom: 20px;
+}
+.closedGlyph { margin-right: 6px; opacity: 0.7; }
+
+/* 列表 */
+.list {
+  list-style: none;
+  margin: 0; padding: 0;
+}
+.row {
+  padding: 12px 4px;
+  border-bottom: 0.5px solid var(--rule-soft);
+  transition: opacity 0.15s, background 0.15s;
+}
+.row:last-child { border-bottom: 0; }
+.rowCompleted { opacity: 0.65; }
+.rowAbandoned { opacity: 0.5; }
+
+/* 标题行：checkbox + 标题 + 操作按钮，始终在同一行不换行 */
+.rowTop {
+  display: flex; align-items: flex-start; gap: 10px;
+}
+
+.checkbox {
+  appearance: none;
+  -webkit-appearance: none;
+  margin-top: 3px;
+  width: 13px; height: 13px;
+  border: 1px solid var(--rule-soft);
+  border-radius: 2px;
+  background: transparent;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: border-color 200ms ease, background 200ms ease;
+}
+.checkbox:hover:not(:disabled) {
+  border-color: var(--rule);
+}
+.checkbox:checked {
+  background: var(--card-deep);
+  border-color: var(--ink-faded);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 10'%3E%3Cpath d='M1.5 5l2.8 2.8 6.2-6.5' stroke='%236B5E4D' stroke-width='1.2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-size: 10px 8px;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+.checkbox:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+.checkbox:disabled:checked {
+  background-color: var(--card-deep);
+  border-color: var(--rule);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 10'%3E%3Cpath d='M1.5 5l2.8 2.8 6.2-6.5' stroke='%236B5E4D' stroke-width='1.2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+.rowMain {
+  flex: 1;
+  display: flex; align-items: flex-start; gap: 8px;
+  background: none; border: none;
+  text-align: left;
+  padding: 0;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  min-width: 0;
+}
+.rowMainText {
+  display: flex; flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.todoDate {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--ink-ghost);
+  margin-top: 3px;
+}
+.titleText {
+  font-family: var(--body);
+  font-size: 14.5px;
+  line-height: 1.5;
+  color: var(--ink);
+  word-break: break-word;
+}
+.struck {
+  text-decoration: line-through;
+  text-decoration-color: var(--ink-faded);
+  text-decoration-thickness: 1px;
+  color: var(--ink-faded);
+}
+.rowAbandoned .titleText {
+  font-style: italic;
+}
+.toggle {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink-ghost);
+  flex-shrink: 0;
+  margin-left: 4px;
+}
+
+.descBlock {
+  margin: 8px 0 0 26px;
+  padding: 10px 12px;
+  background: var(--card);
+  border-left: 2px solid var(--rule);
+}
+.descText {
+  font-family: var(--body);
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--ink-soft);
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+}
+
+.actions {
+  display: flex; gap: 4px; align-items: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.btnAbandon {
+  background: none; border: none;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  color: var(--ink-faded);
+  padding: 4px 6px;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.btnAbandon:hover { color: var(--ink); }
+.btnDelete {
+  background: none; border: none;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  color: var(--oxblood, #7d2222);
+  padding: 4px 6px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.btnDelete:hover { opacity: 0.6; }

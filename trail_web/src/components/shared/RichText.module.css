@@ -1,0 +1,86 @@
+/* ============================================================
+   RichText · 描述/正文里的"轻量 markdown"
+   - 只识别 ![alt](/api/attachments/N) 图片引用
+   - 其余走 pre-wrap 字面换行（不引第三方 markdown 库）
+   - 图片限高 + 宽度由 getImgSize 控制(M11)
+   - M11: hover 浮出尺寸/删除工具条
+   ============================================================ */
+
+.wrap {
+  display: block;
+}
+
+.text {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.imgWrapper {
+  position: relative;
+  display: block;
+  /* width 由 inline style 控制（25/50/75/100%） */
+  margin: 8px 0;
+  max-width: 100%;
+}
+
+.inlineImg {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  max-height: 480px;
+  border: 0.5px solid var(--rule);
+  cursor: zoom-in;
+  background: var(--paper-warm);
+}
+
+.imgToolbar {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: flex;
+  gap: 2px;
+  padding: 2px 4px;
+  background: var(--paper);
+  border: 0.5px solid var(--rule);
+  border-radius: 2px;
+  box-shadow: 0 2px 6px rgba(26, 22, 18, 0.12);
+}
+
+.sizeBtn {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  padding: 2px 6px;
+  color: var(--ink-faded);
+  background: transparent;
+  border: none;
+  border-radius: 1px;
+  cursor: pointer;
+  transition: background 100ms;
+}
+
+.sizeBtn:hover {
+  background: var(--rule-soft);
+  color: var(--ink);
+}
+
+.sizeBtnActive {
+  color: var(--red, var(--oxblood));
+  background: var(--oxblood-bg, rgba(122, 31, 31, 0.05));
+  font-weight: 600;
+}
+
+.delBtn {
+  font-size: 11px;
+  padding: 2px 5px;
+  color: var(--ink-ghost);
+  background: transparent;
+  border: none;
+  border-radius: 1px;
+  cursor: pointer;
+  transition: all 100ms;
+}
+
+.delBtn:hover {
+  color: var(--oxblood);
+  background: var(--oxblood-bg, rgba(122, 31, 31, 0.05));
+}

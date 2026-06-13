@@ -1,0 +1,66 @@
+/* DataDirGate 顶条提示：未配置数据目录时在页面顶部显示一条醒目提示，
+   路径不强制切路由——只自动跳一次到 /settings，且顶条不挡页面内容，
+   让用户能立刻填表单 / 点保存。 */
+
+.banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9000;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 24px;
+  background: color-mix(in srgb, var(--red) 8%, var(--paper));
+  border-bottom: 1px solid color-mix(in srgb, var(--red) 30%, var(--paper));
+  font-family: var(--body);
+  font-size: 13px;
+  color: var(--ink);
+  box-shadow: 0 2px 12px -4px color-mix(in srgb, var(--ink) 20%, transparent);
+  animation: slideDown 240ms ease-out;
+}
+
+.bannerEyebrow {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--red);
+  padding: 2px 8px;
+  border: 1px solid color-mix(in srgb, var(--red) 35%, var(--paper));
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.bannerText {
+  flex: 1;
+  color: var(--ink-soft);
+}
+
+.bannerText strong {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.bannerLink {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--paper);
+  background: var(--ink);
+  text-decoration: none;
+  padding: 4px 12px;
+  border-radius: 2px;
+  flex-shrink: 0;
+  transition: background 120ms ease;
+}
+
+.bannerLink:hover {
+  background: var(--ink-soft);
+}
+
+@keyframes slideDown {
+  from { transform: translateY(-100%); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+

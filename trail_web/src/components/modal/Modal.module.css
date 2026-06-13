@@ -1,0 +1,84 @@
+.shroud {
+  position: fixed; inset: 0; z-index: 1100;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(26, 22, 18, 0.35);
+  animation: shroudIn 0.3s ease;
+}
+
+.modal {
+  background: var(--card);
+  border: 0.5px solid var(--rule);
+  box-shadow: var(--shadow-xl);
+  max-width: 520px;
+  width: calc(100% - 48px);
+  padding: var(--space-xl) var(--space-lg);
+  animation: modalIn 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+  position: relative;
+}
+.modal::before {
+  content: "";
+  position: absolute;
+  top: 0; left: var(--space-md); right: var(--space-md);
+  height: 4px;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--rule) 0px,
+    var(--rule) 6px,
+    transparent 6px,
+    transparent 12px
+  );
+}
+
+.hd {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  margin-bottom: 24px;
+}
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-ghost);
+  display: block;
+  margin-bottom: 6px;
+}
+.title {
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: 28px;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  font-variation-settings: "opsz" 72, "SOFT" 60;
+}
+.titleZh {
+  font-family: var(--serif-sc);
+  font-size: 22px;
+  font-weight: 500;
+}
+.close {
+  background: none; border: none;
+  font-size: 22px; color: var(--ink-ghost);
+  padding: 0 0 0 12px; line-height: 1;
+  transition: color 150ms ease;
+}
+.close:hover { color: var(--ink); }
+
+.bd {
+  font-family: var(--body);
+  font-size: 15.5px;
+  line-height: 1.65;
+  color: var(--ink-soft);
+  margin-bottom: 28px;
+}
+.bd p { margin-bottom: 12px; }
+.bd p:last-child { margin-bottom: 0; }
+.bd em { color: var(--ink); font-style: italic; }
+.bd ul { margin: 8px 0 12px 4px; }
+.bd li { padding: 3px 0 3px 14px; position: relative; }
+.bd li::before {
+  content: "—"; position: absolute; left: 0; color: var(--ink-ghost);
+}
+
+.ft {
+  display: flex; gap: 12px; justify-content: flex-end;
+}

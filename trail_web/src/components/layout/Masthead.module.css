@@ -1,0 +1,95 @@
+.masthead {
+  position: relative;
+  max-width: var(--max-w);
+  margin: 0 auto;
+  padding: 36px 56px 28px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 32px;
+}
+
+.left { display: flex; align-items: flex-end; gap: 22px; }
+.crest { color: var(--ink); }
+.text { padding-bottom: 2px; }
+
+.title {
+  font-family: var(--display);
+  font-weight: 380;
+  font-size: 44px;
+  letter-spacing: -0.01em;
+  font-variation-settings: "SOFT" 60, "WONK" 1, "opsz" 144;
+  line-height: 0.9;
+  margin-bottom: 6px;
+  cursor: pointer;
+  transition: color 200ms;
+  user-select: none;
+}
+.title:hover { color: var(--green-ink); }
+
+.subtitle {
+  font-family: var(--body);
+  font-style: italic;
+  font-size: 12.5px;
+  color: var(--ink-faded);
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  letter-spacing: 0.02em;
+}
+.zh { font-family: var(--serif-sc); font-style: normal; font-weight: 400; font-size: 13px; }
+.en { font-family: var(--body); }
+.vol { font-family: var(--mono); font-size: 11px; font-style: normal; letter-spacing: 0.08em; text-transform: uppercase; }
+.dot { color: var(--ink-ghost); }
+
+.right { display: flex; align-items: center; gap: 28px; padding-bottom: 4px; }
+
+.meta {
+  display: flex; align-items: baseline; gap: 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-faded);
+  letter-spacing: 0.05em;
+}
+.metaLabel { text-transform: uppercase; color: var(--ink-ghost); }
+.metaValue { color: var(--ink); font-feature-settings: "tnum"; }
+.metaSep { color: var(--ink-ghost); }
+
+/* —— 跑马灯：代替原 ::after/::before 分割线，滚动装饰 —— */
+.ticker {
+  position: absolute;
+  left: 0; right: 0;
+  bottom: 1px;
+  overflow: hidden;
+  white-space: nowrap;
+  font-family: var(--mono);
+  font-size: 14px;
+  line-height: 1;
+  color: var(--ink);
+  opacity: 0.28;
+  pointer-events: none;
+  user-select: none;
+  /* 两侧淡出遮罩，模仿原渐变分割线 */
+  -webkit-mask-image: linear-gradient(to right, transparent 2%, black 18%, black 82%, transparent 98%);
+  mask-image: linear-gradient(to right, transparent 2%, black 18%, black 82%, transparent 98%);
+}
+.tickerInner {
+  display: inline-block;
+  animation: tickerScroll 60s linear infinite;
+}
+@keyframes tickerScroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+@media (max-width: 920px) {
+  .masthead {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 24px 20px 20px;
+    gap: 16px;
+  }
+  .title { font-size: 34px; }
+  .right { width: 100%; justify-content: space-between; }
+  .ticker { left: 20px; right: 20px; }
+}
