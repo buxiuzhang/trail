@@ -2,7 +2,7 @@ package com.trail.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.trail.llm.Prompts;
+import com.trail.config.AppProperties;
 import com.trail.store.AiRecordStore;
 import com.trail.store.LLMSettingsStore;
 import com.trail.store.TaskStore;
@@ -31,16 +31,39 @@ import java.util.concurrent.Executors;
 /**
  * LLM 服务层
  * 封装 Anthropic API 调用逻辑
- * Prompt 模板在启动时从数据库加载到内存
+ * Prompt 模板从数据库加载，默认值在 application.yml 配置
  */
 @Service
 public class LlmService {
 
     private static final Logger log = LoggerFactory.getLogger(LlmService.class);
     private static final String ANTHROPIC_VERSION = "2023-06-01";
-    private static final String DEFAULT_MODEL = "claude-haiku-4-5";
-    private static final int DEFAULT_MAX_TOKENS = 1000;
 
+    // User prompt 模板（包含占位符，不入库）
+    private static final String POLISH_USER_TEMPLATE = "请润色以下工作日志：\n\n{content}";
+    private static final String SUMMARIZE_MAIN_USER_TEMPLATE = """
+        以下是任务「{title}」主体阶段（{date_range}）的工作日志：
+
+        {logs}
+
+        请生成主体阶段总结。
+        """;
+    private static final String SUMMARIZE_MAINTENANCE_USER_TEMPLATE = """
+        以下是任务「{title}」维护期（{date_range}）的日志：
+
+        {logs}
+
+        请生成维护期总结。
+        """;
+    private static final String ASK_MAINTENANCE_USER_TEMPLATE = """
+        任务「{title}」当前状态：{status}。主体阶段日志：
+
+        {logs}
+
+        是否建议进入维护期？
+        """;
+
+    private final AppProperties props;
     private final LLMSettingsStore settingsStore;
     private final TaskStore taskStore;
     private final WorkLogStore workLogStore;
@@ -56,8 +79,9 @@ public class LlmService {
     private volatile String cachedAskMaintenancePrompt;
     private volatile String cachedChatPrompt;
 
-    public LlmService(LLMSettingsStore settingsStore, TaskStore taskStore,
+    public LlmService(AppProperties props, LLMSettingsStore settingsStore, TaskStore taskStore,
                       WorkLogStore workLogStore, AiRecordStore aiRecordStore) {
+        this.props = props;
         this.settingsStore = settingsStore;
         this.taskStore = taskStore;
         this.workLogStore = workLogStore;
@@ -65,30 +89,35 @@ public class LlmService {
         this.mapper = new ObjectMapper();
         this.executor = Executors.newCachedThreadPool();
 
-        // 启动时加载 prompt 到内存
-        loadPrompts();
+        // Prompt 延迟加载，在首次使用时或 refreshPrompts() 时加载
     }
 
     /** 从数据库加载 prompt 到内存缓存 */
     private void loadPrompts() {
         Map<String, String> settings = settingsStore.getAll();
-        cachedPolishPrompt = getOrDefault(settings, "polish_system_prompt", Prompts.POLISH_SYSTEM);
-        cachedPolishTodoPrompt = getOrDefault(settings, "polish_todo_system_prompt", Prompts.POLISH_TODO_SYSTEM);
-        cachedSummarizePrompt = getOrDefault(settings, "summarize_system_prompt", Prompts.SUMMARIZE_MAIN_SYSTEM);
-        cachedSummarizeMaintenancePrompt = getOrDefault(settings, "summarize_maintenance_prompt", Prompts.SUMMARIZE_MAINTENANCE_SYSTEM);
-        cachedAskMaintenancePrompt = getOrDefault(settings, "ask_maintenance_prompt", Prompts.ASK_MAINTENANCE_SYSTEM);
-        cachedChatPrompt = getOrDefault(settings, "chat_system_prompt", Prompts.DEFAULT_CHAT_SYSTEM);
+        cachedPolishPrompt = settings.get("polish_system_prompt");
+        cachedPolishTodoPrompt = settings.get("polish_todo_system_prompt");
+        cachedSummarizePrompt = settings.get("summarize_system_prompt");
+        cachedSummarizeMaintenancePrompt = settings.get("summarize_maintenance_prompt");
+        cachedAskMaintenancePrompt = settings.get("ask_maintenance_prompt");
+        cachedChatPrompt = settings.get("chat_system_prompt");
         log.info("Prompt 模板已加载到内存");
     }
 
     /** 刷新 prompt 缓存（设置保存后调用） */
     public void refreshPrompts() {
-        loadPrompts();
+        try {
+            loadPrompts();
+        } catch (Exception e) {
+            log.warn("刷新 Prompt 缓存失败: {}", e.getMessage());
+        }
     }
 
-    private String getOrDefault(Map<String, String> settings, String key, String defaultValue) {
-        String value = settings.get(key);
-        return (value == null || value.isBlank()) ? defaultValue : value;
+    /** 确保缓存已加载 */
+    private void ensurePromptsLoaded() {
+        if (cachedPolishPrompt == null) {
+            loadPrompts();
+        }
     }
 
     // ============================================================
@@ -101,8 +130,12 @@ public class LlmService {
         if (apiKey == null || apiKey.isBlank()) {
             throw new LlmNotConfiguredException();
         }
-        String baseUrl = settings.getOrDefault("base_url", "https://api.anthropic.com");
-        String model = settings.getOrDefault("model", DEFAULT_MODEL);
+        String defaultBaseUrl = props != null && props.llm() != null
+            ? props.llm().getDefaultBaseUrl() : "https://api.anthropic.com";
+        String defaultModel = props != null && props.llm() != null
+            ? props.llm().getDefaultModel() : "claude-haiku-4-5";
+        String baseUrl = settings.getOrDefault("base_url", defaultBaseUrl);
+        String model = settings.getOrDefault("model", defaultModel);
         int maxTokens = 1000;
         String maxTokensStr = settings.get("max_tokens");
         if (maxTokensStr != null && !maxTokensStr.isBlank()) {
@@ -118,9 +151,10 @@ public class LlmService {
 
     /** 润色文本，支持日志和待办两种类型 */
     public String polish(String content, Long taskId, String type) {
+        ensurePromptsLoaded();
         LlmConfig cfg = getConfig();
         String system = "todo".equals(type) ? cachedPolishTodoPrompt : cachedPolishPrompt;
-        String user = Prompts.POLISH_USER.replace("{content}", content);
+        String user = POLISH_USER_TEMPLATE.replace("{content}", content);
 
         AnthropicResponse resp = callAnthropic(cfg, system, List.of(userMessage(user)));
         String promptText = "[system]\n" + system + "\n\n[user]\n" + user;
@@ -139,6 +173,7 @@ public class LlmService {
     // ============================================================
 
     public String summarizeMain(long taskId) {
+        ensurePromptsLoaded();
         LlmConfig cfg = getConfig();
         Map<String, Object> task = taskStore.getTask(taskId);
         String title = (String) task.get("title");
@@ -152,7 +187,7 @@ public class LlmService {
         String logsText = buildLogsText(logs);
 
         String system = cachedSummarizePrompt;
-        String user = Prompts.SUMMARIZE_MAIN_USER
+        String user = SUMMARIZE_MAIN_USER_TEMPLATE
                 .replace("{title}", title)
                 .replace("{date_range}", dateRange)
                 .replace("{logs}", logsText);
@@ -169,6 +204,7 @@ public class LlmService {
     // ============================================================
 
     public String summarizeMaintenance(long taskId) {
+        ensurePromptsLoaded();
         LlmConfig cfg = getConfig();
         Map<String, Object> task = taskStore.getTask(taskId);
         String title = (String) task.get("title");
@@ -182,7 +218,7 @@ public class LlmService {
         String logsText = buildLogsText(logs);
 
         String system = cachedSummarizeMaintenancePrompt;
-        String user = Prompts.SUMMARIZE_MAINTENANCE_USER
+        String user = SUMMARIZE_MAINTENANCE_USER_TEMPLATE
                 .replace("{title}", title)
                 .replace("{date_range}", dateRange)
                 .replace("{logs}", logsText);
@@ -199,6 +235,7 @@ public class LlmService {
     // ============================================================
 
     public String askMaintenance(long taskId) {
+        ensurePromptsLoaded();
         LlmConfig cfg = getConfig();
         Map<String, Object> task = taskStore.getTask(taskId);
         String title = (String) task.get("title");
@@ -212,7 +249,7 @@ public class LlmService {
         String logsText = buildLogsText(logs);
 
         String system = cachedAskMaintenancePrompt;
-        String user = Prompts.ASK_MAINTENANCE_USER
+        String user = ASK_MAINTENANCE_USER_TEMPLATE
                 .replace("{title}", title)
                 .replace("{status}", status)
                 .replace("{logs}", logsText);
@@ -354,6 +391,7 @@ public class LlmService {
     }
 
     private String buildChatSystemPrompt() {
+        ensurePromptsLoaded();
         String customPrompt = cachedChatPrompt;
         // 注入当前日期
         LocalDate today = LocalDate.now();

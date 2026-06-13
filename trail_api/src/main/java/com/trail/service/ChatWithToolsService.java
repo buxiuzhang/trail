@@ -4,8 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.trail.config.AppProperties;
 import com.trail.llm.ApiToolExecutor;
-import com.trail.llm.Prompts;
 import com.trail.llm.ToolRegistry;
 import com.trail.store.AiRecordStore;
 import com.trail.store.LLMSettingsStore;
@@ -45,10 +45,10 @@ import java.util.concurrent.Executors;
 public class ChatWithToolsService {
 
     private static final Logger log = LoggerFactory.getLogger(ChatWithToolsService.class);
-    private static final int MAX_TOOL_ITERATIONS = 10;
     private static final String ANTHROPIC_VERSION = "2023-06-01";
-    private static final String DEFAULT_MODEL = "claude-haiku-4-5";
+    private static final int DEFAULT_MAX_TOOL_ITERATIONS = 10;
 
+    private final AppProperties props;
     private final LLMSettingsStore settingsStore;
     private final ToolRegistry toolRegistry;
     private final ApiToolExecutor apiToolExecutor;
@@ -57,12 +57,14 @@ public class ChatWithToolsService {
     private final ExecutorService executor;
 
     public ChatWithToolsService(
+        AppProperties props,
         LLMSettingsStore settingsStore,
         ToolRegistry toolRegistry,
         ApiToolExecutor apiToolExecutor,
         AiRecordStore aiRecordStore,
         ObjectMapper mapper
     ) {
+        this.props = props;
         this.settingsStore = settingsStore;
         this.toolRegistry = toolRegistry;
         this.apiToolExecutor = apiToolExecutor;
@@ -98,7 +100,9 @@ public class ChatWithToolsService {
                 }
 
                 // 多轮循环
-                for (int iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
+                int maxIterations = props != null && props.llm() != null
+                    ? props.llm().getMaxToolIterations() : DEFAULT_MAX_TOOL_ITERATIONS;
+                for (int iteration = 0; iteration < maxIterations; iteration++) {
                     log.info("Tool use iteration {} started", iteration + 1);
 
                     // 调用 Anthropic API（流式）
@@ -121,7 +125,7 @@ public class ChatWithToolsService {
                     List<ObjectNode> toolResults = new ArrayList<>();
                     for (ToolUse tu : result.toolUses()) {
                         // 发送 tool_call 事件（包含迭代信息）
-                        sendToolCallEvent(emitter, tu.name(), tu.input(), iteration + 1, MAX_TOOL_ITERATIONS);
+                        sendToolCallEvent(emitter, tu.name(), tu.input(), iteration + 1, maxIterations);
 
                         ObjectNode toolResult = mapper.createObjectNode();
                         toolResult.put("type", "tool_result");
@@ -361,8 +365,12 @@ public class ChatWithToolsService {
         if (apiKey == null || apiKey.isBlank()) {
             throw new LlmNotConfiguredException();
         }
-        String baseUrl = settings.getOrDefault("base_url", "https://api.anthropic.com");
-        String model = settings.getOrDefault("model", DEFAULT_MODEL);
+        String defaultBaseUrl = props != null && props.llm() != null
+            ? props.llm().getDefaultBaseUrl() : "https://api.anthropic.com";
+        String defaultModel = props != null && props.llm() != null
+            ? props.llm().getDefaultModel() : "claude-haiku-4-5";
+        String baseUrl = settings.getOrDefault("base_url", defaultBaseUrl);
+        String model = settings.getOrDefault("model", defaultModel);
         int maxTokens = 2000;
         String maxTokensStr = settings.get("max_tokens");
         if (maxTokensStr != null && !maxTokensStr.isBlank()) {
@@ -373,7 +381,7 @@ public class ChatWithToolsService {
     }
 
     /**
-     * 构建 System Prompt，注入日期 + TOOLS_DESC（从配置读取或使用默认值）
+     * 构建 System Prompt，注入日期 + TOOLS_DESC（从配置读取）
      */
     private String buildSystemPrompt() {
         LocalDate today = LocalDate.now();
@@ -395,18 +403,10 @@ public class ChatWithToolsService {
 
             """.formatted(today, weekday, yesterday);
 
-        // 从配置读取 tools_desc，为空时使用默认值
+        // 从配置读取 tools_desc 和 chat_system_prompt
         Map<String, String> settings = settingsStore.getAll();
-        String toolsDesc = settings.get("tools_desc");
-        if (toolsDesc == null || toolsDesc.isBlank()) {
-            toolsDesc = Prompts.TOOLS_DESC;
-        }
-
-        // 从配置读取 chat_system_prompt，为空时使用默认值
-        String chatSystemPrompt = settings.get("chat_system_prompt");
-        if (chatSystemPrompt == null || chatSystemPrompt.isBlank()) {
-            chatSystemPrompt = Prompts.DEFAULT_CHAT_SYSTEM;
-        }
+        String toolsDesc = settings.getOrDefault("tools_desc", "");
+        String chatSystemPrompt = settings.getOrDefault("chat_system_prompt", "");
 
         String systemPrompt = chatSystemPrompt.replace("{tools_desc}", toolsDesc);
 

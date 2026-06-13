@@ -1,7 +1,6 @@
 package com.trail.web.controller;
 
 import com.trail.crypto.RsaKeyService;
-import com.trail.llm.Prompts;
 import com.trail.service.LlmService;
 import com.trail.store.LLMSettingsStore;
 import com.trail.web.dto.LlmSettingsDto;
@@ -14,6 +13,9 @@ import java.util.Map;
  *
  * GET  /api/settings/llm - 获取配置
  * PUT  /api/settings/llm - 保存配置（apiKey 支持 RSA 加密传输）
+ *
+ * 默认值在 application.yml 的 trail.defaults 配置，
+ * 启动时由 DefaultSettingsInitializer 初始化到数据库。
  */
 @RestController
 @RequestMapping("/api/settings/llm")
@@ -40,23 +42,23 @@ public class LlmSettingsController {
         Map<String, String> all = store.getAll();
         String apiKey = all.getOrDefault("api_key", "");
         return new LlmSettingsDto(
-                maskApiKey(apiKey),                            // 遮蔽值
-                rsaKeyService.encryptForFrontend(apiKey),       // 私钥加密，前端用公钥解密
+                maskApiKey(apiKey),
+                rsaKeyService.encryptForFrontend(apiKey),
                 all.getOrDefault("base_url", ""),
                 all.getOrDefault("model", ""),
                 all.getOrDefault("max_tokens", "1000"),
-                // Prompt 模板
-                all.getOrDefault("chat_system_prompt", Prompts.DEFAULT_CHAT_SYSTEM),
-                all.getOrDefault("polish_system_prompt", Prompts.POLISH_SYSTEM),
-                all.getOrDefault("polish_todo_system_prompt", Prompts.POLISH_TODO_SYSTEM),
-                all.getOrDefault("summarize_system_prompt", Prompts.SUMMARIZE_MAIN_SYSTEM),
-                all.getOrDefault("summarize_maintenance_prompt", Prompts.SUMMARIZE_MAINTENANCE_SYSTEM),
-                all.getOrDefault("ask_maintenance_prompt", Prompts.ASK_MAINTENANCE_SYSTEM),
-                all.getOrDefault("tools_desc", Prompts.TOOLS_DESC),
+                // Prompt 模板（直接从数据库读取，默认值已初始化）
+                all.getOrDefault("chat_system_prompt", ""),
+                all.getOrDefault("polish_system_prompt", ""),
+                all.getOrDefault("polish_todo_system_prompt", ""),
+                all.getOrDefault("summarize_system_prompt", ""),
+                all.getOrDefault("summarize_maintenance_prompt", ""),
+                all.getOrDefault("ask_maintenance_prompt", ""),
+                all.getOrDefault("tools_desc", ""),
                 // 日报/周报模板
-                all.getOrDefault("daily_report_template", Prompts.DEFAULT_DAILY_REPORT_TEMPLATE),
-                all.getOrDefault("weekly_report_template", Prompts.DEFAULT_WEEKLY_REPORT_TEMPLATE),
-                // 语音输入时长，默认 10 秒
+                all.getOrDefault("daily_report_template", ""),
+                all.getOrDefault("weekly_report_template", ""),
+                // 语音输入时长
                 all.getOrDefault("speech_duration", "10")
         );
     }
@@ -82,65 +84,40 @@ public class LlmSettingsController {
         }
 
         // 连接配置
-        if (data.containsKey("base_url")) store.save("base_url", data.get("base_url") == null ? "" : data.get("base_url"));
-        if (data.containsKey("model")) store.save("model", data.get("model") == null ? "" : data.get("model"));
-        if (data.containsKey("max_tokens")) store.save("max_tokens", data.get("max_tokens") == null ? "" : data.get("max_tokens"));
+        saveIfPresent(data, "base_url");
+        saveIfPresent(data, "model");
+        saveIfPresent(data, "max_tokens");
+
         // Prompt 模板
-        if (data.containsKey("chat_system_prompt")) {
-            String p = data.get("chat_system_prompt");
-            if (p == null || p.isBlank()) store.delete("chat_system_prompt");
-            else store.save("chat_system_prompt", p);
-        }
-        if (data.containsKey("polish_system_prompt")) {
-            String p = data.get("polish_system_prompt");
-            if (p == null || p.isBlank()) store.delete("polish_system_prompt");
-            else store.save("polish_system_prompt", p);
-        }
-        if (data.containsKey("polish_todo_system_prompt")) {
-            String p = data.get("polish_todo_system_prompt");
-            if (p == null || p.isBlank()) store.delete("polish_todo_system_prompt");
-            else store.save("polish_todo_system_prompt", p);
-        }
-        if (data.containsKey("summarize_system_prompt")) {
-            String p = data.get("summarize_system_prompt");
-            if (p == null || p.isBlank()) store.delete("summarize_system_prompt");
-            else store.save("summarize_system_prompt", p);
-        }
-        if (data.containsKey("summarize_maintenance_prompt")) {
-            String p = data.get("summarize_maintenance_prompt");
-            if (p == null || p.isBlank()) store.delete("summarize_maintenance_prompt");
-            else store.save("summarize_maintenance_prompt", p);
-        }
-        if (data.containsKey("ask_maintenance_prompt")) {
-            String p = data.get("ask_maintenance_prompt");
-            if (p == null || p.isBlank()) store.delete("ask_maintenance_prompt");
-            else store.save("ask_maintenance_prompt", p);
-        }
-        if (data.containsKey("tools_desc")) {
-            String p = data.get("tools_desc");
-            if (p == null || p.isBlank()) store.delete("tools_desc");
-            else store.save("tools_desc", p);
-        }
+        saveIfPresent(data, "chat_system_prompt");
+        saveIfPresent(data, "polish_system_prompt");
+        saveIfPresent(data, "polish_todo_system_prompt");
+        saveIfPresent(data, "summarize_system_prompt");
+        saveIfPresent(data, "summarize_maintenance_prompt");
+        saveIfPresent(data, "ask_maintenance_prompt");
+        saveIfPresent(data, "tools_desc");
+
         // 日报/周报模板
-        if (data.containsKey("daily_report_template")) {
-            String p = data.get("daily_report_template");
-            if (p == null || p.isBlank()) store.delete("daily_report_template");
-            else store.save("daily_report_template", p);
-        }
-        if (data.containsKey("weekly_report_template")) {
-            String p = data.get("weekly_report_template");
-            if (p == null || p.isBlank()) store.delete("weekly_report_template");
-            else store.save("weekly_report_template", p);
-        }
+        saveIfPresent(data, "daily_report_template");
+        saveIfPresent(data, "weekly_report_template");
+
         // 语音输入时长
-        if (data.containsKey("speech_duration")) {
-            String d = data.get("speech_duration");
-            if (d == null || d.isBlank()) store.delete("speech_duration");
-            else store.save("speech_duration", d);
-        }
+        saveIfPresent(data, "speech_duration");
+
         // 刷新 LlmService 的 prompt 缓存
         llmService.refreshPrompts();
         return Map.of("ok", true);
+    }
+
+    private void saveIfPresent(Map<String, String> data, String key) {
+        if (data.containsKey(key)) {
+            String value = data.get(key);
+            if (value == null || value.isBlank()) {
+                store.delete(key);
+            } else {
+                store.save(key, value);
+            }
+        }
     }
 
     /**

@@ -1,5 +1,6 @@
 package com.trail.store;
 
+import com.trail.config.AppProperties;
 import com.trail.config.DataDirService;
 import com.trail.db.SqliteDb;
 import com.trail.store.exception.NotFoundException;
@@ -25,20 +26,7 @@ import java.util.UUID;
 /**
  * 附件存储（M10：描述位截图粘贴 + M11：缩放/引用追踪/删除）。
  *
- * 数据流：
- *   1) save(file)  → 校验 mime/大小 → SHA-256 → 去重 → 写盘 <dataDir>/attachments/YYYY/MM/<uuid>.<ext>
- *                  → INSERT attachments → 返 Saved{...}
- *   2) load(id)    → SELECT rel_path, mime → 返给 controller 流式返回
- *   3) findReferences(id) → 扫 5 字段 LIKE '%/api/attachments/N)%' 返 Reference 列表
- *   4) updateSize(id, size) → UPDATE display_size (1-100 校验在 controller)
- *   5) delete(id)  → 0 引用时删磁盘 + DB；>0 引用时返 false 让 controller 返 409
- *
- * 安全：
- *   - mime 白名单（仅 image/* 四种）
- *   - 单图 10MB（与 application.yml spring.servlet.multipart.max-file-size 对齐）
- *   - 去重键：sha256；同图再粘只返旧 id
- *   - rel_path 由 store 决定，外部只通过 id 访问
- *   - 二次防穿越：load/delete 出来再 normalize，必须仍以 <dataDir>/attachments/ 开头
+ * 配置从 application.yml 读取：trail.attachment.max-bytes
  */
 @Component
 public class AttachmentStore {
@@ -46,7 +34,7 @@ public class AttachmentStore {
     private static final Set<String> ALLOWED_MIMES = Set.of(
             "image/png", "image/jpeg", "image/gif", "image/webp"
     );
-    private static final long MAX_BYTES = 10L * 1024 * 1024;
+    private static final long DEFAULT_MAX_BYTES = 10L * 1024 * 1024; // 10MB
     private static final Map<String, String> EXT_BY_MIME = Map.of(
             "image/png", ".png",
             "image/jpeg", ".jpg",
@@ -57,10 +45,18 @@ public class AttachmentStore {
 
     private final SqliteDb db;
     private final DataDirService dataDir;
+    private final AppProperties props;
 
-    public AttachmentStore(SqliteDb db, DataDirService dataDir) {
+    public AttachmentStore(SqliteDb db, DataDirService dataDir, AppProperties props) {
         this.db = db;
         this.dataDir = dataDir;
+        this.props = props;
+    }
+
+    /** 获取配置的最大文件大小 */
+    private long getMaxBytes() {
+        return props != null && props.attachment() != null
+            ? props.attachment().getMaxBytes() : DEFAULT_MAX_BYTES;
     }
 
     /** 上传一个图片。返回响应 DTO 字段。 */
@@ -76,9 +72,10 @@ public class AttachmentStore {
                     "仅支持 png / jpeg / gif / webp，当前：" + mime);
         }
         long size = file.getSize();
-        if (size > MAX_BYTES) {
+        long maxBytes = getMaxBytes();
+        if (size > maxBytes) {
             throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE,
-                    "单图上限 10MB，当前 " + size + " 字节");
+                    "单图上限 " + (maxBytes / 1024 / 1024) + "MB，当前 " + size + " 字节");
         }
 
         byte[] bytes;

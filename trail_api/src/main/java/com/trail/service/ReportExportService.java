@@ -1,7 +1,6 @@
 package com.trail.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.trail.llm.Prompts;
 import com.trail.store.LLMSettingsStore;
 import com.trail.store.WorkLogStore;
 import org.springframework.stereotype.Service;
@@ -15,6 +14,9 @@ import java.util.stream.Collectors;
 /**
  * 日报/周报导出服务
  * 根据模板和日志数据生成 Markdown 内容
+ *
+ * 默认模板在 application.yml 的 trail.defaults 配置，
+ * 启动时由 DefaultSettingsInitializer 初始化到数据库。
  */
 @Service
 public class ReportExportService {
@@ -45,10 +47,10 @@ public class ReportExportService {
         // 1. 查询当日日志
         List<Map<String, Object>> logs = workLogStore.getByDate(date);
 
-        // 2. 获取模板
+        // 2. 获取模板（从数据库读取）
         String template = llmSettingsStore.get("daily_report_template");
         if (template == null || template.isBlank()) {
-            template = Prompts.DEFAULT_DAILY_REPORT_TEMPLATE;
+            template = "";
         }
 
         // 3. 构建数据 JSON
@@ -84,10 +86,10 @@ public class ReportExportService {
         // 1. 查询日期范围内日志
         List<Map<String, Object>> logs = workLogStore.getByDateRange(start, end);
 
-        // 2. 获取模板
+        // 2. 获取模板（从数据库读取）
         String template = llmSettingsStore.get("weekly_report_template");
         if (template == null || template.isBlank()) {
-            template = Prompts.DEFAULT_WEEKLY_REPORT_TEMPLATE;
+            template = "";
         }
 
         // 3. 构建数据 JSON

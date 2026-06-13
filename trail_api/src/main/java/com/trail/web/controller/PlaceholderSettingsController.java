@@ -6,14 +6,15 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
-/** 占位提示语配置：任务描述 / 编年日志 / 补充说明 */
+/**
+ * 占位提示语配置：任务描述 / 编年日志 / 补充说明
+ *
+ * 默认值在 application.yml 的 trail.defaults 配置，
+ * 启动时由 DefaultSettingsInitializer 初始化到数据库。
+ */
 @RestController
 @RequestMapping("/api/settings/placeholders")
 public class PlaceholderSettingsController {
-
-    private static final String DEFAULT_TASK_DESC = "把要做什么写清楚。先粗糙后润色。";
-    private static final String DEFAULT_LOG = "今日所记……";
-    private static final String DEFAULT_TODO_NOTE = "需要先申请测试 key、跨团队协调人 …";
 
     private static final String KEY_TASK_DESC = "placeholder_task_desc";
     private static final String KEY_LOG = "placeholder_log";
@@ -32,9 +33,9 @@ public class PlaceholderSettingsController {
         String todoNote = store.get(KEY_TODO_NOTE);
 
         return new PlaceholderSettingsDto(
-            taskDesc == null || taskDesc.isBlank() ? DEFAULT_TASK_DESC : taskDesc,
-            log == null || log.isBlank() ? DEFAULT_LOG : log,
-            todoNote == null || todoNote.isBlank() ? DEFAULT_TODO_NOTE : todoNote
+            taskDesc == null ? "" : taskDesc,
+            log == null ? "" : log,
+            todoNote == null ? "" : todoNote
         );
     }
 
@@ -44,24 +45,24 @@ public class PlaceholderSettingsController {
         String log = body.get("log");
         String todoNote = body.get("todo_note");
 
-        // 空 = 删除 = 回归默认值
+        // 空 = 删除
         if (taskDesc == null || taskDesc.isBlank()) {
             store.delete(KEY_TASK_DESC);
-            taskDesc = DEFAULT_TASK_DESC;
+            taskDesc = "";
         } else {
             store.save(KEY_TASK_DESC, taskDesc);
         }
 
         if (log == null || log.isBlank()) {
             store.delete(KEY_LOG);
-            log = DEFAULT_LOG;
+            log = "";
         } else {
             store.save(KEY_LOG, log);
         }
 
         if (todoNote == null || todoNote.isBlank()) {
             store.delete(KEY_TODO_NOTE);
-            todoNote = DEFAULT_TODO_NOTE;
+            todoNote = "";
         } else {
             store.save(KEY_TODO_NOTE, todoNote);
         }

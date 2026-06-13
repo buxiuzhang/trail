@@ -25,7 +25,7 @@ import java.util.Set;
  * - 启动期不读 key；首次访问 dataDir 时（DataDirService.openConnection 之后）才 init
  * - 文件不存在 / 大小 ≠ 32：派生新 key（PBKDF2 + 可配置盐 + hostname），写盘到 <dataDir>/.secret_key
  * - 路径不再来自配置 yaml，**完全由 DataDirService 决定**（即 <dataDir>/.secret_key）
- * - 盐值从 config.yaml 的 trail.crypto.salt 读取，支持环境变量覆盖
+ * - 盐值和迭代次数从 application.yml 的 trail.crypto 配置读取
  */
 @Component
 public class SecretKeyService {
@@ -83,22 +83,27 @@ public class SecretKeyService {
     private byte[] derive() throws NoSuchAlgorithmException, InvalidKeySpecException {
         String host = hostname();
         String salt = getSalt();
-        int iter = DEFAULT_ITERATIONS;
-        if (props != null) {
-            // 可选从 AppProperties 覆盖（暂未在 application.yml 暴露；保留口子）
-        }
+        int iter = getIterations();
         PBEKeySpec spec = new PBEKeySpec(
                 host.toCharArray(), salt.getBytes(), iter, KEY_LENGTH_BYTES * 8);
         SecretKeyFactory skf = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
         return skf.generateSecret(spec).getEncoded();
     }
 
-    /** 从配置获取盐值，支持 config.yaml 的 trail.crypto.salt */
+    /** 从配置获取盐值 */
     private String getSalt() {
         if (props != null && props.crypto() != null && props.crypto().salt() != null) {
             return props.crypto().salt();
         }
         return DEFAULT_SALT;
+    }
+
+    /** 从配置获取迭代次数 */
+    private int getIterations() {
+        if (props != null && props.crypto() != null) {
+            return props.crypto().getIterations();
+        }
+        return DEFAULT_ITERATIONS;
     }
 
     private String hostname() {
