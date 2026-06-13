@@ -73,7 +73,7 @@ jobs:
           jpackage `
             --name "Trail" `
             --app-version "$version" `
-            --description "Trail 工作日志管理工具" `
+            --description "Trail Task Management Tool" `
             --vendor "Trail Team" `
             --type exe `
             --input bundle `
@@ -148,7 +148,7 @@ jobs:
           jpackage \
             --name "Trail" \
             --app-version "$version" \
-            --description "Trail 工作日志管理工具" \
+            --description "Trail Task Management Tool" \
             --vendor "Trail Team" \
             --type dmg \
             --input bundle \
