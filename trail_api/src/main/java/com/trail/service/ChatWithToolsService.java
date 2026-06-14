@@ -212,10 +212,13 @@ public class ChatWithToolsService {
             .header("Content-Type", "application/json")
             .POST(HttpRequest.BodyPublishers.ofString(jsonBody));
 
-        // MiniMax 兼容：使用 Bearer 认证，但保留 anthropic-version header
-        if (cfg.baseUrl().toLowerCase().contains("minimax")) {
+        // MiniMax / 智谱兼容：使用 Bearer 认证，但保留 anthropic-version header
+        if (cfg.baseUrl().toLowerCase().contains("minimax") ||
+            cfg.baseUrl().toLowerCase().contains("sfkey") ||
+            cfg.baseUrl().toLowerCase().contains("zhipu") ||
+            cfg.baseUrl().toLowerCase().contains("bigmodel")) {
             reqBuilder.header("Authorization", "Bearer " + cfg.apiKey());
-            // MiniMax 的 /anthropic 端点也需要 anthropic-version 来启用标准 tool_use 格式
+            // Anthropic 兼容端点也需要 anthropic-version 来启用标准 tool_use 格式
             reqBuilder.header("anthropic-version", ANTHROPIC_VERSION);
         } else {
             reqBuilder.header("x-api-key", cfg.apiKey())
