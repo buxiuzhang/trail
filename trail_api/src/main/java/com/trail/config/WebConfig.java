@@ -56,7 +56,7 @@ public class WebConfig implements WebMvcConfigurer {
 
     /**
      * 解析前端 dist 目录。
-     * 优先级：env TRAIL_FRONTEND_DIR > JAR 同级 static/ > 工作目录 static/ > ../trail_web/dist (开发模式)
+     * 优先级：env TRAIL_FRONTEND_DIR > static/ (发布包模式) > ../trail_web/dist (开发模式)
      */
     private Path resolveDist() {
         // 1. 环境变量优先
@@ -68,8 +68,18 @@ public class WebConfig implements WebMvcConfigurer {
             return resolved;
         }
 
-        // 2. 发布包模式：先查 JAR 同级目录（jpackage 打包后 static 在 app/ 子目录）
+        // 2. 发布包模式：JAR 同级的 static/ 目录
         try {
+            // 获取当前工作目录，检查是否有 static/ 子目录
+            Path workDir = Paths.get("").toAbsolutePath();
+            Path staticDir = workDir.resolve("static");
+            System.out.println("[WebConfig] Work dir: " + workDir);
+            System.out.println("[WebConfig] Checking static dir: " + staticDir + " exists=" + Files.exists(staticDir));
+            if (Files.exists(staticDir) && Files.isDirectory(staticDir)) {
+                return staticDir;
+            }
+
+            // 尝试从 JAR 所在目录查找
             Path jarDir = getJarDirectory();
             if (jarDir != null) {
                 Path jarStaticDir = jarDir.resolve("static");
@@ -79,20 +89,11 @@ public class WebConfig implements WebMvcConfigurer {
                     return jarStaticDir;
                 }
             }
-
-            // 3. 再查工作目录下的 static/（适用于手动运行 JAR 的场景）
-            Path workDir = Paths.get("").toAbsolutePath();
-            Path staticDir = workDir.resolve("static");
-            System.out.println("[WebConfig] Work dir: " + workDir);
-            System.out.println("[WebConfig] Checking static dir: " + staticDir + " exists=" + Files.exists(staticDir));
-            if (Files.exists(staticDir) && Files.isDirectory(staticDir)) {
-                return staticDir;
-            }
         } catch (Exception e) {
             System.out.println("[WebConfig] Error resolving static path: " + e.getMessage());
         }
 
-        // 4. 开发模式：相对项目根的 trail_web/dist
+        // 3. 开发模式：相对项目根的 trail_web/dist
         Path devDist = Paths.get("../trail_web/dist");
         Path resolved = devDist.isAbsolute() ? devDist : devDist.toAbsolutePath();
         System.out.println("[WebConfig] Dev mode dist: " + resolved);
@@ -108,7 +109,6 @@ public class WebConfig implements WebMvcConfigurer {
             var codeSource = getClass().getProtectionDomain().getCodeSource();
             if (codeSource != null) {
                 Path path = Paths.get(codeSource.getLocation().toURI());
-                System.out.println("[WebConfig] CodeSource location: " + path);
                 if (path.toString().endsWith(".jar")) {
                     return path.getParent();
                 }
@@ -118,24 +118,8 @@ public class WebConfig implements WebMvcConfigurer {
                 }
             }
         } catch (Exception e) {
-            System.out.println("[WebConfig] CodeSource method failed: " + e.getMessage());
+            // 忽略，尝试其他方法
         }
-
-        // 方法2：通过 classpath 查找（jpackage 打包后的场景）
-        String classPath = System.getProperty("java.class.path");
-        if (classPath != null) {
-            String[] paths = classPath.split(System.getProperty("path.separator"));
-            for (String p : paths) {
-                if (p.endsWith("trail-api.jar")) {
-                    Path jarPath = Paths.get(p);
-                    if (Files.exists(jarPath)) {
-                        System.out.println("[WebConfig] Found JAR via classpath: " + jarPath);
-                        return jarPath.getParent();
-                    }
-                }
-            }
-        }
-
         return null;
     }
 }

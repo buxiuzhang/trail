@@ -1,4 +1,11 @@
-const API_BASE = ''; // 同源，Vite proxy 转发 /api/*
+// Electron 环境：检测是否在 file:// 协议下运行，直接访问后端 URL
+// Web 开发环境：同源，Vite proxy 转发 /api/*
+function getApiBase(): string {
+  if (typeof window !== 'undefined' && window.location.protocol === 'file:') {
+    return 'http://localhost:8765';
+  }
+  return '';
+}
 
 /** M8：数据目录未配置时后端返 503 + {code: "NEEDS_DATA_DIR"}。 */
 export class DataDirNotConfiguredError extends Error {
@@ -18,8 +25,9 @@ interface FetchOptions extends Omit<RequestInit, 'body'> {
 /** 带重试的 request（处理 DuckDB 锁冲突） */
 async function request<T>(path: string, opts: FetchOptions = {}, retries = 3): Promise<T> {
   const { body, headers, skipNeedsDataDirRetry, ...rest } = opts;
+  const apiBase = getApiBase(); // 动态获取
   for (let attempt = 0; attempt <= retries; attempt++) {
-    const res = await fetch(API_BASE + path, {
+    const res = await fetch(apiBase + path, {
       headers: { 'Content-Type': 'application/json', ...headers },
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
       ...rest,
@@ -68,7 +76,8 @@ export async function* streamPost<TChunk>(
   body: unknown,
   signal?: AbortSignal,
 ): AsyncGenerator<TChunk> {
-  const res = await fetch(API_BASE + path, {
+  const apiBase = getApiBase(); // 动态获取
+  const res = await fetch(apiBase + path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),

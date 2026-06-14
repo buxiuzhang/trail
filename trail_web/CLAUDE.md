@@ -11,17 +11,17 @@ trail 项目的前端（与同仓库后端 `../trail_app/` 配合）。React 19 
 ```bash
 pnpm install            # 装依赖
 pnpm dev                # http://localhost:5173，/api 走 proxy → 后端 127.0.0.1:8765
-pnpm build              # tsc -b && vite build，产物 dist/（被后端 web/main.py 找）
+pnpm build              # tsc -b && vite build，产物 dist/
 pnpm preview            # 预览 dist/
 pnpm lint               # eslint .
 ```
 
-后端必须先跑（`../` 目录 `python -m trail_app.web`）——`pnpm dev` 才有数据。
+后端必须先跑（`../trail_api` 目录 `java -jar target/trail-api.jar`）——`pnpm dev` 才有数据。
 
 ## 后端契约
 
-- 全部走同源 `/api/*`，由 Vite `server.proxy` 转发到 `http://127.0.0.1:8765`（`vite.config.ts`）。生产构建后由 FastAPI 自己挂载 `dist/`。
-- 后端在 `503 / 500` 时**可能**是 DuckDB 写锁冲突——`src/api/client.ts:request()` 最多自动重试 3 次（指数退避 200/400/600ms）。**别在前端再包一层重试**。
+- 全部走同源 `/api/*`，由 Vite `server.proxy` 转发到 `http://127.0.0.1:8765`（`vite.config.ts`）。生产构建后由后端挂载静态资源。
+- 后端在 `503` 时**可能**是未配置数据目录或 SQLite 写锁冲突——`src/api/client.ts:request()` 最多自动重试 3 次（指数退避 200/400/600ms）。**别在前端再包一层重试**。
 - SSE：`streamPost()` 解析 `data: {…}\n\n`，`[DONE]` 结束。后端 `POST /api/llm/chat/stream` 唯一流端点。
 - 4xx 错误体形如 `{ "detail": "…" }`，`request()` 把它转成 `Error.message` 抛出；UI 拿到的就是 `err.message`。
 

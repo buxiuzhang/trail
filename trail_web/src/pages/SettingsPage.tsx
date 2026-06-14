@@ -4,13 +4,13 @@ import {
   useMotto, useSaveMotto,
   useDataDir, useSaveDataDir,
   usePlaceholders, useSavePlaceholders, DEFAULT_PLACEHOLDERS,
-  type LLMSettings,
 } from '@/api/settings'
 import { rsaDecrypt } from '@/api/crypto'
 import { useToastContext } from '@/context/ToastContext'
 import { useSettingsContext } from '@/App'
 import { Crumbs } from '@/components/shared/Crumbs'
 import { DescriptionEditorWithMode, type EditorMode } from '@/components/shared/DescriptionEditorWithMode'
+import { useConfirm } from '@/utils/confirm'
 import styles from './SettingsPage.module.css'
 
 // 默认 Prompt 模板
@@ -64,6 +64,7 @@ export function SettingsPage() {
   const { showToast } = useToastContext()
   const settingsCtx = useSettingsContext()
   const activeSection = settingsCtx?.activeSection ?? 'interface'
+  const confirm = useConfirm()
 
   // 按需加载：只有切换到对应 section 才请求数据
   const { data: settings, isLoading } = useLLMSettings({
@@ -182,8 +183,18 @@ export function SettingsPage() {
     if (dataDir?.dataDir) setDirDraft(dataDir.dataDir)
   }, [dataDir])
 
-  async function handleSaveLLM(e: React.FormEvent) {
+  async function handleSaveLLM(e: React.SyntheticEvent) {
     e.preventDefault()
+
+    // 二次确认
+    const ok = await confirm({
+      level: 'moderate',
+      title: '保存 LLM 设置？',
+      body: <p>将保存 API Key、Base URL、模型配置及所有 Prompt 模板。</p>,
+      confirmLabel: '保存',
+    })
+    if (!ok) return
+
     // API Key 可以为空（用户不修改时）
     try {
       await saveLLM.mutateAsync({
@@ -236,6 +247,15 @@ export function SettingsPage() {
     // 防止重复调用
     if (saveMotto.isPending || saveLLM.isPending) return
 
+    // 二次确认
+    const ok = await confirm({
+      level: 'moderate',
+      title: '保存界面偏好？',
+      body: <p>将保存卷首语和语音输入时长设置。</p>,
+      confirmLabel: '保存',
+    })
+    if (!ok) return
+
     try {
       // 保存卷首语
       await saveMotto.mutateAsync(mottoDraft.trim())
@@ -250,6 +270,15 @@ export function SettingsPage() {
   }
 
   async function handleSavePlaceholders() {
+    // 二次确认
+    const ok = await confirm({
+      level: 'moderate',
+      title: '保存占位提示语？',
+      body: <p>将保存任务描述、编年日志、补充说明的占位提示。</p>,
+      confirmLabel: '保存',
+    })
+    if (!ok) return
+
     try {
       await savePlaceholders.mutateAsync({
         task_desc: taskDescDraft.trim() || DEFAULT_PLACEHOLDERS.task_desc,
@@ -262,13 +291,31 @@ export function SettingsPage() {
     }
   }
 
-  async function handleSaveDir(e: React.FormEvent) {
+  async function handleSaveDir(e: React.SyntheticEvent) {
     e.preventDefault()
     const path = dirDraft.trim()
     if (!path) { showToast('路径不能为空'); return }
     if (!path.startsWith('/') && !/^[a-zA-Z]:[\\\/]/.test(path)) {
       showToast('请输入绝对路径'); return
     }
+
+    // 二次确认
+    const ok = await confirm({
+      level: 'critical',
+      title: '切换数据目录？',
+      body: (
+        <div>
+          <p>新目录：<em style={{ fontFamily: 'var(--mono)' }}>{path}</em></p>
+          <p>后端将关闭旧连接、在新目录建库并初始化子目录。</p>
+          <p style={{ color: 'var(--oxblood)', fontWeight: 500 }}>
+            此操作立即生效，页面将自动刷新。
+          </p>
+        </div>
+      ),
+      confirmLabel: '确认切换',
+    })
+    if (!ok) return
+
     try {
       await saveDir.mutateAsync(path)
       showToast('数据目录已切换')
@@ -421,25 +468,6 @@ export function SettingsPage() {
               </div>
             </div>
 
-            {/* 语音输入时长 */}
-            <div className="field">
-              <div className="field__label">
-                <span>语音输入时长</span>
-                <span className="field__hint">{speechDuration} 秒</span>
-              </div>
-              <input
-                type="range"
-                min="5"
-                max="60"
-                value={speechDuration}
-                onChange={e => setSpeechDuration(e.target.value)}
-                className={styles.slider}
-              />
-              <p className={styles.fieldHint}>
-                聊天窗口语音输入的最大时长，拖动调整。
-              </p>
-            </div>
-
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
               <button type="submit" className="btn btn--primary" disabled={saveLLM.isPending}>
                 {saveLLM.isPending ? '保存中...' : '保存'}
@@ -464,7 +492,15 @@ export function SettingsPage() {
                   待办润色提示词
                   <button
                     type="button"
-                    onClick={() => setPolishTodoPrompt(DEFAULT_POLISH_TODO_PROMPT)}
+                    onClick={async () => {
+                      const ok = await confirm({
+                        level: 'moderate',
+                        title: '重置待办润色提示词？',
+                        body: <p>将恢复为系统默认值，您的自定义内容将被覆盖。</p>,
+                        confirmLabel: '重置',
+                      })
+                      if (ok) setPolishTodoPrompt(DEFAULT_POLISH_TODO_PROMPT)
+                    }}
                     className={styles.resetBtn}
                   >
                     重置
@@ -499,7 +535,15 @@ export function SettingsPage() {
                   润色提示词
                   <button
                     type="button"
-                    onClick={() => setPolishPrompt(DEFAULT_POLISH_PROMPT)}
+                    onClick={async () => {
+                      const ok = await confirm({
+                        level: 'moderate',
+                        title: '重置润色提示词？',
+                        body: <p>将恢复为系统默认值，您的自定义内容将被覆盖。</p>,
+                        confirmLabel: '重置',
+                      })
+                      if (ok) setPolishPrompt(DEFAULT_POLISH_PROMPT)
+                    }}
                     className={styles.resetBtn}
                   >
                     重置
@@ -534,7 +578,15 @@ export function SettingsPage() {
                   总结提示词
                   <button
                     type="button"
-                    onClick={() => setSummarizePrompt(DEFAULT_SUMMARIZE_PROMPT)}
+                    onClick={async () => {
+                      const ok = await confirm({
+                        level: 'moderate',
+                        title: '重置总结提示词？',
+                        body: <p>将恢复为系统默认值，您的自定义内容将被覆盖。</p>,
+                        confirmLabel: '重置',
+                      })
+                      if (ok) setSummarizePrompt(DEFAULT_SUMMARIZE_PROMPT)
+                    }}
                     className={styles.resetBtn}
                   >
                     重置
@@ -569,7 +621,15 @@ export function SettingsPage() {
                   维护期总结提示词
                   <button
                     type="button"
-                    onClick={() => setSummarizeMaintenancePrompt(DEFAULT_SUMMARIZE_MAINTENANCE_PROMPT)}
+                    onClick={async () => {
+                      const ok = await confirm({
+                        level: 'moderate',
+                        title: '重置维护期总结提示词？',
+                        body: <p>将恢复为系统默认值，您的自定义内容将被覆盖。</p>,
+                        confirmLabel: '重置',
+                      })
+                      if (ok) setSummarizeMaintenancePrompt(DEFAULT_SUMMARIZE_MAINTENANCE_PROMPT)
+                    }}
                     className={styles.resetBtn}
                   >
                     重置
@@ -604,7 +664,15 @@ export function SettingsPage() {
                   维护建议提示词
                   <button
                     type="button"
-                    onClick={() => setAskMaintenancePrompt(DEFAULT_ASK_MAINTENANCE_PROMPT)}
+                    onClick={async () => {
+                      const ok = await confirm({
+                        level: 'moderate',
+                        title: '重置维护建议提示词？',
+                        body: <p>将恢复为系统默认值，您的自定义内容将被覆盖。</p>,
+                        confirmLabel: '重置',
+                      })
+                      if (ok) setAskMaintenancePrompt(DEFAULT_ASK_MAINTENANCE_PROMPT)
+                    }}
                     className={styles.resetBtn}
                   >
                     重置
@@ -639,7 +707,15 @@ export function SettingsPage() {
                   对话提示词
                   <button
                     type="button"
-                    onClick={() => setChatPrompt(DEFAULT_CHAT_PROMPT)}
+                    onClick={async () => {
+                      const ok = await confirm({
+                        level: 'moderate',
+                        title: '重置对话提示词？',
+                        body: <p>将恢复为系统默认值，您的自定义内容将被覆盖。</p>,
+                        confirmLabel: '重置',
+                      })
+                      if (ok) setChatPrompt(DEFAULT_CHAT_PROMPT)
+                    }}
                     className={styles.resetBtn}
                   >
                     重置
@@ -701,7 +777,15 @@ export function SettingsPage() {
                   今日工作模板
                   <button
                     type="button"
-                    onClick={() => setDailyReportTemplate(DEFAULT_DAILY_REPORT_TEMPLATE)}
+                    onClick={async () => {
+                      const ok = await confirm({
+                        level: 'moderate',
+                        title: '重置今日工作模板？',
+                        body: <p>将恢复为系统默认值，您的自定义内容将被覆盖。</p>,
+                        confirmLabel: '重置',
+                      })
+                      if (ok) setDailyReportTemplate(DEFAULT_DAILY_REPORT_TEMPLATE)
+                    }}
                     className={styles.resetBtn}
                   >
                     重置
@@ -735,7 +819,15 @@ export function SettingsPage() {
                   本周工作模板
                   <button
                     type="button"
-                    onClick={() => setWeeklyReportTemplate(DEFAULT_WEEKLY_REPORT_TEMPLATE)}
+                    onClick={async () => {
+                      const ok = await confirm({
+                        level: 'moderate',
+                        title: '重置本周工作模板？',
+                        body: <p>将恢复为系统默认值，您的自定义内容将被覆盖。</p>,
+                        confirmLabel: '重置',
+                      })
+                      if (ok) setWeeklyReportTemplate(DEFAULT_WEEKLY_REPORT_TEMPLATE)
+                    }}
                     className={styles.resetBtn}
                   >
                     重置
@@ -819,9 +911,17 @@ export function SettingsPage() {
           <button
             type="button"
             className="btn btn--ghost"
-            onClick={() => {
-              setMottoDraft('')
-              setSpeechDuration('10')
+            onClick={async () => {
+              const ok = await confirm({
+                level: 'dangerous',
+                title: '恢复所有默认值？',
+                body: <p>卷首语和语音时长将全部恢复为默认值。</p>,
+                confirmLabel: '恢复默认',
+              })
+              if (ok) {
+                setMottoDraft('')
+                setSpeechDuration('10')
+              }
             }}
             title="恢复默认"
           >
@@ -853,7 +953,15 @@ export function SettingsPage() {
                 <span>任务描述</span>
                 <button
                   type="button"
-                  onClick={() => setTaskDescDraft(DEFAULT_PLACEHOLDERS.task_desc)}
+                  onClick={async () => {
+                    const ok = await confirm({
+                      level: 'moderate',
+                      title: '重置任务描述提示语？',
+                      body: <p>将恢复为系统默认值。</p>,
+                      confirmLabel: '重置',
+                    })
+                    if (ok) setTaskDescDraft(DEFAULT_PLACEHOLDERS.task_desc)
+                  }}
                   title="恢复为默认"
                   style={{
                     background: 'none', border: 'none', cursor: 'pointer',
@@ -878,7 +986,15 @@ export function SettingsPage() {
                 <span>编年日志</span>
                 <button
                   type="button"
-                  onClick={() => setLogDraft(DEFAULT_PLACEHOLDERS.log)}
+                  onClick={async () => {
+                    const ok = await confirm({
+                      level: 'moderate',
+                      title: '重置编年日志提示语？',
+                      body: <p>将恢复为系统默认值。</p>,
+                      confirmLabel: '重置',
+                    })
+                    if (ok) setLogDraft(DEFAULT_PLACEHOLDERS.log)
+                  }}
                   title="恢复为默认"
                   style={{
                     background: 'none', border: 'none', cursor: 'pointer',
@@ -903,7 +1019,15 @@ export function SettingsPage() {
                 <span>补充说明</span>
                 <button
                   type="button"
-                  onClick={() => setTodoNoteDraft(DEFAULT_PLACEHOLDERS.todo_note)}
+                  onClick={async () => {
+                    const ok = await confirm({
+                      level: 'moderate',
+                      title: '重置补充说明提示语？',
+                      body: <p>将恢复为系统默认值。</p>,
+                      confirmLabel: '重置',
+                    })
+                    if (ok) setTodoNoteDraft(DEFAULT_PLACEHOLDERS.todo_note)
+                  }}
                   title="恢复为默认"
                   style={{
                     background: 'none', border: 'none', cursor: 'pointer',
@@ -927,10 +1051,18 @@ export function SettingsPage() {
               <button
                 type="button"
                 className="btn btn--ghost"
-                onClick={() => {
-                  setTaskDescDraft(DEFAULT_PLACEHOLDERS.task_desc)
-                  setLogDraft(DEFAULT_PLACEHOLDERS.log)
-                  setTodoNoteDraft(DEFAULT_PLACEHOLDERS.todo_note)
+                onClick={async () => {
+                  const ok = await confirm({
+                    level: 'dangerous',
+                    title: '重置所有占位提示语？',
+                    body: <p>任务描述、编年日志、补充说明的提示语将全部恢复为默认值。</p>,
+                    confirmLabel: '全部重置',
+                  })
+                  if (ok) {
+                    setTaskDescDraft(DEFAULT_PLACEHOLDERS.task_desc)
+                    setLogDraft(DEFAULT_PLACEHOLDERS.log)
+                    setTodoNoteDraft(DEFAULT_PLACEHOLDERS.todo_note)
+                  }
                 }}
               >
                 全部重置

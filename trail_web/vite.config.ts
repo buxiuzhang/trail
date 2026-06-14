@@ -5,6 +5,7 @@ import { resolve } from 'path'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  base: './',  // 使用相对路径，便于 Electron 打包
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src'),

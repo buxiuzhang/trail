@@ -13,7 +13,7 @@
 
   <groupId>com.trail</groupId>
   <artifactId>trail-api</artifactId>
-  <version>0.3.2</version>
+  <version>0.3.0</version>
   <name>trail-api</name>
   <description>Trail v2 Java rewrite (Phase 1: non-LLM endpoints)</description>
 

@@ -45,12 +45,6 @@ public class DataDirService {
 
     /** 启动期初始化（不主动开 conn，留给 StartupChecks 调 openAndInitialize） */
     public void init() {
-        // 调试：显示用户 home 和配置文件路径
-        String userHome = System.getProperty("user.home");
-        log.info("user.home = {}", userHome);
-        log.info("配置文件路径 = {}", userConfigPath);
-        log.info("配置文件存在 = {}", Files.exists(userConfigPath));
-
         String envDir = System.getenv("TRAIL_DATA_DIR");
         if (envDir != null && !envDir.isBlank()) {
             Path p = Path.of(envDir).toAbsolutePath();
@@ -66,13 +60,11 @@ public class DataDirService {
         if (Files.exists(userConfigPath)) {
             try {
                 String yaml = Files.readString(userConfigPath);
-                log.info("配置文件内容: {}", yaml);
                 Object loaded = new Yaml().load(yaml);
                 if (loaded instanceof Map<?, ?> m) {
                     @SuppressWarnings("unchecked")
                     Map<String, Object> raw = (Map<String, Object>) m;
                     UserConfig cfg = UserConfig.fromMap(raw);
-                    log.info("解析后 dataDir = {}", cfg.dataDir());
                     if (cfg.dataDir() != null) {
                         Path p = Path.of(cfg.dataDir()).toAbsolutePath();
                         log.info("数据目录来自 user config: {}", p);

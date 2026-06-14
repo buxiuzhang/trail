@@ -2,6 +2,8 @@
 
 本文件供 Claude Code 读取。**所有对话、注释、文档用中文。**
 
+项目中的执行计划统一保存到docs中。
+
 ## 项目
 
 Trail v2 —— **任务填报 + 大模型辅助的 Web 工具**。
@@ -13,8 +15,8 @@ Trail v2 —— **任务填报 + 大模型辅助的 Web 工具**。
 
 ## 技术栈
 
-- **后端**：`trail_api/`——Java 17 + Spring Boot 3.2 + SQLite（JDBC）
-- **前端**：`trail_web/`——Vite + React 19 + TypeScript（独立 npm 包，gitlink 记录）
+- **后端**：`trail_api/`——Java 17 + Spring Boot 3.2 + SQLite（JDBC，WAL 模式）
+- **前端**：`trail_web/`——Vite + React 19 + TypeScript（独立 npm 包）
 - **数据目录**：`~/.trail/data/`（`db/tasks.sqlite` + `attachments/` + `exports/` + `logs/`）
 - **密钥文件**：`~/.trail/data/trail_private.key`（RSA 私钥）+ `.secret_key`（AES 密钥）
 
@@ -23,17 +25,30 @@ Trail v2 —— **任务填报 + 大模型辅助的 Web 工具**。
 ## 启动 / 常用命令
 
 ```bash
-# 后端
+# 使用启停脚本（推荐）
+sh run.sh start          # 启动 API + Web
+sh run.sh stop           # 停止全部
+sh run.sh status         # 查看状态
+sh run.sh start api      # 只启动后端
+sh run.sh start web      # 只启动前端
+
+# 手动启动后端
 cd trail_api
 mvn clean package -DskipTests   # 编译
 java -jar target/trail-api.jar  # 启动（端口 8765）
 
-# 前端（Vite dev，proxy /api → 8765）
+# 手动启动前端（Vite dev，proxy /api → 8765）
 cd trail_web && pnpm dev       # http://localhost:5173
 
+# Electron 桌面应用（暂未实现）
+cd trail-electron
+npm run build                  # 构建主进程
+npm run build:mac              # 打包 macOS .dmg
+npm run build:win              # 打包 Windows .exe（需要在 Windows 或 CI 环境）
+
 # 测试
-mvn test -Dtest="AttachmentControllerTest"   # Java 端单项
-mvn test                                       # Java 端全部
+mvn test -Dtest="AttachmentControllerTest"   # Java 端单项测试
+mvn test                                       # Java 端全部测试
 ```
 
 ## 关键不变量
@@ -53,11 +68,35 @@ mvn test                                       # Java 端全部
 ## LLM
 
 Java 后端 LLM 端点已实现：
+
 - 4 个同步函数：`polish` / `summarize_main` / `summarize_maintenance` / `ask_maintenance`
 - 聊天走 Anthropic 协议原生 tool use 多轮循环
 - SSE 端点 `POST /api/llm/chat/stream`
 - 工具定义与协议见 `docs/CHAT_TOOLS.md`
 - 工具调用审计落 `ai_records`，`op='chat_tool_use'`
+
+## 后端架构
+
+**SQLite 连接管理**（`SqliteDb`）：
+
+- 单连接 + WAL 模式 + `synchronous=NORMAL`
+- 写操作用 `ReentrantLock(true)` 串行化（公平锁）
+- 未配置数据目录时 `conn=null`，所有查询抛 `DataDirNotConfiguredException` → HTTP 503
+
+**分层架构**：
+
+- `web/controller`：REST API 端点（Spring MVC）
+- `service`：业务逻辑（如 `LlmService`）
+- `store`：数据访问层（`TaskStore` / `LogStore` / `ContactStore` 等）
+- `db`：SQLite 封装（`SqliteDb`）
+- `crypto`：加密服务（RSA / AES-GCM）
+- `llm`：LLM 集成（`OpenApiService` 提供 API 文档给 LLM 动态查询）
+
+**OpenAPI 服务**（`OpenApiService`）：
+
+- 从 `/v3/api-docs` 加载 API 文档
+- 提供搜索接口给 LLM tool use（避免硬编码 API 列表）
+- 禁止路径：`/api/llm/`、`/api/chat/`、`/api/settings/llm`（含 API Key）、`/api/attachments`、`/api/settings/data-dir`
 
 ## 测试
 
