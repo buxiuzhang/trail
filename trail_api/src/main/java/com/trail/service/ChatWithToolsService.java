@@ -212,17 +212,16 @@ public class ChatWithToolsService {
             .header("Content-Type", "application/json")
             .POST(HttpRequest.BodyPublishers.ofString(jsonBody));
 
-        // MiniMax / 智谱兼容：使用 Bearer 认证，但保留 anthropic-version header
-        if (cfg.baseUrl().toLowerCase().contains("minimax") ||
-            cfg.baseUrl().toLowerCase().contains("sfkey") ||
-            cfg.baseUrl().toLowerCase().contains("zhipu") ||
-            cfg.baseUrl().toLowerCase().contains("bigmodel")) {
-            reqBuilder.header("Authorization", "Bearer " + cfg.apiKey());
-            // Anthropic 兼容端点也需要 anthropic-version 来启用标准 tool_use 格式
-            reqBuilder.header("anthropic-version", ANTHROPIC_VERSION);
-        } else {
+        // 根据 auth_type 配置选择认证方式
+        // bearer: Authorization: Bearer <key>（智谱、DeepSeek、MiniMax 等）
+        // x-api-key: x-api-key: <key>（Anthropic 原生）
+        if ("x-api-key".equals(cfg.authType())) {
             reqBuilder.header("x-api-key", cfg.apiKey())
                       .header("anthropic-version", ANTHROPIC_VERSION);
+        } else {
+            // 默认 bearer 认证
+            reqBuilder.header("Authorization", "Bearer " + cfg.apiKey());
+            reqBuilder.header("anthropic-version", ANTHROPIC_VERSION);
         }
 
         HttpResponse<java.io.InputStream> response = client.send(
@@ -374,13 +373,15 @@ public class ChatWithToolsService {
             ? props.llm().getDefaultModel() : "claude-haiku-4-5";
         String baseUrl = settings.getOrDefault("base_url", defaultBaseUrl);
         String model = settings.getOrDefault("model", defaultModel);
+        // 认证方式：bearer（默认）或 x-api-key
+        String authType = settings.getOrDefault("auth_type", "bearer");
         int maxTokens = 2000;
         String maxTokensStr = settings.get("max_tokens");
         if (maxTokensStr != null && !maxTokensStr.isBlank()) {
             try { maxTokens = Integer.parseInt(maxTokensStr); }
             catch (NumberFormatException ignored) {}
         }
-        return new LlmConfig(apiKey, baseUrl, model, maxTokens);
+        return new LlmConfig(apiKey, baseUrl, model, maxTokens, authType);
     }
 
     /**
@@ -474,7 +475,7 @@ public class ChatWithToolsService {
     // 内部记录
     // ============================================================
 
-    private record LlmConfig(String apiKey, String baseUrl, String model, int maxTokens) {}
+    private record LlmConfig(String apiKey, String baseUrl, String model, int maxTokens, String authType) {}
 
     private record ToolUse(String id, String name, Map<String, Object> input) {}
 

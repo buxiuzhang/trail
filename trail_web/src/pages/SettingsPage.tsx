@@ -91,6 +91,7 @@ export function SettingsPage() {
   const [apiKeyDecrypted, setApiKeyDecrypted] = useState('')     // 解密后的明文（点击显示时）
   const [baseUrl, setBaseUrl] = useState('')
   const [model, setModel] = useState('')
+  const [authType, setAuthType] = useState<'bearer' | 'x-api-key'>('bearer')
   const [maxTokens, setMaxTokens] = useState('1000')
   const [showKey, setShowKey] = useState(false)
   const [isDecrypting, setIsDecrypting] = useState(false)
@@ -144,6 +145,7 @@ export function SettingsPage() {
       setApiKey('')  // 输入框初始为空，用户需要输入新的 API Key
       setBaseUrl(settings.base_url || '')
       setModel(settings.model || '')
+      setAuthType((settings.auth_type as 'bearer' | 'x-api-key') || 'bearer')
       setMaxTokens(settings.max_tokens || '1000')
       // Prompt 模板
       setChatPrompt(settings.chat_system_prompt || '')
@@ -202,6 +204,7 @@ export function SettingsPage() {
         ...(apiKey.trim() ? { api_key: apiKey.trim() } : {}),
         base_url: baseUrl.trim(),
         model: model.trim(),
+        auth_type: authType,
         max_tokens: maxTokens.trim(),
         // Prompt 模板
         chat_system_prompt: chatPrompt.trim(),
@@ -445,6 +448,27 @@ export function SettingsPage() {
                 onChange={e => setBaseUrl(e.target.value)}
                 placeholder="https://api.minimaxi.com/anthropic"
               />
+            </div>
+
+            <div className="field">
+              <div className="field__label">
+                <span>认证方式</span>
+                <span className="field__hint">{authType === 'bearer' ? 'Authorization: Bearer' : 'x-api-key header'}</span>
+              </div>
+              <select
+                className="field__input"
+                value={authType}
+                onChange={e => setAuthType(e.target.value as 'bearer' | 'x-api-key')}
+                style={{ cursor: 'pointer' }}
+              >
+                <option value="bearer">Bearer（智谱、DeepSeek、MiniMax 等）</option>
+                <option value="x-api-key">x-api-key（Anthropic 原生）</option>
+              </select>
+              <p className={styles.fieldHint}>
+                {authType === 'bearer'
+                  ? '使用 Authorization: Bearer &lt;key&gt; 认证，适用于大多数第三方 API'
+                  : '使用 x-api-key: &lt;key&gt; 认证，适用于 Anthropic 官方 API'}
+              </p>
             </div>
 
             <div className="field-row">
