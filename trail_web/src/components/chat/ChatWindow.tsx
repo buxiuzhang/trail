@@ -3,7 +3,6 @@ import { useChatContext, type Message } from '@/context/ChatContext'
 import { useChat } from '@/api/chat'
 import { useToastContext } from '@/context/ToastContext'
 import { useLLMSettings } from '@/api/settings'
-import { RichText } from '@/components/shared/RichText'
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition'
 import styles from './ChatWindow.module.css'
 
@@ -404,13 +403,9 @@ function ChatMessageRow({
           // 流式：纯文本 + 打字机
           <div className={styles.msgContent} ref={liveRef} />
         ) : (
-          // 完成：用户消息纯文本，助手消息 Markdown 渲染
+          // 完成：用户消息和助手消息都显示纯文本（不渲染 Markdown）
           <div className={styles.msgContent}>
-            {isUser ? (
-              message.content
-            ) : (
-              <RichText text={message.content} as="div" />
-            )}
+            {message.content}
           </div>
         )}
         {/* 助手消息完成后显示复制按钮 */}
