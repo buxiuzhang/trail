@@ -20,6 +20,7 @@
 import { Fragment, useState } from 'react'
 import { parseRichText } from './richtext-utils'
 import { MarkdownRenderer } from './MarkdownRenderer'
+import { ImageLightbox } from './ImageLightbox'
 import styles from './RichText.module.css'
 
 interface RichTextProps {
@@ -35,6 +36,8 @@ interface RichTextProps {
   onImgSizeChange?: (id: number, size: number) => void
   /** 删除按钮点击回调。 */
   onImgDelete?: (id: number) => void
+  /** 是否启用点击预览。默认 true。 */
+  enablePreview?: boolean
 }
 
 const SIZE_PRESETS = [25, 50, 75, 100] as const
@@ -58,7 +61,11 @@ export function RichText({
   getImgSize,
   onImgSizeChange,
   onImgDelete,
+  enablePreview = true,
 }: RichTextProps) {
+  const [previewSrc, setPreviewSrc] = useState<string | null>(null)
+  const [previewAlt, setPreviewAlt] = useState<string>('')
+
   if (!text) return null
 
   // 如果有图片交互需求 或 包含 markdown 语法,用 MarkdownRenderer
@@ -71,6 +78,13 @@ export function RichText({
   const parts = parseRichText(text)
 
   const interactive = !!(getImgSize || onImgSizeChange || onImgDelete)
+
+  const handleImgClick = (url: string, alt: string) => {
+    if (enablePreview) {
+      setPreviewSrc(url)
+      setPreviewAlt(alt)
+    }
+  }
 
   const content = parts.map((p, i) =>
     p.kind === 'text' ? (
@@ -85,17 +99,46 @@ export function RichText({
         onImgSizeChange={onImgSizeChange}
         onImgDelete={onImgDelete}
         interactive={interactive}
+        enablePreview={enablePreview}
+        onClick={() => handleImgClick(p.url, p.alt)}
+        inlineCount={p.inlineCount}
       />
     ),
   )
 
   if (!className) {
-    return <>{content}</>
+    return (
+      <>
+        {content}
+        {previewSrc && (
+          <ImageLightbox
+            src={previewSrc}
+            alt={previewAlt}
+            onClose={() => setPreviewSrc(null)}
+          />
+        )}
+      </>
+    )
   }
 
-  if (As === 'div') return <div className={className}>{content}</div>
-  if (As === 'span') return <span className={className}>{content}</span>
-  return <p className={className}>{content}</p>
+  return (
+    <>
+      {As === 'div' ? (
+        <div className={className}>{content}</div>
+      ) : As === 'span' ? (
+        <span className={className}>{content}</span>
+      ) : (
+        <p className={className}>{content}</p>
+      )}
+      {previewSrc && (
+        <ImageLightbox
+          src={previewSrc}
+          alt={previewAlt}
+          onClose={() => setPreviewSrc(null)}
+        />
+      )}
+    </>
+  )
 }
 
 interface ImgNodeProps {
@@ -106,12 +149,19 @@ interface ImgNodeProps {
   onImgSizeChange?: (id: number, size: number) => void
   onImgDelete?: (id: number) => void
   interactive: boolean
+  enablePreview: boolean
+  onClick: () => void
+  /** 同一行有多少张图片，用于自动均分宽度 */
+  inlineCount?: number
 }
 
-function ImgNode({ url, alt, maxHeight, getImgSize, onImgSizeChange, onImgDelete, interactive }: ImgNodeProps) {
+function ImgNode({ url, alt, maxHeight, getImgSize, onImgSizeChange, onImgDelete, interactive, enablePreview, onClick, inlineCount }: ImgNodeProps) {
   const [hovered, setHovered] = useState(false)
   const id = Number(url.split('/').pop() ?? '0')
-  const size = getImgSize?.(id) ?? 100
+  // 优先用用户设置的尺寸
+  const userSize = getImgSize?.(id)
+  // 单图占满一行，多图并排时宽度用 calc 减去间距
+  const size = userSize ?? (inlineCount && inlineCount > 1 ? `calc(50% - 2px)` : '100%')
   return (
     <span
       className={styles.imgWrapper}
@@ -125,6 +175,7 @@ function ImgNode({ url, alt, maxHeight, getImgSize, onImgSizeChange, onImgDelete
         className={styles.inlineImg}
         style={{ maxHeight: `${maxHeight}px` }}
         loading="lazy"
+        onClick={enablePreview ? (e) => { e.stopPropagation(); onClick(); } : undefined}
       />
       {interactive && hovered && (onImgSizeChange || onImgDelete) && (
         <span className={styles.imgToolbar}>
