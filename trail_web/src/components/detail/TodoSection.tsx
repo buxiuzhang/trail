@@ -120,7 +120,7 @@ export function TodoSection({
                 {expanded && (
                   <div className={styles.descBlock}>
                     {t.description && (
-                      <RichText text={t.description} className={styles.descText} />
+                      <RichText text={t.description} className={styles.descText} maxImgHeight={80} />
                     )}
                     {!isCompleted && !isClosed && (
                       <div className={styles.descActions}>

@@ -23,6 +23,7 @@ export function DetailHeader({ task, catalog, logCount }: DetailHeaderProps) {
         <CollapsibleText
           text={task.description}
           maxHeight={200}
+          maxImgHeight={120}
           className="detail__lede"
         />
       )}

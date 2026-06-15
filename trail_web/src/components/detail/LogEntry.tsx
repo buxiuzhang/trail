@@ -1,7 +1,7 @@
 import type { TaskOut, LogOut } from '@/types'
 import { isSealed } from '@/constants'
 import { LogCompose } from './LogCompose'
-import { RichText } from '@/components/shared/RichText'
+import { CollapsibleText } from '@/components/shared/CollapsibleText'
 import styles from './Logbook.module.css'
 
 interface LogEntryProps {
@@ -44,11 +44,20 @@ export function LogEntry({ task, log, isEditing, onEdit, onDelete, onSaveEdit, o
           <span className={styles.ord}>№ {String(log.id).padStart(3, '0')}</span>
           {editedTag}
         </div>
-        <RichText text={log.content} className={styles.content} />
+        <CollapsibleText
+          text={log.content}
+          maxHeight={240}
+          maxImgHeight={80}
+          className={styles.content}
+        />
         {log.polished_content && (
           <div className={styles.polish}>
             <span className={styles.polishLabel}>润色后</span>
-            <RichText text={log.polished_content} />
+            <CollapsibleText
+              text={log.polished_content}
+              maxHeight={240}
+              maxImgHeight={80}
+            />
           </div>
         )}
         <div className={styles.actions}>
