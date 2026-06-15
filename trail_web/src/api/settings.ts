@@ -8,6 +8,7 @@ export interface LLMSettings {
   base_url: string
   model: string
   max_tokens: string
+  min_tokens: string
   auth_type: 'bearer' | 'x-api-key'  // 认证方式：bearer（智谱、DeepSeek 等）或 x-api-key（Anthropic 原生）
   // Prompt 模板
   chat_system_prompt: string

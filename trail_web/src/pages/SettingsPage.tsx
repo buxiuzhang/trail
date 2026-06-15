@@ -93,6 +93,7 @@ export function SettingsPage() {
   const [model, setModel] = useState('')
   const [authType, setAuthType] = useState<'bearer' | 'x-api-key'>('bearer')
   const [maxTokens, setMaxTokens] = useState('1000')
+  const [minTokens, setMinTokens] = useState('100')
   const [showKey, setShowKey] = useState(false)
   const [isDecrypting, setIsDecrypting] = useState(false)
 
@@ -147,6 +148,7 @@ export function SettingsPage() {
       setModel(settings.model || '')
       setAuthType((settings.auth_type as 'bearer' | 'x-api-key') || 'bearer')
       setMaxTokens(settings.max_tokens || '1000')
+      setMinTokens(settings.min_tokens || '100')
       // Prompt 模板
       setChatPrompt(settings.chat_system_prompt || '')
       setPolishPrompt(settings.polish_system_prompt || '')
@@ -206,6 +208,7 @@ export function SettingsPage() {
         model: model.trim(),
         auth_type: authType,
         max_tokens: maxTokens.trim(),
+        min_tokens: minTokens.trim(),
         // Prompt 模板
         chat_system_prompt: chatPrompt.trim(),
         polish_system_prompt: polishPrompt.trim(),
@@ -478,16 +481,34 @@ export function SettingsPage() {
                   className="field__input"
                   value={model}
                   onChange={e => setModel(e.target.value)}
-                  placeholder="MiniMax-M1"
+                  placeholder="glm-5"
+                />
+              </div>
+            </div>
+
+            <div className="field-row">
+              <div className="field">
+                <div className="field__label"><span>Max Tokens</span><span className="field__hint">输出上限</span></div>
+                <input
+                  className="field__input"
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={maxTokens}
+                  onChange={e => setMaxTokens(e.target.value.replace(/\D/g, ''))}
+                  placeholder="1000"
                 />
               </div>
               <div className="field">
-                <div className="field__label"><span>Max Tokens</span></div>
+                <div className="field__label"><span>Min Tokens</span><span className="field__hint">输出下限，0=不限制</span></div>
                 <input
                   className="field__input"
-                  value={maxTokens}
-                  onChange={e => setMaxTokens(e.target.value)}
-                  placeholder="1000"
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={minTokens}
+                  onChange={e => setMinTokens(e.target.value.replace(/\D/g, ''))}
+                  placeholder="100"
                 />
               </div>
             </div>

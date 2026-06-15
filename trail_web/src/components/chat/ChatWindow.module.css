@@ -103,7 +103,7 @@
 
 .msgBubble {
   position: relative;
-  padding: 8px 12px;
+  padding: 8px 12px 24px 12px;  /* 底部增加 padding 给复制按钮留空间 */
 }
 
 .msgUser .msgBubble {
@@ -134,6 +134,20 @@
   word-break: break-word;
 }
 
+/* 消息中的链接 */
+.msgContent .link,
+.link {
+  color: var(--red);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  transition: opacity 150ms ease;
+}
+
+.link:hover {
+  opacity: 0.8;
+}
+
 /* 复制按钮 */
 .copyBtn {
   position: absolute;
@@ -147,6 +161,9 @@
   color: var(--ink-ghost);
   font-size: 12px;
   padding: 2px 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .msgBubble:hover .copyBtn {
@@ -155,6 +172,16 @@
 
 .copyBtn:hover {
   color: var(--ink-soft);
+}
+
+.copyIcon {
+  width: 14px;
+  height: 14px;
+  opacity: 0.6;
+}
+
+.copyBtn:hover .copyIcon {
+  opacity: 1;
 }
 
 /* —— 输入中动画（三个点跳动）—— */

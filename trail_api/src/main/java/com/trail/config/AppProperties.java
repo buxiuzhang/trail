@@ -45,6 +45,8 @@ public record AppProperties(
 
     public record Defaults(
             String maxTokens,
+            String minTokens,
+            String authType,
             String speechDuration,
             String motto,
             String placeholderTaskDesc,

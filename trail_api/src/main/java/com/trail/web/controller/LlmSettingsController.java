@@ -47,6 +47,8 @@ public class LlmSettingsController {
                 all.getOrDefault("base_url", ""),
                 all.getOrDefault("model", ""),
                 all.getOrDefault("max_tokens", "1000"),
+                all.getOrDefault("min_tokens", "0"),
+                all.getOrDefault("auth_type", "bearer"),
                 // Prompt 模板（直接从数据库读取，默认值已初始化）
                 all.getOrDefault("chat_system_prompt", ""),
                 all.getOrDefault("polish_system_prompt", ""),
@@ -87,6 +89,8 @@ public class LlmSettingsController {
         saveIfPresent(data, "base_url");
         saveIfPresent(data, "model");
         saveIfPresent(data, "max_tokens");
+        saveIfPresent(data, "min_tokens");
+        saveIfPresent(data, "auth_type");
 
         // Prompt 模板
         saveIfPresent(data, "chat_system_prompt");

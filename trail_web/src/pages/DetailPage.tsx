@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useTask, useUpdateTask, useChangeTaskStatus, useCancelTask } from '@/api/tasks'
 import { useLogs, useCreateLog, useUpdateLog, useDeleteLog } from '@/api/logs'
-import { useTodos, useCreateTodo, useCompleteTodo, useAbandonTodo, useDeleteTodo } from '@/api/todos'
+import { useTodos, useCreateTodo, useUpdateTodo, useCompleteTodo, useAbandonTodo, useDeleteTodo } from '@/api/todos'
 import { usePlaceholders, DEFAULT_PLACEHOLDERS } from '@/api/settings'
 import { usePolish, LLM_AVAILABLE } from '@/api/llm'
 import { useModalContext } from '@/context/ModalContext'
@@ -19,15 +19,18 @@ import { ModeToggleButton } from '@/components/shared/ModeToggleButton'
 import polishIcon from '@/icons/polish.svg'
 import type { LogOut, TodoOut } from '@/types'
 
-/** 添加待办弹窗内的表单子组件。
- *  "保存" → 提交后关闭弹窗；"保存并继续添加" → 提交后清空表单继续。 */
-function TodoAddForm({ onSubmit, onClose }: {
+/** 添加/编辑待办弹窗内的表单子组件。
+ *  "保存" → 提交后关闭弹窗；"保存并继续添加" → 提交后清空表单继续。
+ *  initialTitle/initialDescription 用于编辑模式，填充初始值。 */
+function TodoAddForm({ onSubmit, onClose, initialTitle = '', initialDescription = '' }: {
   onSubmit: (data: { title: string; description?: string }) => Promise<void>
   onClose: () => void
+  initialTitle?: string
+  initialDescription?: string
 }) {
   const { data: placeholders } = usePlaceholders()
-  const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
+  const [title, setTitle] = useState(initialTitle)
+  const [description, setDescription] = useState(initialDescription)
   const [polishedFrom, setPolishedFrom] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [hoverClose, setHoverClose] = useState(false)
@@ -218,6 +221,7 @@ export function DetailPage() {
   const changeStatus = useChangeTaskStatus(taskId)
   const cancelTask = useCancelTask(taskId)
   const createTodo = useCreateTodo(taskId)
+  const updateTodo = useUpdateTodo(taskId)
   const completeTodo = useCompleteTodo(taskId)
   const abandonTodo = useAbandonTodo(taskId)
   const deleteTodo = useDeleteTodo(taskId)
@@ -430,6 +434,32 @@ export function DetailPage() {
     })
   }
 
+  /** 编辑待办弹窗。 */
+  function openEditTodoModal(todoId: number) {
+    const t = todos.find((x: TodoOut) => x.id === todoId)
+    if (!t) return
+    openModal({
+      eyebrow: '待办 · 编辑',
+      title: '修改待办内容',
+      titleMode: 'zh',
+      body: <TodoAddForm
+        onSubmit={async (data) => {
+          try {
+            await updateTodo.mutateAsync({ todoId, data })
+            showToast('已保存')
+          } catch (err: any) {
+            showToast('保存失败：' + err.message)
+            throw err
+          }
+        }}
+        onClose={closeModal}
+        initialTitle={t.title}
+        initialDescription={t.description || ''}
+      />,
+      buttons: [],
+    })
+  }
+
   /** 勾选完成 → 弹窗二次确认。 */
   function openCompleteTodoModal(todoId: number) {
     const t = todos.find((x: TodoOut) => x.id === todoId)
@@ -521,6 +551,7 @@ export function DetailPage() {
         todos={todos}
         onRequestAdd={openAddTodoModal}
         onRequestComplete={openCompleteTodoModal}
+        onRequestEdit={openEditTodoModal}
         onAbandon={handleAbandonTodo}
         onDelete={handleDeleteTodo}
       />

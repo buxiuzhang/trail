@@ -144,7 +144,13 @@ public class LlmService {
             try { maxTokens = Integer.parseInt(maxTokensStr); }
             catch (NumberFormatException ignored) {}
         }
-        return new LlmConfig(apiKey, baseUrl, model, maxTokens, authType);
+        int minTokens = 0;
+        String minTokensStr = settings.get("min_tokens");
+        if (minTokensStr != null && !minTokensStr.isBlank()) {
+            try { minTokens = Integer.parseInt(minTokensStr); }
+            catch (NumberFormatException ignored) {}
+        }
+        return new LlmConfig(apiKey, baseUrl, model, maxTokens, minTokens, authType);
     }
 
     // ============================================================
@@ -296,18 +302,20 @@ public class LlmService {
                 String systemPrompt = buildChatSystemPrompt();
 
                 // 构建 Anthropic 请求
-                var reqBody = Map.of(
-                    "model", cfg.model(),
-                    "max_tokens", cfg.maxTokens(),
-                    "system", systemPrompt,
-                    "stream", true,
-                    "messages", messages.stream()
+                var reqBody = new java.util.LinkedHashMap<String, Object>();
+                reqBody.put("model", cfg.model());
+                reqBody.put("max_tokens", cfg.maxTokens());
+                if (cfg.minTokens() > 0) {
+                    reqBody.put("min_tokens", cfg.minTokens());
+                }
+                reqBody.put("system", systemPrompt);
+                reqBody.put("stream", true);
+                reqBody.put("messages", messages.stream()
                         .map(m -> Map.of(
                             "role", m.get("role"),
                             "content", List.of(Map.of("type", "text", "text", m.get("content")))
                         ))
-                        .toList()
-                );
+                        .toList());
 
                 String jsonBody = mapper.writeValueAsString(reqBody);
 
@@ -428,12 +436,14 @@ public class LlmService {
         try {
             HttpClient client = HttpClient.newHttpClient();
 
-            var reqBody = Map.of(
-                "model", cfg.model(),
-                "max_tokens", cfg.maxTokens(),
-                "system", system,
-                "messages", messages
-            );
+            var reqBody = new java.util.LinkedHashMap<String, Object>();
+            reqBody.put("model", cfg.model());
+            reqBody.put("max_tokens", cfg.maxTokens());
+            if (cfg.minTokens() > 0) {
+                reqBody.put("min_tokens", cfg.minTokens());
+            }
+            reqBody.put("system", system);
+            reqBody.put("messages", messages);
 
             String jsonBody = mapper.writeValueAsString(reqBody);
 
@@ -526,7 +536,7 @@ public class LlmService {
     // 内部记录
     // ============================================================
 
-    private record LlmConfig(String apiKey, String baseUrl, String model, int maxTokens, String authType) {}
+    private record LlmConfig(String apiKey, String baseUrl, String model, int maxTokens, int minTokens, String authType) {}
 
     private record AnthropicResponse(String text, String raw) {}
 }

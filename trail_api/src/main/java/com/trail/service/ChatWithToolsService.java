@@ -199,6 +199,9 @@ public class ChatWithToolsService {
         ObjectNode reqBody = mapper.createObjectNode();
         reqBody.put("model", cfg.model());
         reqBody.put("max_tokens", cfg.maxTokens());
+        if (cfg.minTokens() > 0) {
+            reqBody.put("min_tokens", cfg.minTokens());
+        }
         reqBody.put("stream", true);
         reqBody.put("system", buildSystemPrompt());
         reqBody.set("tools", mapper.valueToTree(toolRegistry.getToolsJson()));
@@ -381,7 +384,13 @@ public class ChatWithToolsService {
             try { maxTokens = Integer.parseInt(maxTokensStr); }
             catch (NumberFormatException ignored) {}
         }
-        return new LlmConfig(apiKey, baseUrl, model, maxTokens, authType);
+        int minTokens = 0;
+        String minTokensStr = settings.get("min_tokens");
+        if (minTokensStr != null && !minTokensStr.isBlank()) {
+            try { minTokens = Integer.parseInt(minTokensStr); }
+            catch (NumberFormatException ignored) {}
+        }
+        return new LlmConfig(apiKey, baseUrl, model, maxTokens, minTokens, authType);
     }
 
     /**
@@ -475,7 +484,7 @@ public class ChatWithToolsService {
     // 内部记录
     // ============================================================
 
-    private record LlmConfig(String apiKey, String baseUrl, String model, int maxTokens, String authType) {}
+    private record LlmConfig(String apiKey, String baseUrl, String model, int maxTokens, int minTokens, String authType) {}
 
     private record ToolUse(String id, String name, Map<String, Object> input) {}
 

@@ -68,6 +68,10 @@ trail:
     # LLM 基础配置
     # max-tokens: LLM 响应的最大 token 数
     max-tokens: "1000"
+    # min-tokens: LLM 响应的最小 token 数，0=不限制（智谱等模型可能需要设置）
+    min-tokens: "100"
+    # auth-type: 认证方式，bearer（第三方 API）或 x-api-key（Anthropic 原生）
+    auth-type: "bearer"
     # speech-duration: 语音输入最大时长（秒），用于前端录音限制
     speech-duration: "10"
 

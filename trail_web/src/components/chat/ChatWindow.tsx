@@ -4,6 +4,9 @@ import { useChat } from '@/api/chat'
 import { useToastContext } from '@/context/ToastContext'
 import { useLLMSettings } from '@/api/settings'
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition'
+import { MessageContent } from './MessageContent'
+import CopyIcon from './copy.svg'
+import CopiedIcon from './copied.svg'
 import styles from './ChatWindow.module.css'
 
 /** 最近消息条数上限（防 token 溢出） */
@@ -220,6 +223,11 @@ export function ChatWindow() {
         (current, max) => {
           setIterationInfo({ current, max })
         },
+        // onRetry：重试前清空已渲染的 partial 内容
+        () => {
+          stopTimer()
+          if (liveRef.current) liveRef.current.textContent = ''
+        },
       )
     } catch (err: any) {
       const detail = err?.message ?? String(err)
@@ -244,7 +252,7 @@ export function ChatWindow() {
       } else if (detail.includes('502') || status === 502) {
         showToast('LLM 服务暂时异常，请稍后再试')
       } else {
-        showToast('对话失败：' + detail)
+        showToast('LLM 服务暂时无法响应，已重试 3 次仍未成功，请稍后再试')
       }
     } finally {
       // 流结束（正常 / 异常 / 中止）时，把队列里剩余字符瞬间排空 + 同步回 state
@@ -403,20 +411,22 @@ function ChatMessageRow({
           // 流式：纯文本 + 打字机
           <div className={styles.msgContent} ref={liveRef} />
         ) : (
-          // 完成：用户消息和助手消息都显示纯文本（不渲染 Markdown）
-          <div className={styles.msgContent}>
-            {message.content}
-          </div>
+          // 完成：使用 MessageContent 组件解析链接
+          <MessageContent content={message.content} />
         )}
         {/* 助手消息完成后显示复制按钮 */}
         {!isUser && !isStreaming && (
           <button
             className={styles.copyBtn}
             onClick={handleCopy}
-            title="复制"
+            title={copied ? '已复制' : '复制'}
             aria-label="复制内容"
           >
-            {copied ? '✓' : '📋'}
+            {copied ? (
+              <img src={CopiedIcon} alt="" className={styles.copyIcon} />
+            ) : (
+              <img src={CopyIcon} alt="" className={styles.copyIcon} />
+            )}
           </button>
         )}
       </div>

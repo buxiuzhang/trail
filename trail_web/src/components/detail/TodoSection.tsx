@@ -11,6 +11,7 @@ interface TodoSectionProps {
   onRequestAdd: () => void
   /** 点 checkbox 触发（不再直接调完成 API，由父级弹窗二次确认）。 */
   onRequestComplete: (todoId: number) => void
+  onRequestEdit: (todoId: number) => void
   onAbandon: (todoId: number) => void
   onDelete: (todoId: number) => void
 }
@@ -20,6 +21,7 @@ export function TodoSection({
   todos,
   onRequestAdd,
   onRequestComplete,
+  onRequestEdit,
   onAbandon,
   onDelete,
 }: TodoSectionProps) {
@@ -113,36 +115,42 @@ export function TodoSection({
                         </span>
                       )}
                     </span>
-                    {t.description && (
-                      <span className={styles.toggle}>{expanded ? '▴' : '▾'}</span>
-                    )}
                   </button>
-                  <div className={styles.actions}>
-                    {!isCompleted && !isAbandoned && (
-                      <button
-                        type="button"
-                        className={styles.btnAbandon}
-                        onClick={() => onAbandon(t.id)}
-                        title="标记为废弃"
-                      >
-                        废弃
-                      </button>
-                    )}
-                    {!isCompleted && (
-                      <button
-                        type="button"
-                        className={styles.btnDelete}
-                        onClick={() => onDelete(t.id)}
-                        title="永久删除"
-                      >
-                        删除
-                      </button>
-                    )}
-                  </div>
                 </div>
-                {expanded && t.description && (
+                {expanded && (
                   <div className={styles.descBlock}>
-                    <RichText text={t.description} className={styles.descText} />
+                    {t.description && (
+                      <RichText text={t.description} className={styles.descText} />
+                    )}
+                    {!isCompleted && !isClosed && (
+                      <div className={styles.descActions}>
+                        {!isAbandoned && (
+                          <button
+                            type="button"
+                            className={styles.btnEdit}
+                            onClick={() => onRequestEdit(t.id)}
+                          >
+                            编辑
+                          </button>
+                        )}
+                        {!isAbandoned && (
+                          <button
+                            type="button"
+                            className={styles.btnAbandonInline}
+                            onClick={() => onAbandon(t.id)}
+                          >
+                            废弃
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          className={styles.btnDeleteInline}
+                          onClick={() => onDelete(t.id)}
+                        >
+                          删除
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </li>

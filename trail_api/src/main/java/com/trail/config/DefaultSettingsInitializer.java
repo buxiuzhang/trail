@@ -49,6 +49,8 @@ public class DefaultSettingsInitializer {
         Map<String, String> defaults = new LinkedHashMap<>();
         // LLM 基础配置
         putIfPresent(defaults, "max_tokens", d.maxTokens());
+        putIfPresent(defaults, "min_tokens", d.minTokens());
+        putIfPresent(defaults, "auth_type", d.authType());
         putIfPresent(defaults, "speech_duration", d.speechDuration());
         // 座右铭
         putIfPresent(defaults, "motto", d.motto());
