@@ -265,7 +265,9 @@ export function ChatWindow() {
 
   // 流是否正在进行（用于 liveRef 绑到 DOM 节点 + 渲染 typing dots）
   const lastMsg = messages[messages.length - 1]
-  const isStreaming = isPending && lastMsg?.role === 'assistant'
+  // isStreaming: assistant 正在流式输出内容（内容非空）
+  // 内容为空时显示 typing dots 动画
+  const isStreaming = isPending && lastMsg?.role === 'assistant' && lastMsg?.content !== ''
 
   return (
     <div className={styles.window} role="dialog" aria-label="工作对话">
@@ -305,7 +307,7 @@ export function ChatWindow() {
             )}
           </div>
         )}
-        {/* 等待中动画（无工具调用时） */}
+        {/* 等待中动画（assistant 内容为空且无工具调用时） */}
         {isPending && !isStreaming && !toolStatus && (
           <div className={styles.typing}>
             <span className={styles.typingDot} />
