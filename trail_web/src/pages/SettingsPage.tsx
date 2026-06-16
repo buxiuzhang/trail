@@ -217,7 +217,7 @@ export function SettingsPage() {
     const ok = await confirm({
       level: 'moderate',
       title: '保存界面偏好？',
-      body: <p>将保存卷首语、语音输入时长和 LLM 工具调用次数设置。</p>,
+      body: <p>将保存卷首语、LLM 语音输入时长和 LLM 工具调用次数设置。</p>,
       confirmLabel: '保存',
     })
     if (!ok) return
@@ -913,7 +913,7 @@ export function SettingsPage() {
         {/* 语音输入时长 */}
         <div className="field">
           <div className="field__label">
-            <span>语音输入时长</span>
+            <span>LLM 语音输入时长</span>
             <span className="field__hint">{speechDuration} 秒</span>
           </div>
           <input
@@ -956,7 +956,7 @@ export function SettingsPage() {
               const ok = await confirm({
                 level: 'dangerous',
                 title: '恢复所有默认值？',
-                body: <p>卷首语、语音时长和 LLM 工具调用次数将全部恢复为默认值。</p>,
+                body: <p>卷首语、LLM 语音时长和 LLM 工具调用次数将全部恢复为默认值。</p>,
                 confirmLabel: '恢复默认',
               })
               if (ok) {
