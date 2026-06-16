@@ -32,16 +32,7 @@
 
 /* 三孔装订 —— 上孔 */
 .card::before {
-  content: "";
-  position: absolute;
-  left: 12px;
-  top: 22%;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--ink-ghost);
-  opacity: 0.35;
-  box-shadow: inset 0 1px 1px rgba(0,0,0,0.1);
+  display: none;
 }
 
 .card:hover {
@@ -69,17 +60,7 @@
 
 /* 三孔装订 —— 中孔（挂在 .cat 上） */
 .cat::before {
-  content: "";
-  position: absolute;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--ink-ghost);
-  opacity: 0.35;
-  box-shadow: inset 0 1px 1px rgba(0,0,0,0.1);
+  display: none;
 }
 .catNo {
   font-family: var(--mono);
@@ -187,16 +168,7 @@
 
 /* 三孔装订 —— 下孔（挂在 .body 上） */
 .body::before {
-  content: "";
-  position: absolute;
-  left: calc(-1 * var(--space-xl) - 12px); /* 回到左边界 + 12px */
-  top: 78%;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--ink-ghost);
-  opacity: 0.35;
-  box-shadow: inset 0 1px 1px rgba(0,0,0,0.1);
+  display: none;
 }
 
 .topline {
