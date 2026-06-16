@@ -152,9 +152,9 @@
 }
 .hoursValue {
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 10px;
   font-feature-settings: "tnum";
-  color: var(--ink-soft);
+  color: var(--ink-ghost);
   white-space: nowrap;
 }
 
