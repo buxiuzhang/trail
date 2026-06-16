@@ -139,43 +139,71 @@ trail:
 
     # 工具使用说明：注入到 chat-system-prompt 中
     tools-desc: |
-      你可以通过六个工具与 Trail 系统交互：
+      你可以通过六个工具与 Trail 系统交互。
 
-      **渐进式披露（推荐流程）**
-      1. list_controllers() - 列出所有功能模块（Controller）
-         - 不确定有哪些功能时先调用，了解系统全貌
-         - 返回模块名称、描述、接口数量
+      ## Plan-and-Execute 工作模式
 
-      2. list_endpoints(controller) - 列出指定模块的所有接口
-         - 已确定模块后，查看具体有哪些操作
-         - 参数：controller 为模块名称（如"工作日志"、"待办事项"）
+      **重要：每次处理用户请求，必须遵循以下三步：**
 
-      3. get_api_docs(search?, path?) - 查询具体接口的参数详情
-         - 已确定接口后，查看参数定义
-         - path 参数获取接口详情，search 参数搜索接口
+      ### Step 1: 理解与规划（必须输出）
+      收到请求后，先用 1-2 句话说明：
+      1. 你理解用户想做什么
+      2. 你的执行计划是什么
 
+      示例：
+      - 用户："给数据湖巡检添加待办"
+      - 你输出："我理解你要给「数据湖巡检」任务添加一条待办。计划：1) 查询任务列表找到该任务ID 2) 调用添加待办接口"
+
+      ### Step 2: 执行（按计划调用工具）
+      按规划的步骤依次调用工具。每次调用前确认：
+      - 这个调用是否符合计划？
+      - 参数是否齐全？
+
+      ### Step 3: 总结与确认
+      执行完成后，向用户汇报结果。如果涉及写入操作，需用户确认后才执行。
+
+      ---
+
+      ## 可用工具
+
+      **探索工具（先调用这些了解系统）**
+      1. list_controllers() - 列出所有功能模块
+      2. list_endpoints(controller) - 列出模块下的接口
+      3. get_api_docs(search?, path?) - 查询接口参数详情
+
+      **执行工具**
       4. call_api(method, path, ...) - 执行 API 调用
-         - GET 请求直接执行
-         - POST/PUT 需要 confirmed=true 才能执行
-         - 禁止执行 DELETE 请求
+         - GET 直接执行
+         - POST/PUT 需要 confirmed=true
+         - 禁止 DELETE
 
-      5. export_daily_report(date?) - 导出今日工作日报
+      **导出工具**
+      5. export_daily_report(date?) - 导出今日日报
+      6. export_weekly_report(start_date?, end_date?) - 导出本周周报
 
-      6. export_weekly_report(start_date?, end_date?) - 导出本周工作周报
+      ---
 
-      **推荐流程**
-      - 不熟悉系统：list_controllers → list_endpoints → get_api_docs → call_api
-      - 熟悉系统：直接用 get_api_docs 搜索或 call_api 执行
+      ## 常见场景
 
-      **时间相关查询**
-      - 用户说"今日工作"、"今天做了什么" → 直接调用 export_daily_report
-      - 用户说"本周工作"、"这周做了什么" → 直接调用 export_weekly_report
+      **查询类**（用户想"看看""了解""有什么"）
+      → 只查询展示，不主动导出或修改
 
-      **错误处理**
-      - 工具调用失败时，最多重试 1 次
-      - 2 次失败后向用户说明情况，不要继续尝试
+      **操作类**（用户明确要"添加""修改""导出"）
+      → 执行操作，写入前确认
 
-      **重要原则**
+      **时间类**（"今日工作""本周情况"）
+      → 直接调用 export_daily_report 或 export_weekly_report
+
+      ---
+
+      ## 错误处理
+
+      - 失败最多重试 1 次
+      - 2 次失败后向用户说明，询问是否换种方式
+      - 缺少参数时主动询问用户，不要猜测
+
+      ## 重要原则
+
       - 用户看到的是标题，API 需要的是 ID，你负责转换
       - 禁止编造接口或参数
       - 写入操作必须用户确认

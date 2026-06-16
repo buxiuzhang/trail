@@ -13,93 +13,7 @@ import { DescriptionEditorWithMode, type EditorMode } from '@/components/shared/
 import { useConfirm } from '@/utils/confirm'
 import styles from './SettingsPage.module.css'
 
-// 默认 Prompt 模板
-export const DEFAULT_POLISH_PROMPT =
-  '你是中文文本润色助手。把用户给的工作日志原文化、书面化，保留原意和事实细节，不要添加用户没写过的信息，不要改日期和数字。用第一人称（我）。如果原文没有标点，末尾补全句号。只输出润色后的纯文本，不要任何解释、Markdown 包裹、前后缀。'
-
-export const DEFAULT_POLISH_TODO_PROMPT =
-  '你是中文文本润色助手。把用户给的待办事项补充说明润色为清晰、简洁的描述。保持原意，不要添加用户没写过的信息。可以适当调整语序、补充标点，使表达更流畅。如果是技术内容（接口、参数、步骤等），保持准确性。只输出润色后的纯文本，不要任何解释、Markdown 包裹、前后缀。'
-
-export const DEFAULT_SUMMARIZE_PROMPT =
-  '你是中文写作助手。基于用户提供的多条工作日志，提炼成一段 200-400 字的主体阶段总结。结构：开头一句总体目标；中间按时间或主题列关键动作；结尾一句结果或遗留。不要添加日志中不存在的事实。不要用 Markdown 标题，只输出连续段落。第一人称（我）。'
-
-export const DEFAULT_SUMMARIZE_MAINTENANCE_PROMPT =
-  '你是中文写作助手。基于维护期工作日志，写一段 150-300 字的维护情况总结。重点：偶发问题、调整内容、对外影响。不要堆砌每天做了什么。第一人称（我）。只输出连续段落，不用 Markdown。'
-
-export const DEFAULT_ASK_MAINTENANCE_PROMPT =
-  '你是任务收尾助手。根据用户给出的工作日志整体特征，判断（仅作为建议，最终由用户决定）：任务是否长期存在（还可能偶发出现）、是否需要后续小修小补。用 1-2 句中文回答。给出明确建议（\'建议进入维护期\' 或 \'建议直接关闭\'）并附一句理由。不要 Markdown 包裹。'
-
-export const DEFAULT_CHAT_PROMPT =
-  '你是 Trail 工作日志助教。你帮助用户回顾工作进展、整理任务状态、回答关于工作日志的问题。回答使用中文，简洁、有条理，用第二人称（你/您）。回答可以适当使用条目列表，但不要用 Markdown 标题（#）。'
-
-export const DEFAULT_TOOLS_DESC = `你可以通过六个工具与 Trail 系统交互：
-
-**渐进式披露（推荐流程）**
-1. list_controllers() - 列出所有功能模块（Controller）
-   - 不确定有哪些功能时先调用，了解系统全貌
-   - 返回模块名称、描述、接口数量
-
-2. list_endpoints(controller) - 列出指定模块的所有接口
-   - 已确定模块后，查看具体有哪些操作
-   - 参数：controller 为模块名称（如"工作日志"、"待办事项"）
-
-3. get_api_docs(search?, path?) - 查询具体接口的参数详情
-   - 已确定接口后，查看参数定义
-   - path 参数获取接口详情，search 参数搜索接口
-
-4. call_api(method, path, ...) - 执行 API 调用
-   - GET 请求直接执行
-   - POST/PUT 需要 confirmed=true 才能执行
-   - 禁止执行 DELETE 请求
-
-5. export_daily_report(date?) - 导出今日工作日报
-
-6. export_weekly_report(start_date?, end_date?) - 导出本周工作周报
-
-**推荐流程**
-- 不熟悉系统：list_controllers → list_endpoints → get_api_docs → call_api
-- 熟悉系统：直接用 get_api_docs 搜索或 call_api 执行
-
-**时间相关查询**
-- 用户说"今日工作"、"今天做了什么" → 直接调用 export_daily_report
-- 用户说"本周工作"、"这周做了什么" → 直接调用 export_weekly_report
-
-**错误处理**
-- 工具调用失败时，最多重试 1 次
-- 2 次失败后向用户说明情况，不要继续尝试
-
-**重要原则**
-- 用户看到的是标题，API 需要的是 ID，你负责转换
-- 禁止编造接口或参数
-- 写入操作必须用户确认`
-
-export const DEFAULT_MOTTO = '凡录入者，皆为正典。\n凡未录者，皆为虚构。'
-
-// 默认日报/周报模板
-export const DEFAULT_DAILY_REPORT_TEMPLATE = `# 今日工作日报
-
-## 工作内容
-[按任务列出今日完成的工作]
-
-## 明日计划
-[待办事项或下一步计划]
-
-## 备注
-[需要说明的事项]`
-
-export const DEFAULT_WEEKLY_REPORT_TEMPLATE = `# 本周工作周报
-
-## 本周完成
-[按任务列出本周完成的工作]
-
-## 进行中
-[正在进行的工作及进度]
-
-## 下周计划
-[下周重点工作安排]
-
-## 备注
-[需要说明的事项]`
+export const DEFAULT_MOTTO = '凡录入者，皆为正典。\n凡未录者，皆为虚构.'
 
 export function SettingsPage() {
   const { showToast } = useToastContext()
@@ -585,7 +499,7 @@ export function SettingsPage() {
                         body: <p>将恢复为系统默认值，您的自定义内容将被覆盖。</p>,
                         confirmLabel: '重置',
                       })
-                      if (ok) setPolishTodoPrompt(DEFAULT_POLISH_TODO_PROMPT)
+                      if (ok) setPolishTodoPrompt('')
                     }}
                     className={styles.resetBtn}
                   >
@@ -603,7 +517,7 @@ export function SettingsPage() {
               <p className={styles.promptDesc}>润色待办事项的补充说明，使其更清晰简洁</p>
               <div style={{ marginTop: '8px' }}>
                 <DescriptionEditorWithMode
-                  value={polishTodoPrompt || DEFAULT_POLISH_TODO_PROMPT}
+                  value={polishTodoPrompt || ''}
                   onChange={setPolishTodoPrompt}
                   mode={polishTodoPromptMode}
                   onModeChange={setPolishTodoPromptMode}
@@ -628,7 +542,7 @@ export function SettingsPage() {
                         body: <p>将恢复为系统默认值，您的自定义内容将被覆盖。</p>,
                         confirmLabel: '重置',
                       })
-                      if (ok) setPolishPrompt(DEFAULT_POLISH_PROMPT)
+                      if (ok) setPolishPrompt('')
                     }}
                     className={styles.resetBtn}
                   >
@@ -646,7 +560,7 @@ export function SettingsPage() {
               <p className={styles.promptDesc}>润色工作日志，使其书面化、正式化</p>
               <div style={{ marginTop: '8px' }}>
                 <DescriptionEditorWithMode
-                  value={polishPrompt || DEFAULT_POLISH_PROMPT}
+                  value={polishPrompt || ''}
                   onChange={setPolishPrompt}
                   mode={polishPromptMode}
                   onModeChange={setPolishPromptMode}
@@ -671,7 +585,7 @@ export function SettingsPage() {
                         body: <p>将恢复为系统默认值，您的自定义内容将被覆盖。</p>,
                         confirmLabel: '重置',
                       })
-                      if (ok) setSummarizePrompt(DEFAULT_SUMMARIZE_PROMPT)
+                      if (ok) setSummarizePrompt('')
                     }}
                     className={styles.resetBtn}
                   >
@@ -689,7 +603,7 @@ export function SettingsPage() {
               <p className={styles.promptDesc}>主体阶段结束时，基于日志提炼总结</p>
               <div style={{ marginTop: '8px' }}>
                 <DescriptionEditorWithMode
-                  value={summarizePrompt || DEFAULT_SUMMARIZE_PROMPT}
+                  value={summarizePrompt || ''}
                   onChange={setSummarizePrompt}
                   mode={summarizePromptMode}
                   onModeChange={setSummarizePromptMode}
@@ -714,7 +628,7 @@ export function SettingsPage() {
                         body: <p>将恢复为系统默认值，您的自定义内容将被覆盖。</p>,
                         confirmLabel: '重置',
                       })
-                      if (ok) setSummarizeMaintenancePrompt(DEFAULT_SUMMARIZE_MAINTENANCE_PROMPT)
+                      if (ok) setSummarizeMaintenancePrompt('')
                     }}
                     className={styles.resetBtn}
                   >
@@ -732,7 +646,7 @@ export function SettingsPage() {
               <p className={styles.promptDesc}>维护阶段结束时的总结，侧重偶发问题和对外影响</p>
               <div style={{ marginTop: '8px' }}>
                 <DescriptionEditorWithMode
-                  value={summarizeMaintenancePrompt || DEFAULT_SUMMARIZE_MAINTENANCE_PROMPT}
+                  value={summarizeMaintenancePrompt || ''}
                   onChange={setSummarizeMaintenancePrompt}
                   mode={summarizeMaintenancePromptMode}
                   onModeChange={setSummarizeMaintenancePromptMode}
@@ -757,7 +671,7 @@ export function SettingsPage() {
                         body: <p>将恢复为系统默认值，您的自定义内容将被覆盖。</p>,
                         confirmLabel: '重置',
                       })
-                      if (ok) setAskMaintenancePrompt(DEFAULT_ASK_MAINTENANCE_PROMPT)
+                      if (ok) setAskMaintenancePrompt('')
                     }}
                     className={styles.resetBtn}
                   >
@@ -775,7 +689,7 @@ export function SettingsPage() {
               <p className={styles.promptDesc}>判断任务是否应进入维护期或直接关闭</p>
               <div style={{ marginTop: '8px' }}>
                 <DescriptionEditorWithMode
-                  value={askMaintenancePrompt || DEFAULT_ASK_MAINTENANCE_PROMPT}
+                  value={askMaintenancePrompt || ''}
                   onChange={setAskMaintenancePrompt}
                   mode={askMaintenancePromptMode}
                   onModeChange={setAskMaintenancePromptMode}
@@ -800,7 +714,7 @@ export function SettingsPage() {
                         body: <p>将恢复为系统默认值，您的自定义内容将被覆盖。</p>,
                         confirmLabel: '重置',
                       })
-                      if (ok) setChatPrompt(DEFAULT_CHAT_PROMPT)
+                      if (ok) setChatPrompt('')
                     }}
                     className={styles.resetBtn}
                   >
@@ -818,7 +732,7 @@ export function SettingsPage() {
               <p className={styles.promptDesc}>聊天窗口的系统提示，定义 AI 的角色和行为</p>
               <div style={{ marginTop: '8px' }}>
                 <DescriptionEditorWithMode
-                  value={chatPrompt || DEFAULT_CHAT_PROMPT}
+                  value={chatPrompt || ''}
                   onChange={setChatPrompt}
                   mode={chatPromptMode}
                   onModeChange={setChatPromptMode}
@@ -843,7 +757,7 @@ export function SettingsPage() {
                         body: <p>将恢复为系统默认值，您的自定义内容将被覆盖。</p>,
                         confirmLabel: '重置',
                       })
-                      if (ok) setToolsDesc(DEFAULT_TOOLS_DESC)
+                      if (ok) setToolsDesc('')
                     }}
                     className={styles.resetBtn}
                   >
@@ -861,7 +775,7 @@ export function SettingsPage() {
               <p className={styles.promptDesc}>告诉 LLM 有哪些工具可用及如何使用</p>
               <div style={{ marginTop: '8px' }}>
                 <DescriptionEditorWithMode
-                  value={toolsDesc || DEFAULT_TOOLS_DESC}
+                  value={toolsDesc || ''}
                   onChange={setToolsDesc}
                   mode={toolsDescMode}
                   onModeChange={setToolsDescMode}
@@ -886,7 +800,7 @@ export function SettingsPage() {
                         body: <p>将恢复为系统默认值，您的自定义内容将被覆盖。</p>,
                         confirmLabel: '重置',
                       })
-                      if (ok) setDailyReportTemplate(DEFAULT_DAILY_REPORT_TEMPLATE)
+                      if (ok) setDailyReportTemplate('')
                     }}
                     className={styles.resetBtn}
                   >
@@ -904,7 +818,7 @@ export function SettingsPage() {
               <p className={styles.promptDesc}>聊天说「导出今日工作」时使用</p>
               <div style={{ marginTop: '8px' }}>
                 <DescriptionEditorWithMode
-                  value={dailyReportTemplate || DEFAULT_DAILY_REPORT_TEMPLATE}
+                  value={dailyReportTemplate || ''}
                   onChange={setDailyReportTemplate}
                   mode={dailyReportTemplateMode}
                   onModeChange={setDailyReportTemplateMode}
@@ -928,7 +842,7 @@ export function SettingsPage() {
                         body: <p>将恢复为系统默认值，您的自定义内容将被覆盖。</p>,
                         confirmLabel: '重置',
                       })
-                      if (ok) setWeeklyReportTemplate(DEFAULT_WEEKLY_REPORT_TEMPLATE)
+                      if (ok) setWeeklyReportTemplate('')
                     }}
                     className={styles.resetBtn}
                   >
@@ -946,7 +860,7 @@ export function SettingsPage() {
               <p className={styles.promptDesc}>聊天说「导出本周工作」时使用</p>
               <div style={{ marginTop: '8px' }}>
                 <DescriptionEditorWithMode
-                  value={weeklyReportTemplate || DEFAULT_WEEKLY_REPORT_TEMPLATE}
+                  value={weeklyReportTemplate || ''}
                   onChange={setWeeklyReportTemplate}
                   mode={weeklyReportTemplateMode}
                   onModeChange={setWeeklyReportTemplateMode}
