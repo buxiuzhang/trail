@@ -265,9 +265,11 @@ export function ChatWindow() {
 
   // 流是否正在进行（用于 liveRef 绑到 DOM 节点 + 渲染 typing dots）
   const lastMsg = messages[messages.length - 1]
-  // isStreaming: assistant 正在流式输出内容（内容非空）
-  // 内容为空时显示 typing dots 动画
-  const isStreaming = isPending && lastMsg?.role === 'assistant' && lastMsg?.content !== ''
+  // isStreaming: assistant 正在流式输出（内容会逐字写入 liveRef）
+  // 内容为空时显示 typing dots，同时 liveRef 也要绑定
+  const isStreaming = isPending && lastMsg?.role === 'assistant'
+  // showTyping: 内容为空时显示跳动动画
+  const showTyping = isStreaming && lastMsg?.content === ''
 
   return (
     <div className={styles.window} role="dialog" aria-label="工作对话">
@@ -289,7 +291,7 @@ export function ChatWindow() {
               message={msg}
               liveRef={isLast && isStreaming ? liveRef : undefined}
               isStreaming={isLast && isStreaming}
-              isPending={isLast && isPending}
+              showTyping={isLast && showTyping && !toolStatus}
             />
           )
         })}
@@ -384,12 +386,12 @@ function ChatMessageRow({
   message,
   liveRef,
   isStreaming,
-  isPending,
+  showTyping,
 }: {
   message: Message
   liveRef?: React.RefObject<HTMLDivElement | null>
   isStreaming?: boolean
-  isPending?: boolean
+  showTyping?: boolean
 }) {
   const isUser = message.role === 'user'
   const [copied, setCopied] = useState(false)
@@ -399,9 +401,6 @@ function ChatMessageRow({
     setCopied(true)
     setTimeout(() => setCopied(false), 1500)
   }
-
-  // assistant 空内容且正在等待：显示 typing dots
-  const showTyping = !isUser && message.content === '' && isPending && !isStreaming
 
   return (
     <div className={`${styles.msg} ${isUser ? styles.msgUser : styles.msgAssistant}`}>
