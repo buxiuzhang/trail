@@ -197,10 +197,12 @@
 }
 
 .typingDot {
+  display: inline-block;
   width: 6px;
   height: 6px;
   background: var(--ink-soft);
   border-radius: 50%;
+  margin-right: 4px;
   animation: typingPulse 1.4s ease-in-out infinite;
 }
 
@@ -214,6 +216,7 @@
 
 .typingDot:nth-child(3) {
   animation-delay: 0.4s;
+  margin-right: 0;
 }
 
 @keyframes typingPulse {

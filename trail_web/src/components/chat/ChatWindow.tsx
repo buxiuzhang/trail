@@ -289,6 +289,7 @@ export function ChatWindow() {
               message={msg}
               liveRef={isLast && isStreaming ? liveRef : undefined}
               isStreaming={isLast && isStreaming}
+              isPending={isLast && isPending}
             />
           )
         })}
@@ -305,14 +306,6 @@ export function ChatWindow() {
                 ({iterationInfo.current}/{iterationInfo.max})
               </span>
             )}
-          </div>
-        )}
-        {/* 等待中动画（assistant 内容为空且无工具调用时） */}
-        {isPending && !isStreaming && !toolStatus && (
-          <div className={styles.typing}>
-            <span className={styles.typingDot} />
-            <span className={styles.typingDot} />
-            <span className={styles.typingDot} />
           </div>
         )}
       </div>
@@ -391,10 +384,12 @@ function ChatMessageRow({
   message,
   liveRef,
   isStreaming,
+  isPending,
 }: {
   message: Message
   liveRef?: React.RefObject<HTMLDivElement | null>
   isStreaming?: boolean
+  isPending?: boolean
 }) {
   const isUser = message.role === 'user'
   const [copied, setCopied] = useState(false)
@@ -405,11 +400,21 @@ function ChatMessageRow({
     setTimeout(() => setCopied(false), 1500)
   }
 
+  // assistant 空内容且正在等待：显示 typing dots
+  const showTyping = !isUser && message.content === '' && isPending && !isStreaming
+
   return (
     <div className={`${styles.msg} ${isUser ? styles.msgUser : styles.msgAssistant}`}>
       <div className={styles.msgBubble}>
         <span className={styles.msgRole}>{isUser ? '我' : 'Trail'}</span>
-        {isStreaming && liveRef ? (
+        {showTyping ? (
+          // 等待中：显示 typing dots
+          <div className={styles.msgContent}>
+            <span className={styles.typingDot} />
+            <span className={styles.typingDot} />
+            <span className={styles.typingDot} />
+          </div>
+        ) : isStreaming && liveRef ? (
           // 流式：纯文本 + 打字机
           <div className={styles.msgContent} ref={liveRef} />
         ) : (
@@ -417,7 +422,7 @@ function ChatMessageRow({
           <MessageContent content={message.content} />
         )}
         {/* 助手消息完成后显示复制按钮 */}
-        {!isUser && !isStreaming && (
+        {!isUser && !isStreaming && !showTyping && (
           <button
             className={styles.copyBtn}
             onClick={handleCopy}
