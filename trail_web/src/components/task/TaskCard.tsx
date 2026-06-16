@@ -64,14 +64,18 @@ function formatHours(hours: number): string {
   const weeks = Math.floor(rem1 / WEEK_HOURS)
   const rem2 = rem1 % WEEK_HOURS
   const days = Math.floor(rem2 / DAY_HOURS)
-  const remainHours = Math.round(rem2 % DAY_HOURS)
+  const remainHours = rem2 % DAY_HOURS
 
   // 优先级：月 > 周 > 天 > 小时
   const parts: string[] = []
   if (months) parts.push(`${months} 月`)
   if (weeks) parts.push(`${weeks} 周`)
   if (days) parts.push(`${days} 天`)
-  if (remainHours && !months) parts.push(`${remainHours} 小时`)  // 小时只在没月时显示
+  // 小时保留一位小数，0.5 显示为 0.5 小时
+  if (remainHours && !months) {
+    const h = remainHours % 1 === 0 ? String(remainHours) : remainHours.toFixed(1)
+    parts.push(`${h} 小时`)
+  }
 
   return parts.join(' ') || '—'
 }
