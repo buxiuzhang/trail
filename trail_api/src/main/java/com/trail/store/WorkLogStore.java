@@ -72,10 +72,12 @@ public class WorkLogStore {
         return null;
     }
 
-    public Map<String, Object> addLog(long taskId, LocalDate logDate, String content, String phase) {
+    public Map<String, Object> addLog(long taskId, LocalDate logDate, String content, String phase, Double hours) {
         if (content == null || content.isBlank()) throw new StoreError("日志内容不能为空");
         if (phase == null) phase = "main";
         if (!PHASES.contains(phase)) throw new StoreError("非法 phase：" + phase);
+        if (hours == null) hours = 1.0;
+        if (hours <= 0 || hours >= 12) throw new StoreError("工时必须大于 0 且小于 12");
 
         // 校验任务存在 + 封版规则
         List<Map<String, Object>> taskRows = db.query(
@@ -96,11 +98,11 @@ public class WorkLogStore {
 
         Long newId = db.insertReturningId("""
             INSERT INTO work_logs
-              (task_id, log_date, phase, ordinal, content, is_deleted, edit_count)
-            VALUES (?, ?, ?, ?, ?, 0, 0)
+              (task_id, log_date, phase, ordinal, content, hours, is_deleted, edit_count)
+            VALUES (?, ?, ?, ?, ?, ?, 0, 0)
             RETURNING id
             """,
-            taskId, logDate, phase, ordinal, content.strip());
+            taskId, logDate, phase, ordinal, content.strip(), hours);
         if (newId == null) throw new StoreError("写日志失败");
         return getLog(newId);
     }
@@ -112,11 +114,12 @@ public class WorkLogStore {
     }
 
     public Map<String, Object> updateLog(long logId, long taskId,
-                                         String content, LocalDate logDate, String phase) {
-        if (content == null && logDate == null && phase == null)
+                                         String content, LocalDate logDate, String phase, Double hours) {
+        if (content == null && logDate == null && phase == null && hours == null)
             throw new StoreError("至少要改一个字段");
         if (content != null && content.isBlank()) throw new StoreError("日志内容不能为空");
         if (phase != null && !PHASES.contains(phase)) throw new StoreError("非法 phase：" + phase);
+        if (hours != null && (hours <= 0 || hours >= 12)) throw new StoreError("工时必须大于 0 且小于 12");
 
         // 查旧值
         List<Map<String, Object>> oldRows = db.query(
@@ -157,6 +160,10 @@ public class WorkLogStore {
         if (phase != null) {
             sets.append(", phase = ?");
             params.add(newPhase);
+        }
+        if (hours != null) {
+            sets.append(", hours = ?");
+            params.add(hours);
         }
         if (newOrdinal != oldOrdinal) {
             sets.append(", ordinal = ?");

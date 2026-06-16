@@ -234,7 +234,7 @@ export function DetailPage() {
   const catalog = catalogOf(task.id, task.created_at)
 
   // ── 日志操作 ──
-  async function handleSaveNew(data: { log_date: string; content: string; phase: string }) {
+  async function handleSaveNew(data: { log_date: string; content: string; phase: string; hours: number }) {
     await createLog.mutateAsync(data)
     // 首次记录时自动设置 processing_date
     if (!task!.processing_date) {
@@ -243,7 +243,7 @@ export function DetailPage() {
     showToast('已落档')
   }
 
-  async function handleSaveEdit(logId: number, data: { log_date: string; content: string; phase: string }) {
+  async function handleSaveEdit(logId: number, data: { log_date: string; content: string; phase: string; hours: number }) {
     await updateLog.mutateAsync({ logId, data })
     showToast('已保存')
   }

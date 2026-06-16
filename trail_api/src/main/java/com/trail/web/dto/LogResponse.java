@@ -11,6 +11,7 @@ public record LogResponse(
         Integer ordinal,
         String content,
         String polishedContent,
+        Double hours,  // M11：工时（小时）
         Boolean isDeleted,
         Instant deletedAt,
         Instant updatedAt,

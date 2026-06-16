@@ -9,8 +9,8 @@ type SortOrder = 'asc' | 'desc'
 interface LogbookProps {
   task: TaskOut
   logs: LogOut[]
-  onSaveNew: (data: { log_date: string; content: string; phase: string }) => Promise<void>
-  onSaveEdit: (logId: number, data: { log_date: string; content: string; phase: string }) => Promise<void>
+  onSaveNew: (data: { log_date: string; content: string; phase: string; hours: number }) => Promise<void>
+  onSaveEdit: (logId: number, data: { log_date: string; content: string; phase: string; hours: number }) => Promise<void>
   onDelete: (logId: number) => void
   onAddLogFocus: boolean
 }

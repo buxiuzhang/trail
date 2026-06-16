@@ -47,6 +47,7 @@ CREATE TABLE IF NOT EXISTS work_logs (
     ordinal           INTEGER NOT NULL DEFAULT 0,
     content           TEXT    NOT NULL,
     polished_content  TEXT,
+    hours             REAL    NOT NULL DEFAULT 1.0,    -- 工时（小时），0 < hours < 12
     is_deleted        INTEGER NOT NULL DEFAULT 0,      -- BOOLEAN → INTEGER
     deleted_at        TEXT,
     updated_at        TEXT,

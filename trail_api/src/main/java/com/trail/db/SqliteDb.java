@@ -197,6 +197,13 @@ public class SqliteDb {
                     log.info("M10 迁移: attachments.display_size 列已添加");
                 }
             }
+            // M11: work_logs 表补 hours 列
+            if (tableExists("work_logs") && !columnExists("work_logs", "hours")) {
+                try (Statement s = c.createStatement()) {
+                    s.execute("ALTER TABLE work_logs ADD COLUMN hours REAL NOT NULL DEFAULT 1.0");
+                    log.info("M11 迁移: work_logs.hours 列已添加");
+                }
+            }
             log.info("ensureSchema 完成");
         } catch (Exception e) {
             throw new RuntimeException("ensureSchema 失败: " + e.getMessage(), e);

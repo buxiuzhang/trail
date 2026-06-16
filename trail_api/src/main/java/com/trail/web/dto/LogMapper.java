@@ -21,6 +21,7 @@ public final class LogMapper {
                 asInt(row.get("ordinal")),
                 asString(row.get("content")),
                 asString(row.get("polished_content")),
+                asDouble(row.get("hours")),
                 asBool(row.get("is_deleted")),
                 asInstant(row.get("deleted_at")),
                 asInstant(row.get("updated_at")),
@@ -31,6 +32,7 @@ public final class LogMapper {
 
     private static Long asLong(Object o) { return o == null ? null : ((Number) o).longValue(); }
     private static Integer asInt(Object o) { return o == null ? null : ((Number) o).intValue(); }
+    private static Double asDouble(Object o) { return o == null ? null : ((Number) o).doubleValue(); }
     private static Boolean asBool(Object o) {
         if (o == null) return Boolean.FALSE;
         // SQLite 用 INTEGER 存 bool（0/1），Xerial 返回 Integer

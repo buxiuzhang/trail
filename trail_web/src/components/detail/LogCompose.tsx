@@ -4,6 +4,7 @@ import { TODAY } from '@/constants'
 import { usePolish, LLM_AVAILABLE } from '@/api/llm'
 import { usePlaceholders, DEFAULT_PLACEHOLDERS } from '@/api/settings'
 import { useToastContext } from '@/context/ToastContext'
+import { useModalContext } from '@/context/ModalContext'
 import { Select } from '@/components/shared/Select'
 import { DescriptionEditorWithMode as DescriptionEditor } from '@/components/shared/DescriptionEditorWithMode'
 import { ModeToggleButton } from '@/components/shared/ModeToggleButton'
@@ -13,7 +14,7 @@ import styles from './Logbook.module.css'
 interface LogComposeProps {
   task: TaskOut
   editing: LogOut | null
-  onSave: (data: { log_date: string; content: string; phase: string }) => Promise<void>
+  onSave: (data: { log_date: string; content: string; phase: string; hours: number }) => Promise<void>
   onCancel: () => void
 }
 
@@ -23,6 +24,7 @@ export function LogCompose({ task, editing, onSave, onCancel }: LogComposeProps)
   const isEdit = !!editing
   const [logDate, setLogDate] = useState(editing?.log_date || TODAY)
   const [phase, setPhase] = useState(editing?.phase || (task.nature === '维护' ? 'maintenance' : 'main'))
+  const [hours, setHours] = useState(editing?.hours || 1)
   const [content, setContent] = useState(editing?.content || '')
   const [polishedFrom, setPolishedFrom] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -30,6 +32,7 @@ export function LogCompose({ task, editing, onSave, onCancel }: LogComposeProps)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const polishMutation = usePolish()
   const { showToast } = useToastContext()
+  const { openModal, closeModal } = useModalContext()
   const { data: placeholders } = usePlaceholders()
 
   useEffect(() => {
@@ -42,9 +45,36 @@ export function LogCompose({ task, editing, onSave, onCancel }: LogComposeProps)
     e.preventDefault()
     const trimmed = content.trim()
     if (!trimmed) return
+
+    // 编辑模式：二次确认
+    if (isEdit) {
+      openModal({
+        eyebrow: '确认',
+        title: '保存此编辑？',
+        titleMode: 'zh',
+        body: <p>日志 № {String(editing!.id).padStart(3, '0')} 的修改将被保存。</p>,
+        buttons: [
+          { label: '取消', className: 'btn btn--ghost', action: () => {} },
+          {
+            label: '确认保存',
+            className: 'btn btn--primary',
+            action: async () => {
+              await doSave(trimmed)
+            },
+          },
+        ],
+      })
+      return
+    }
+
+    // 新建模式：直接保存
+    await doSave(trimmed)
+  }
+
+  async function doSave(trimmed: string) {
     setSubmitting(true)
     try {
-      await onSave({ log_date: logDate, content: trimmed, phase })
+      await onSave({ log_date: logDate, content: trimmed, phase, hours })
       setContent('')
       setPolishedFrom(null)
       if (!isEdit) setLogDate(TODAY)
@@ -89,6 +119,16 @@ export function LogCompose({ task, editing, onSave, onCancel }: LogComposeProps)
             { value: 'maintenance', label: 'maintenance · 维护' },
           ]}
           onChange={setPhase}
+        />
+        <label>工时</label>
+        <input
+          type="number"
+          step="0.5"
+          min="0.5"
+          max="11.5"
+          value={hours}
+          onChange={e => setHours(parseFloat(e.target.value) || 1)}
+          className={styles.hoursInput}
         />
         <ModeToggleButton mode={mode} onModeChange={setMode} style={{ marginLeft: 'auto' }} />
       </div>

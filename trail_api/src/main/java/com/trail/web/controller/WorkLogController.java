@@ -46,10 +46,10 @@ public class WorkLogController {
     public ResponseEntity<LogResponse> add(
             @Parameter(description = "任务 ID")
             @PathVariable long taskId,
-            @Parameter(description = "日志内容，包含 log_date（日期 YYYY-MM-DD）、content（日志内容）、phase（阶段，默认 main）")
+            @Parameter(description = "日志内容，包含 log_date（日期 YYYY-MM-DD）、content（日志内容）、phase（阶段，默认 main）、hours（工时，默认 1.0）")
             @RequestBody LogCreateRequest req) {
         String phase = req.phase() == null ? "main" : req.phase();
-        var created = logs.addLog(taskId, req.logDate(), req.content(), phase);
+        var created = logs.addLog(taskId, req.logDate(), req.content(), phase, req.hours());
         // 首日志：未开始 → 进行中
         var task = tasks.getTask(taskId);
         if ("未开始".equals(task.get("status"))) {
@@ -58,16 +58,16 @@ public class WorkLogController {
         return ResponseEntity.status(HttpStatus.CREATED).body(LogMapper.toResponse(created));
     }
 
-    @Operation(summary = "编辑工作日志", description = "修改已有工作日志的内容、日期或阶段。")
+    @Operation(summary = "编辑工作日志", description = "修改已有工作日志的内容、日期、阶段或工时。")
     @PutMapping("/{logId}")
     public LogResponse update(
             @Parameter(description = "任务 ID")
             @PathVariable long taskId,
             @Parameter(description = "日志 ID")
             @PathVariable long logId,
-            @Parameter(description = "要修改的字段，包含 content（内容）、log_date（日期）、phase（阶段）")
+            @Parameter(description = "要修改的字段，包含 content（内容）、log_date（日期）、phase（阶段）、hours（工时）")
             @RequestBody LogUpdateRequest req) {
-        return LogMapper.toResponse(logs.updateLog(logId, taskId, req.content(), req.logDate(), req.phase()));
+        return LogMapper.toResponse(logs.updateLog(logId, taskId, req.content(), req.logDate(), req.phase(), req.hours()));
     }
 
     @Operation(summary = "删除工作日志", description = "删除指定的工作日志。默认软删除（标记为已删除），hard=true 时永久删除。")

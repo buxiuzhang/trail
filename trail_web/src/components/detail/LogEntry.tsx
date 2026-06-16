@@ -10,7 +10,7 @@ interface LogEntryProps {
   isEditing: boolean
   onEdit: () => void
   onDelete: () => void
-  onSaveEdit: (data: { log_date: string; content: string; phase: string }) => Promise<void>
+  onSaveEdit: (data: { log_date: string; content: string; phase: string; hours: number }) => Promise<void>
   onCancelEdit: () => void
 }
 
@@ -43,6 +43,7 @@ export function LogEntry({ task, log, isEditing, onEdit, onDelete, onSaveEdit, o
           <span className={styles.phase}>{isMt ? 'maintenance' : 'main'}</span>
           <span className={styles.ord}>№ {String(log.id).padStart(3, '0')}</span>
           {editedTag}
+          {log.hours && <span className={styles.hours}>{log.hours}h</span>}
         </div>
         <CollapsibleText
           text={log.content}
