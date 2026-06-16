@@ -103,7 +103,7 @@
 
 .msgBubble {
   position: relative;
-  padding: 6px 10px 20px 10px;  /* 底部留空间给复制按钮 */
+  padding: 6px 10px;
 }
 
 .msgUser .msgBubble {
@@ -111,6 +111,7 @@
 }
 .msgAssistant .msgBubble {
   background: var(--card-soft);
+  padding-bottom: 20px;  /* LLM 回复底部留空间给复制按钮 */
 }
 
 .msgRole {
