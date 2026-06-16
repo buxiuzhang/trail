@@ -24,6 +24,8 @@ export interface LLMSettings {
   weekly_report_template: string
   // 语音输入时长（秒）
   speech_duration: string
+  // 工具调用最大迭代次数
+  max_tool_iterations: string
 }
 
 /** LLM 设置保存请求（支持 API Key 加密传输） */

@@ -50,7 +50,8 @@ public class LlmSettingsController {
                 all.getOrDefault("tools_desc", ""),
                 all.getOrDefault("daily_report_template", ""),
                 all.getOrDefault("weekly_report_template", ""),
-                all.getOrDefault("speech_duration", "10")
+                all.getOrDefault("speech_duration", "10"),
+                all.getOrDefault("max_tool_iterations", "30")
         );
     }
 
@@ -86,6 +87,7 @@ public class LlmSettingsController {
         saveIfPresent(data, "weekly_report_template");
 
         saveIfPresent(data, "speech_duration");
+        saveIfPresent(data, "max_tool_iterations");
 
         llmService.refreshPrompts();
         return Map.of("ok", true);

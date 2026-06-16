@@ -36,9 +36,10 @@ export function ChatWindow() {
   const bodyRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // 获取 LLM 设置（包含语音时长）——只在窗口打开时才请求
+  // 获取 LLM 设置（包含语音时长、模型名称）——只在窗口打开时才请求
   const { data: llmSettings } = useLLMSettings({ enabled: isOpen })
   const speechDuration = parseInt(llmSettings?.speech_duration || '10', 10)
+  const modelName = llmSettings?.model || ''
 
   // 语音识别 - 使用回调方式实时更新输入框
   const {
@@ -289,6 +290,7 @@ export function ChatWindow() {
             <ChatMessageRow
               key={msg.id}
               message={msg}
+              modelName={modelName}
               liveRef={isLast && isStreaming ? liveRef : undefined}
               isStreaming={isLast && isStreaming}
               showTyping={isLast && showTyping && !toolStatus}
@@ -384,11 +386,13 @@ export function ChatWindow() {
 /** 单条消息 */
 function ChatMessageRow({
   message,
+  modelName,
   liveRef,
   isStreaming,
   showTyping,
 }: {
   message: Message
+  modelName?: string
   liveRef?: React.RefObject<HTMLDivElement | null>
   isStreaming?: boolean
   showTyping?: boolean
@@ -405,7 +409,14 @@ function ChatMessageRow({
   return (
     <div className={`${styles.msg} ${isUser ? styles.msgUser : styles.msgAssistant}`}>
       <div className={styles.msgBubble}>
-        <span className={styles.msgRole}>{isUser ? '我' : 'Trail'}</span>
+        {isUser ? (
+          <span className={styles.msgRole}>我</span>
+        ) : (
+          <div className={styles.msgRoleRow}>
+            <span className={styles.msgRole}>Trail</span>
+            {modelName && <span className={styles.modelName}>{modelName}</span>}
+          </div>
+        )}
         {isStreaming && liveRef ? (
           // 流式：纯文本 + 打字机
           <div className={styles.msgContent} ref={liveRef} />

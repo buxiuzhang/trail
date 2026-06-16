@@ -46,7 +46,7 @@ public class ChatWithToolsService {
 
     private static final Logger log = LoggerFactory.getLogger(ChatWithToolsService.class);
     private static final String ANTHROPIC_VERSION = "2023-06-01";
-    private static final int DEFAULT_MAX_TOOL_ITERATIONS = 10;
+    private static final int DEFAULT_MAX_TOOL_ITERATIONS = 30;
 
     private final AppProperties props;
     private final LLMSettingsStore settingsStore;
@@ -99,9 +99,18 @@ public class ChatWithToolsService {
                     apiMessages.add(msg);
                 }
 
-                // 多轮循环
-                int maxIterations = props != null && props.llm() != null
-                    ? props.llm().getMaxToolIterations() : DEFAULT_MAX_TOOL_ITERATIONS;
+                // 多轮循环：优先从数据库读取，否则从配置文件，最后用默认值
+                String maxIterSetting = settingsStore.get("max_tool_iterations");
+                int maxIterations = DEFAULT_MAX_TOOL_ITERATIONS;
+                if (maxIterSetting != null && !maxIterSetting.isBlank()) {
+                    try {
+                        maxIterations = Integer.parseInt(maxIterSetting);
+                    } catch (NumberFormatException e) {
+                        log.warn("Invalid max_tool_iterations value: {}", maxIterSetting);
+                    }
+                } else if (props != null && props.llm() != null) {
+                    maxIterations = props.llm().getMaxToolIterations();
+                }
                 for (int iteration = 0; iteration < maxIterations; iteration++) {
                     log.info("Tool use iteration {} started", iteration + 1);
 

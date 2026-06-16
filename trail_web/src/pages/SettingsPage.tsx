@@ -81,6 +81,9 @@ export function SettingsPage() {
   // 语音输入时长
   const [speechDuration, setSpeechDuration] = useState('10')
 
+  // 工具调用最大迭代次数
+  const [maxToolIterations, setMaxToolIterations] = useState('30')
+
   // 其他设置
   const [mottoDraft, setMottoDraft] = useState('')
   const [taskDescDraft, setTaskDescDraft] = useState('')
@@ -117,6 +120,8 @@ export function SettingsPage() {
       setWeeklyReportTemplate(settings.weekly_report_template || '')
       // 语音输入时长
       setSpeechDuration(settings.speech_duration || '10')
+      // 工具调用最大迭代次数
+      setMaxToolIterations(settings.max_tool_iterations || '30')
     }
   }, [settings])
 
@@ -203,7 +208,7 @@ export function SettingsPage() {
     }
   }
 
-  // 保存界面偏好（卷首语 + 语音时长）
+  // 保存界面偏好（卷首语 + 语音时长 + 工具调用次数）
   async function handleSaveInterface() {
     // 防止重复调用
     if (saveMotto.isPending || saveLLM.isPending) return
@@ -212,7 +217,7 @@ export function SettingsPage() {
     const ok = await confirm({
       level: 'moderate',
       title: '保存界面偏好？',
-      body: <p>将保存卷首语和语音输入时长设置。</p>,
+      body: <p>将保存卷首语、语音输入时长和工具调用次数设置。</p>,
       confirmLabel: '保存',
     })
     if (!ok) return
@@ -220,9 +225,10 @@ export function SettingsPage() {
     try {
       // 保存卷首语
       await saveMotto.mutateAsync(mottoDraft.trim())
-      // 保存语音时长
+      // 保存语音时长和工具调用次数
       await saveLLM.mutateAsync({
         speech_duration: speechDuration.trim(),
+        max_tool_iterations: maxToolIterations.trim(),
       })
       showToast('已保存')
     } catch (err: any) {
@@ -923,6 +929,25 @@ export function SettingsPage() {
           </p>
         </div>
 
+        {/* 工具调用最大迭代次数 */}
+        <div className="field">
+          <div className="field__label">
+            <span>工具调用次数上限</span>
+            <span className="field__hint">{maxToolIterations} 次</span>
+          </div>
+          <input
+            type="range"
+            min="1"
+            max="100"
+            value={maxToolIterations}
+            onChange={e => setMaxToolIterations(e.target.value)}
+            className={styles.slider}
+          />
+          <p className={styles.fieldHint}>
+            大模型聊天时工具调用的最大迭代次数，防止无限循环。
+          </p>
+        </div>
+
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16, gap: 8 }}>
           <button
             type="button"
@@ -931,12 +956,13 @@ export function SettingsPage() {
               const ok = await confirm({
                 level: 'dangerous',
                 title: '恢复所有默认值？',
-                body: <p>卷首语和语音时长将全部恢复为默认值。</p>,
+                body: <p>卷首语、语音时长和工具调用次数将全部恢复为默认值。</p>,
                 confirmLabel: '恢复默认',
               })
               if (ok) {
                 setMottoDraft('')
                 setSpeechDuration('10')
+                setMaxToolIterations('30')
               }
             }}
             title="恢复默认"

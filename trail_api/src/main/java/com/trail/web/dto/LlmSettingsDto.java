@@ -26,5 +26,7 @@ public record LlmSettingsDto(
         String dailyReportTemplate,
         String weeklyReportTemplate,
         // 语音输入时长（秒）
-        String speechDuration
+        String speechDuration,
+        // 工具调用最大迭代次数
+        String maxToolIterations
 ) {}
