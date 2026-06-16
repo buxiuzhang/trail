@@ -406,19 +406,20 @@ function ChatMessageRow({
     <div className={`${styles.msg} ${isUser ? styles.msgUser : styles.msgAssistant}`}>
       <div className={styles.msgBubble}>
         <span className={styles.msgRole}>{isUser ? '我' : 'Trail'}</span>
-        {showTyping ? (
-          // 等待中：显示 typing dots
-          <div className={styles.msgContent}>
-            <span className={styles.typingDot} />
-            <span className={styles.typingDot} />
-            <span className={styles.typingDot} />
-          </div>
-        ) : isStreaming && liveRef ? (
+        {isStreaming && liveRef ? (
           // 流式：纯文本 + 打字机
           <div className={styles.msgContent} ref={liveRef} />
         ) : (
           // 完成：使用 MessageContent 组件解析链接
           <MessageContent content={message.content} />
+        )}
+        {/* 等待中：右下角显示 typing dots */}
+        {showTyping && (
+          <div className={styles.typingIndicator}>
+            <span className={styles.typingDotSmall} />
+            <span className={styles.typingDotSmall} />
+            <span className={styles.typingDotSmall} />
+          </div>
         )}
         {/* 助手消息完成后显示复制按钮 */}
         {!isUser && !isStreaming && !showTyping && (

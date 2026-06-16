@@ -185,6 +185,36 @@
   opacity: 1;
 }
 
+/* —— 右下角 typing dots（小号）—— */
+.typingIndicator {
+  position: absolute;
+  bottom: 4px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.typingDotSmall {
+  width: 4px;
+  height: 4px;
+  background: var(--ink-ghost);
+  border-radius: 50%;
+  animation: typingPulse 1.4s ease-in-out infinite;
+}
+
+.typingDotSmall:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.typingDotSmall:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typingDotSmall:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
 /* —— 输入中动画（三个点跳动）—— */
 .typing {
   align-self: flex-start;
