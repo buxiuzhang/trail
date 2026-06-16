@@ -105,6 +105,14 @@ public class ChatWithToolsService {
                 for (int iteration = 0; iteration < maxIterations; iteration++) {
                     log.info("Tool use iteration {} started", iteration + 1);
 
+                    // 降频：第 2 次及以后的迭代，等待 1 秒再调用 API
+                    // 避免短时间内频繁请求被限流
+                    if (iteration > 0) {
+                        try {
+                            Thread.sleep(1000);
+                        } catch (InterruptedException ignored) {}
+                    }
+
                     // 调用 Anthropic API（流式）
                     AnthropicStreamResult result = callAnthropicStream(cfg, apiMessages, emitter, fullText);
 
