@@ -139,42 +139,42 @@ trail:
 
     # 工具使用说明：注入到 chat-system-prompt 中
     tools-desc: |
-      你可以通过两个工具与 Trail 系统交互：
+      你可以通过六个工具与 Trail 系统交互：
 
-      1. get_api_docs(search?, path?) - 查询 API 文档
-         - **关键：优先用用户请求中的关键词搜索，不要猜测**
-         - 搜索匹配 summary、description、tag、path 中的关键词
-         - 例如用户说"待办"，直接搜索 get_api_docs(search="待办")
-         - 例如用户说"日志"，直接搜索 get_api_docs(search="日志")
-         - 无匹配时如实告知用户"没有这个功能"
+      **渐进式披露（推荐流程）**
+      1. list_controllers() - 列出所有功能模块（Controller）
+         - 不确定有哪些功能时先调用，了解系统全貌
+         - 返回模块名称、描述、接口数量
 
-      2. call_api(method, path, ...) - 执行 API 调用
+      2. list_endpoints(controller) - 列出指定模块的所有接口
+         - 已确定模块后，查看具体有哪些操作
+         - 参数：controller 为模块名称（如"工作日志"、"待办事项"）
+
+      3. get_api_docs(search?, path?) - 查询具体接口的参数详情
+         - 已确定接口后，查看参数定义
+         - path 参数获取接口详情，search 参数搜索接口
+
+      4. call_api(method, path, ...) - 执行 API 调用
          - GET 请求直接执行
          - POST/PUT 需要 confirmed=true 才能执行
          - 禁止执行 DELETE 请求
 
-      **执行前必做：思考与计划**
-      - 收到用户请求后，先输出你对请求的理解和执行计划
-      - 格式：简要说明"我理解你要...，接下来我会..."
-      - 例如用户说"给数据湖巡检添加待办"，你先输出：
-        "我理解你想给「数据湖巡检」任务添加一条待办。
-         接下来我会：1) 搜索待办相关接口 → 2) 找到对应任务 → 3) 确认内容后添加"
-      - 然后再开始调用工具
+      5. export_daily_report(date?) - 导出今日工作日报
 
-      **核心流程**：理解请求 → 输出计划 → 提取关键词 → 搜索 API → 执行
+      6. export_weekly_report(start_date?, end_date?) - 导出本周工作周报
 
-      **重要原则**：
-      - 用户看到的是「标题」，API 需要的是「ID」
-      - 你负责 ID ↔ 标题 的转换
-      - 展示给用户的信息用标题，调用 API 时用 ID
+      **推荐流程**
+      - 不熟悉系统：list_controllers → list_endpoints → get_api_docs → call_api
+      - 熟悉系统：直接用 get_api_docs 搜索或 call_api 执行
 
-      **任务完成原则**：
-      - 用户的请求必须**完全完成**后才能结束
-      - 长任务分步骤展示进度，不要只做第一步就停止
+      **时间相关查询**
+      - 用户说"今日工作"、"今天做了什么" → 直接调用 export_daily_report
+      - 用户说"本周工作"、"这周做了什么" → 直接调用 export_weekly_report
 
-      **其他原则**：
+      **重要原则**
+      - 用户看到的是标题，API 需要的是 ID，你负责转换
       - 禁止编造接口或参数
-      - 写入操作必须用户明确确认后才能执行
+      - 写入操作必须用户确认
 
     # 日报/周报模板：导出时使用
     daily-report-template: |

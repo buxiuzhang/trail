@@ -5,6 +5,8 @@ import com.trail.service.LlmService;
 import com.trail.store.WorkLogStore;
 import com.trail.store.exception.NotFoundException;
 import com.trail.web.dto.*;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -17,6 +19,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api")
+@Tag(name = "LLM 服务", description = "大模型相关功能：润色、总结、聊天")
 public class LlmController {
 
     private final LlmService llmService;
@@ -29,11 +32,7 @@ public class LlmController {
         this.workLogStore = workLogStore;
     }
 
-    // ============================================================
-    // 润色
-    // ============================================================
-
-    /** 落档前润色 */
+    @Operation(summary = "润色文本", description = "将口语化文本润色为书面化表达")
     @PostMapping("/llm/polish")
     public LlmPolishResponse polish(@RequestBody LlmPolishRequest req) {
         String type = req.type() != null ? req.type() : "log";
@@ -41,7 +40,7 @@ public class LlmController {
         return new LlmPolishResponse(polished, false);
     }
 
-    /** 已落档日志润色 */
+    @Operation(summary = "润色已落档日志", description = "润色指定日志的内容")
     @PostMapping("/tasks/{taskId}/logs/{logId}/polish")
     public LlmPolishResponse polishLogged(@PathVariable Long taskId, @PathVariable Long logId) {
         List<Map<String, Object>> logs = workLogStore.listLogs(taskId, null, false, null, null);
@@ -55,60 +54,39 @@ public class LlmController {
         return new LlmPolishResponse(polished, false);
     }
 
-    // ============================================================
-    // 总结
-    // ============================================================
-
-    /** 主体阶段总结 */
+    @Operation(summary = "主体阶段总结", description = "总结任务主体阶段的工作内容")
     @PostMapping("/tasks/{taskId}/summarize")
     public LlmSummarizeResponse summarizeMain(@PathVariable Long taskId) {
         String text = llmService.summarizeMain(taskId);
         return new LlmSummarizeResponse(text);
     }
 
-    /** 维护期总结 */
+    @Operation(summary = "维护期总结", description = "总结任务维护阶段的工作内容")
     @PostMapping("/tasks/{taskId}/maintenance/summarize")
     public LlmSummarizeResponse summarizeMaintenance(@PathVariable Long taskId) {
         String text = llmService.summarizeMaintenance(taskId);
         return new LlmSummarizeResponse(text);
     }
 
-    // ============================================================
-    // 维护建议
-    // ============================================================
-
-    /** 询问是否进入维护期 */
+    @Operation(summary = "询问维护建议", description = "判断任务是否应进入维护期")
     @PostMapping("/tasks/{taskId}/ask-maintenance")
     public LlmAskMaintenanceResponse askMaintenance(@PathVariable Long taskId) {
         String suggestion = llmService.askMaintenance(taskId);
         return new LlmAskMaintenanceResponse(suggestion);
     }
 
-    // ============================================================
-    // SSE 流式聊天
-    // ============================================================
-
-    /** 多轮对话（SSE） */
+    @Operation(summary = "基础聊天（SSE）", description = "流式聊天，无工具调用")
     @PostMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter chatStream(@RequestBody ChatRequest req) {
-        // 转换消息格式
         List<Map<String, String>> messages = req.messages().stream()
                 .map(m -> Map.of("role", m.role(), "content", m.content()))
                 .toList();
         return llmService.chatStream(messages);
     }
 
-    // ============================================================
-    // SSE 流式聊天（Tool Use）
-    // ============================================================
-
-    /**
-     * 多轮 Tool Use 流式聊天（SSE）
-     * 新增端点，支持 LLM 调用工具查询数据
-     */
+    @Operation(summary = "工具调用聊天（SSE）", description = "流式聊天，支持 LLM 调用工具查询数据")
     @PostMapping(value = "/chat/tools/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter chatStreamWithTools(@RequestBody ChatRequest req) {
-        // 转换消息格式
         List<Map<String, String>> messages = req.messages().stream()
                 .map(m -> Map.of("role", m.role(), "content", m.content()))
                 .toList();

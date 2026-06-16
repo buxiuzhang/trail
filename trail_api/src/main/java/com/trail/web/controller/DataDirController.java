@@ -1,6 +1,8 @@
 package com.trail.web.controller;
 
 import com.trail.config.DataDirService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
@@ -9,15 +11,11 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * 数据目录配置端点（M8）。
- *
- * GET /api/settings/data-dir → 永远 200（前端 DataDirGate 探测依赖；未配置也返 200）
- * PUT /api/settings/data-dir → 切换数据目录（运行时切 conn + 写 user config）
- *
- * 不走 requireConfigured() —— 这两个端点必须在未配置时也响应。
+ * 数据目录配置端点
  */
 @RestController
 @RequestMapping("/api/settings/data-dir")
+@Tag(name = "数据目录", description = "数据存储路径的配置与切换")
 public class DataDirController {
 
     private final DataDirService dataDir;
@@ -26,23 +24,22 @@ public class DataDirController {
         this.dataDir = dataDir;
     }
 
+    @Operation(summary = "获取数据目录", description = "获取当前数据目录路径及配置状态")
     @GetMapping
     public Map<String, Object> get() {
         Map<String, Object> r = new HashMap<>();
         if (dataDir.isConfigured()) {
             r.put("dataDir", dataDir.currentDataDir().toString());
         } else {
-            // 未配置时返回默认建议路径，前端预填，用户点击确认后才初始化
             r.put("dataDir", dataDir.defaultDataDir().toString());
         }
         r.put("configured", dataDir.isConfigured());
         return r;
     }
 
+    @Operation(summary = "切换数据目录", description = "切换到新的数据目录，自动初始化数据库")
     @PutMapping
     public Map<String, Object> save(@RequestBody Map<String, Object> body) {
-        // 全局 SNAKE_CASE 不会转 Map 的 key（Jackson 只对 typed bean / record 走策略），
-        // 因此前端发的 snake_case `data_dir` 不会自动变成 `dataDir`。兼容两种 key。
         Object raw = body.get("dataDir");
         if (raw == null) raw = body.get("data_dir");
         String path = raw == null ? null : raw.toString();

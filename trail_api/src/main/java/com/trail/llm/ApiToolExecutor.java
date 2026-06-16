@@ -43,6 +43,8 @@ public class ApiToolExecutor {
     public String execute(String name, Map<String, Object> input) {
         try {
             Object result = switch (name) {
+                case "list_controllers" -> executeListControllers();
+                case "list_endpoints" -> executeListEndpoints(input);
                 case "get_api_docs" -> executeGetApiDocs(input);
                 case "call_api" -> executeCallApi(input);
                 case "export_daily_report" -> executeExportDailyReport(input);
@@ -54,6 +56,70 @@ public class ApiToolExecutor {
             log.error("Tool {} execution failed", name, e);
             return toJson(Map.of("error", "工具执行失败：" + e.getMessage()));
         }
+    }
+
+    // ============================================================
+    // list_controllers 执行
+    // ============================================================
+
+    private Map<String, Object> executeListControllers() {
+        List<OpenApiService.ControllerInfo> controllers = openApiService.listControllers();
+        if (controllers.isEmpty()) {
+            return Map.of("error", "无法获取模块列表，请检查 API 文档是否加载");
+        }
+
+        List<Map<String, Object>> list = controllers.stream()
+            .map(c -> {
+                Map<String, Object> m = new HashMap<>();
+                m.put("name", c.name());
+                m.put("description", c.description());
+                m.put("path_prefix", c.pathPrefix());
+                m.put("endpoints", c.endpoints());
+                return m;
+            })
+            .toList();
+
+        return Map.of(
+            "controllers", list,
+            "count", list.size(),
+            "hint", "选择一个模块，使用 list_endpoints 查看具体接口"
+        );
+    }
+
+    // ============================================================
+    // list_endpoints 执行
+    // ============================================================
+
+    private Map<String, Object> executeListEndpoints(Map<String, Object> input) {
+        String controller = (String) input.get("controller");
+        if (controller == null || controller.isBlank()) {
+            return Map.of("error", "controller 参数必填，请先使用 list_controllers 查看可用模块");
+        }
+
+        List<OpenApiService.EndpointInfo> endpoints = openApiService.listEndpoints(controller);
+        if (endpoints.isEmpty()) {
+            return Map.of(
+                "error", "未找到模块：" + controller,
+                "hint", "请使用 list_controllers 查看正确的模块名称"
+            );
+        }
+
+        List<Map<String, Object>> list = endpoints.stream()
+            .map(e -> {
+                Map<String, Object> m = new HashMap<>();
+                m.put("method", e.method());
+                m.put("path", e.path());
+                m.put("summary", e.summary());
+                return m;
+            })
+            .toList();
+
+        return Map.of(
+            "controller", controller,
+            "endpoints", list,
+            "count", list.size(),
+            "hint", "选择一个接口，使用 get_api_docs(path=...) 查看参数详情"
+        );
     }
 
     // ============================================================

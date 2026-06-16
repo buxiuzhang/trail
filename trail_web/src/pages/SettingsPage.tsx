@@ -32,6 +32,43 @@ export const DEFAULT_ASK_MAINTENANCE_PROMPT =
 export const DEFAULT_CHAT_PROMPT =
   '你是 Trail 工作日志助教。你帮助用户回顾工作进展、整理任务状态、回答关于工作日志的问题。回答使用中文，简洁、有条理，用第二人称（你/您）。回答可以适当使用条目列表，但不要用 Markdown 标题（#）。'
 
+export const DEFAULT_TOOLS_DESC = `你可以通过六个工具与 Trail 系统交互：
+
+**渐进式披露（推荐流程）**
+1. list_controllers() - 列出所有功能模块（Controller）
+   - 不确定有哪些功能时先调用，了解系统全貌
+   - 返回模块名称、描述、接口数量
+
+2. list_endpoints(controller) - 列出指定模块的所有接口
+   - 已确定模块后，查看具体有哪些操作
+   - 参数：controller 为模块名称（如"工作日志"、"待办事项"）
+
+3. get_api_docs(search?, path?) - 查询具体接口的参数详情
+   - 已确定接口后，查看参数定义
+   - path 参数获取接口详情，search 参数搜索接口
+
+4. call_api(method, path, ...) - 执行 API 调用
+   - GET 请求直接执行
+   - POST/PUT 需要 confirmed=true 才能执行
+   - 禁止执行 DELETE 请求
+
+5. export_daily_report(date?) - 导出今日工作日报
+
+6. export_weekly_report(start_date?, end_date?) - 导出本周工作周报
+
+**推荐流程**
+- 不熟悉系统：list_controllers → list_endpoints → get_api_docs → call_api
+- 熟悉系统：直接用 get_api_docs 搜索或 call_api 执行
+
+**时间相关查询**
+- 用户说"今日工作"、"今天做了什么" → 直接调用 export_daily_report
+- 用户说"本周工作"、"这周做了什么" → 直接调用 export_weekly_report
+
+**重要原则**
+- 用户看到的是标题，API 需要的是 ID，你负责转换
+- 禁止编造接口或参数
+- 写入操作必须用户确认`
+
 export const DEFAULT_MOTTO = '凡录入者，皆为正典。\n凡未录者，皆为虚构。'
 
 // 默认日报/周报模板
@@ -791,7 +828,24 @@ export function SettingsPage() {
             {/* 工具说明 */}
             <div className={styles.promptField}>
               <div className={styles.promptLabel}>
-                <span className={styles.promptName}>工具说明</span>
+                <span className={styles.promptName}>
+                  工具说明
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const ok = await confirm({
+                        level: 'moderate',
+                        title: '重置工具说明？',
+                        body: <p>将恢复为系统默认值，您的自定义内容将被覆盖。</p>,
+                        confirmLabel: '重置',
+                      })
+                      if (ok) setToolsDesc(DEFAULT_TOOLS_DESC)
+                    }}
+                    className={styles.resetBtn}
+                  >
+                    重置
+                  </button>
+                </span>
                 <button
                   type="button"
                   className={styles.modeToggle}
@@ -803,13 +857,12 @@ export function SettingsPage() {
               <p className={styles.promptDesc}>告诉 LLM 有哪些工具可用及如何使用</p>
               <div style={{ marginTop: '8px' }}>
                 <DescriptionEditorWithMode
-                  value={toolsDesc}
+                  value={toolsDesc || DEFAULT_TOOLS_DESC}
                   onChange={setToolsDesc}
                   mode={toolsDescMode}
                   onModeChange={setToolsDescMode}
                   minHeight={200}
                   textareaClassName="field__textarea"
-                  placeholder="描述 LLM 可用的工具及其使用方式。留空则使用内置默认说明。"
                   hideInlineToggle
                 />
               </div>

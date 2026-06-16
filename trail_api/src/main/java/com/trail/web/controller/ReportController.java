@@ -1,6 +1,9 @@
 package com.trail.web.controller;
 
 import com.trail.service.ReportExportService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -19,6 +22,7 @@ import java.time.LocalDate;
  */
 @RestController
 @RequestMapping("/api/reports")
+@Tag(name = "报告导出", description = "日报、周报的生成与导出")
 public class ReportController {
 
     private final ReportExportService exportService;
@@ -27,12 +31,10 @@ public class ReportController {
         this.exportService = exportService;
     }
 
-    /**
-     * 导出今日日报
-     * GET /api/reports/daily?date=2025-01-15
-     */
+    @Operation(summary = "导出今日日报", description = "根据日期导出工作日报，返回 Markdown 文件下载")
     @GetMapping("/daily")
     public ResponseEntity<Resource> exportDaily(
+        @Parameter(description = "日期，格式 YYYY-MM-DD，默认今天")
         @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate date
     ) {
         if (date == null) {
@@ -45,13 +47,12 @@ public class ReportController {
         return downloadResponse(content, filename);
     }
 
-    /**
-     * 导出本周周报
-     * GET /api/reports/weekly?start=2025-01-13&end=2025-01-19
-     */
+    @Operation(summary = "导出本周周报", description = "根据时间范围导出工作周报，返回 Markdown 文件下载")
     @GetMapping("/weekly")
     public ResponseEntity<Resource> exportWeekly(
+        @Parameter(description = "起始日期，格式 YYYY-MM-DD，默认本周一")
         @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate start,
+        @Parameter(description = "结束日期，格式 YYYY-MM-DD，默认今天")
         @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate end
     ) {
         if (start == null) {

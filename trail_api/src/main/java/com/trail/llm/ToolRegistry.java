@@ -19,6 +19,8 @@ public class ToolRegistry {
     public ToolRegistry(ObjectMapper mapper) {
         this.mapper = mapper;
         this.tools = List.of(
+            listControllers(),
+            listEndpoints(),
             getApiDocs(),
             callApi(),
             exportDailyReport(),
@@ -39,6 +41,36 @@ public class ToolRegistry {
     // ============================================================
 
     /**
+     * 列出所有 Controller（模块）
+     * 第一层：帮助 LLM 定位到正确的模块
+     */
+    private Tool listControllers() {
+        ObjectNode props = mapper.createObjectNode();
+        return new Tool(
+            "list_controllers",
+            "列出 Trail 系统的所有功能模块（Controller）。用于了解系统有哪些功能，如'任务管理'、'工作日志'、'待办事项'等。",
+            new Tool.InputSchema("object", props, null)
+        );
+    }
+
+    /**
+     * 列出指定 Controller 的所有接口
+     * 第二层：缩小搜索范围
+     */
+    private Tool listEndpoints() {
+        ObjectNode props = mapper.createObjectNode();
+        props.set("controller", mapper.createObjectNode()
+            .put("type", "string")
+            .put("description", "Controller 名称，如'工作日志'、'任务管理'"));
+
+        return new Tool(
+            "list_endpoints",
+            "列出指定功能模块（Controller）下的所有接口。用于查看某个模块有哪些操作，如'工作日志'模块包括添加、查询、编辑、删除日志等接口。",
+            new Tool.InputSchema("object", props, List.of("controller"))
+        );
+    }
+
+    /**
      * 查询 API 文档
      */
     private Tool getApiDocs() {
@@ -52,7 +84,7 @@ public class ToolRegistry {
 
         return new Tool(
             "get_api_docs",
-            "查询 Trail 系统的 API 文档。可传入关键词搜索相关接口，或查询具体端点的参数定义。",
+            "查询具体接口的参数详情。传入 path 参数获取接口的完整参数定义，包括 path 参数、query 参数、request body 等。",
             new Tool.InputSchema("object", props, null)
         );
     }

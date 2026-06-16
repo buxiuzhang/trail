@@ -2,6 +2,8 @@ package com.trail.web.controller;
 
 import com.trail.config.DataDirService;
 import com.trail.web.dto.DbSettingsDto;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -11,14 +13,11 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.Map;
 
 /**
- * 数据源信息查询（M8 简化版）。
- *
- * GET /api/settings/db：返回当前数据目录 + backend（固定 "sqlite"）。前端兼容用。
- * PUT /api/settings/db：M8 不再支持切换 backend（固定 SQLite；切路径走 PUT /api/settings/data-dir）。
- *   返 410 Gone 提示。
+ * 数据源信息查询
  */
 @RestController
 @RequestMapping("/api/settings/db")
+@Tag(name = "数据库设置", description = "数据源路径信息")
 public class DbSettingsController {
 
     private final DataDirService dataDir;
@@ -27,6 +26,7 @@ public class DbSettingsController {
         this.dataDir = dataDir;
     }
 
+    @Operation(summary = "获取数据库信息", description = "获取当前 SQLite 数据库路径")
     @GetMapping
     public DbSettingsDto get() {
         String absPath = dataDir.currentDbPath() == null ? null : dataDir.currentDbPath().toString();
@@ -38,6 +38,7 @@ public class DbSettingsController {
         );
     }
 
+    @Operation(summary = "切换数据库（已废弃）", description = "M8 起固定使用 SQLite，请用 /api/settings/data-dir 切换路径")
     @org.springframework.web.bind.annotation.PutMapping
     public Map<String, Object> save(@org.springframework.web.bind.annotation.RequestBody Map<String, Object> body) {
         throw new ResponseStatusException(HttpStatus.GONE,

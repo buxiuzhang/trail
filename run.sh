@@ -68,7 +68,19 @@ start_api() {
 
     # 检查 jar 是否存在
     JAR_FILE="trail_api/target/trail-api.jar"
+
+    # 检查源文件是否有更新（比 jar 新）
+    NEED_BUILD=false
     if [ ! -f "$JAR_FILE" ]; then
+        NEED_BUILD=true
+    else
+        # 检查是否有比 jar 更新的源文件
+        if find trail_api/src -name "*.java" -newer "$JAR_FILE" | grep -q .; then
+            NEED_BUILD=true
+        fi
+    fi
+
+    if [ "$NEED_BUILD" = true ]; then
         log_info "编译 API 后端..."
         cd trail_api
         mvn clean package -DskipTests -q

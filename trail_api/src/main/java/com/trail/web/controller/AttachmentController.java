@@ -2,6 +2,9 @@ package com.trail.web.controller;
 
 import com.trail.store.AttachmentStore;
 import com.trail.web.dto.AttachmentResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -13,17 +16,11 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 附件上传 / 下载 / 更新 / 引用追踪 / 删除（M10 + M11）。
- *
- * 端点：
- *   POST   /api/attachments            上传
- *   GET    /api/attachments/{id}       流式返图
- *   PUT    /api/attachments/{id}       更新 displaySize（范围 1-100）
- *   GET    /api/attachments/{id}/references  反查引用此图的 5 字段位置
- *   DELETE /api/attachments/{id}       删除（>0 引用返 409）
+ * 附件上传 / 下载 / 更新 / 引用追踪 / 删除
  */
 @RestController
 @RequestMapping("/api/attachments")
+@Tag(name = "附件管理", description = "图片等附件的上传、下载、更新、删除")
 public class AttachmentController {
 
     private final AttachmentStore store;
@@ -32,13 +29,15 @@ public class AttachmentController {
         this.store = store;
     }
 
+    @Operation(summary = "上传附件", description = "上传图片等文件，返回附件 ID 和访问路径")
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public AttachmentResponse upload(@RequestParam("file") MultipartFile file) {
+    public AttachmentResponse upload(@Parameter(description = "文件") @RequestParam("file") MultipartFile file) {
         return AttachmentResponse.from(store.save(file));
     }
 
+    @Operation(summary = "下载附件", description = "获取附件二进制内容，用于图片显示")
     @GetMapping("/{id}")
-    public ResponseEntity<FileSystemResource> serve(@PathVariable long id) {
+    public ResponseEntity<FileSystemResource> serve(@Parameter(description = "附件 ID") @PathVariable long id) {
         AttachmentStore.Loaded f = store.load(id);
         MediaType ct;
         try {
@@ -51,14 +50,15 @@ public class AttachmentController {
                 .body(new FileSystemResource(f.absolutePath()));
     }
 
-    /** 拿 attachment 元信息（JSON 形态）。与 GET /{id} 的二进制流分开。 */
+    @Operation(summary = "获取附件元信息", description = "获取附件的 JSON 元数据")
     @GetMapping("/{id}/meta")
-    public AttachmentResponse meta(@PathVariable long id) {
+    public AttachmentResponse meta(@Parameter(description = "附件 ID") @PathVariable long id) {
         return AttachmentResponse.from(store.get(id));
     }
 
+    @Operation(summary = "更新附件显示尺寸", description = "设置附件在描述中的显示宽度百分比（1-100）")
     @PutMapping("/{id}")
-    public AttachmentResponse update(@PathVariable long id, @RequestBody UpdateRequest body) {
+    public AttachmentResponse update(@Parameter(description = "附件 ID") @PathVariable long id, @RequestBody UpdateRequest body) {
         if (body == null || body.getDisplaySize() == null) {
             throw new IllegalArgumentException("displaySize 必填");
         }
@@ -69,15 +69,16 @@ public class AttachmentController {
         return AttachmentResponse.from(store.updateSize(id, size));
     }
 
+    @Operation(summary = "查询附件引用", description = "反查此附件被哪些任务/日志引用")
     @GetMapping("/{id}/references")
-    public List<ReferenceDto> references(@PathVariable long id) {
-        // 先确认 id 存在（不存在直接 404）
+    public List<ReferenceDto> references(@Parameter(description = "附件 ID") @PathVariable long id) {
         store.get(id);
         return store.findReferences(id).stream().map(ReferenceDto::from).toList();
     }
 
+    @Operation(summary = "删除附件", description = "删除附件（有引用时返回 409 冲突）")
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> delete(@PathVariable long id) {
+    public ResponseEntity<?> delete(@Parameter(description = "附件 ID") @PathVariable long id) {
         List<AttachmentStore.Reference> refs = store.findReferences(id);
         if (!refs.isEmpty()) {
             List<ReferenceDto> dtos = refs.stream().map(ReferenceDto::from).toList();
@@ -92,8 +93,6 @@ public class AttachmentController {
     }
 
     public static class UpdateRequest {
-        // 入参字段名锁定 displaySize（绕开 JacksonConfig 的 SNAKE_CASE 全局策略，
-        // 保证 PUT /api/attachments/{id} 的 body 字段名稳定）
         @com.fasterxml.jackson.annotation.JsonProperty("displaySize")
         private Integer displaySize;
         public Integer getDisplaySize() { return displaySize; }
