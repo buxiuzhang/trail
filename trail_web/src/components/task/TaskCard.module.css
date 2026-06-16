@@ -156,6 +156,7 @@
   font-feature-settings: "tnum";
   color: var(--ink-ghost);
   white-space: nowrap;
+  padding-left: 6px;            /* 与待办列表缩进对齐 */
 }
 
 /* 置顶按钮 —— 位于卡片左上角 */
