@@ -200,6 +200,16 @@ public class TaskStore {
     // 创建
     // ============================================================
 
+    /** 清理标签：去除首尾空白 + 不可见特殊字符（零宽空格等） */
+    private static List<String> cleanTags(List<String> tags) {
+        if (tags == null) return List.of();
+        // 匹配零宽字符：U+200B-U+200D (零宽空格/非连接符/连接符) + U+FEFF (BOM)
+        return tags.stream()
+                .map(t -> t.replaceAll("^[\\u200B-\\u200D\\uFEFF\\s]+|[\\u200B-\\u200D\\uFEFF\\s]+$", "").trim())
+                .filter(t -> !t.isEmpty())
+                .toList();
+    }
+
     public Map<String, Object> createTask(
             String title, String nature, String alias, String description,
             LocalDate startDate, LocalDate processingDate, String status, List<String> tags) {
@@ -231,7 +241,7 @@ public class TaskStore {
             processingDate,
             status,
             nature,
-            tags == null ? List.of() : tags
+            cleanTags(tags)
         );
         if (newId == null) throw new StoreError("创建任务失败");
         return getTask(newId);
@@ -262,6 +272,12 @@ public class TaskStore {
         }
         if (fields.containsKey("nature") && !TASK_NATURES.contains((String) fields.get("nature"))) {
             throw new StoreError("非法性质：" + fields.get("nature"));
+        }
+        // 清理标签
+        if (fields.containsKey("tags") && fields.get("tags") instanceof List<?> list) {
+            @SuppressWarnings("unchecked")
+            List<String> rawTags = (List<String>) list;
+            fields.put("tags", cleanTags(rawTags));
         }
 
         if (fields.isEmpty()) return getTask(taskId);

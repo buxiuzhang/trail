@@ -117,7 +117,10 @@ export function TaskForm({ mode, task }: TaskFormProps) {
 
     // 过滤空联系人行
     const validContacts = contacts.filter(c => c.name.trim())
-    const tags = tagsStr.split(/[,，、\s]+/).map(s => s.trim()).filter(Boolean)
+    // 清理标签：去除首尾空白 + 不可见特殊字符（零宽空格、零宽非连接符等）
+    const tags = tagsStr.split(/[,，、\s]+/)
+      .map(s => s.replace(/^[​-‍﻿\s]+|[​-‍﻿\s]+$/g, '').trim())
+      .filter(Boolean)
 
     setSubmitting(true)
     try {
