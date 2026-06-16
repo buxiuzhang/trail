@@ -64,13 +64,14 @@ export interface TaskOut {
   created_at: string | null;
   updated_at: string | null;
   last_log_date: string | null;  // 派生：未软删日志 max(log_date)
-  // 5 聚合字段（store 层 LEFT JOIN + SUM 派生，避免 N+1）
+  // 6 聚合字段（store 层 LEFT JOIN + SUM 派生，避免 N+1）
   // 后端 Jackson 全局 SNAKE_CASE → 前端历来用 snake_case 接收
   todo_active_count: number;
   todo_completed_count: number;
   todo_abandoned_count: number;
   log_count: number;          // 未软删 work_logs 总数
   log_main_count: number;     // 未软删且 phase='main' 的 work_logs 数
+  total_hours: number;        // 未软删 work_logs 的 hours 总和
   contacts: ContactOut[];
 }
 

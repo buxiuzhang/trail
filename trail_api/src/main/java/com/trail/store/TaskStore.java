@@ -42,9 +42,9 @@ public class TaskStore {
     }
 
     /**
-     * 完整筛选 + 分页 + 5 聚合字段：
+     * 完整筛选 + 分页 + 6 聚合字段：
      *   todo_active_count / todo_completed_count / todo_abandoned_count
-     *   log_count / log_main_count
+     *   log_count / log_main_count / total_hours
      * 派生自 LEFT JOIN 子查询（与现有 last_log_date 派生风格一致）。
      */
     public List<Map<String, Object>> listTasksPaged(
@@ -58,14 +58,15 @@ public class TaskStore {
           + " AND start_date IS NOT NULL AND start_date < date('now', '-30 days')",
             "长期", "临时", "已完成", "已作废");
 
-        // 2) 主 SQL：派生 last_log_date + 5 聚合
+        // 2) 主 SQL：派生 last_log_date + 6 聚合
         StringBuilder sql = new StringBuilder("""
             SELECT t.*, sub.last_log_date,
               COALESCE(todo_sub.todo_active_count, 0) AS todo_active_count,
               COALESCE(todo_sub.todo_completed_count, 0) AS todo_completed_count,
               COALESCE(todo_sub.todo_abandoned_count, 0) AS todo_abandoned_count,
               COALESCE(log_sub.log_count, 0) AS log_count,
-              COALESCE(log_sub.log_main_count, 0) AS log_main_count
+              COALESCE(log_sub.log_main_count, 0) AS log_main_count,
+              COALESCE(log_sub.total_hours, 0.0) AS total_hours
             FROM tasks t
             LEFT JOIN (
                 SELECT task_id, MAX(log_date) AS last_log_date
@@ -83,7 +84,8 @@ public class TaskStore {
             LEFT JOIN (
                 SELECT task_id,
                   SUM(CASE WHEN is_deleted = 0 THEN 1 ELSE 0 END) AS log_count,
-                  SUM(CASE WHEN is_deleted = 0 AND phase = 'main' THEN 1 ELSE 0 END) AS log_main_count
+                  SUM(CASE WHEN is_deleted = 0 AND phase = 'main' THEN 1 ELSE 0 END) AS log_main_count,
+                  SUM(CASE WHEN is_deleted = 0 THEN hours ELSE 0 END) AS total_hours
                 FROM work_logs
                 GROUP BY task_id
             ) log_sub ON log_sub.task_id = t.id
@@ -164,7 +166,8 @@ public class TaskStore {
               COALESCE(todo_sub.todo_completed_count, 0) AS todo_completed_count,
               COALESCE(todo_sub.todo_abandoned_count, 0) AS todo_abandoned_count,
               COALESCE(log_sub.log_count, 0) AS log_count,
-              COALESCE(log_sub.log_main_count, 0) AS log_main_count
+              COALESCE(log_sub.log_main_count, 0) AS log_main_count,
+              COALESCE(log_sub.total_hours, 0.0) AS total_hours
             FROM tasks t
             LEFT JOIN (
                 SELECT task_id, MAX(log_date) AS last_log_date
@@ -182,7 +185,8 @@ public class TaskStore {
             LEFT JOIN (
                 SELECT task_id,
                   SUM(CASE WHEN is_deleted = 0 THEN 1 ELSE 0 END) AS log_count,
-                  SUM(CASE WHEN is_deleted = 0 AND phase = 'main' THEN 1 ELSE 0 END) AS log_main_count
+                  SUM(CASE WHEN is_deleted = 0 AND phase = 'main' THEN 1 ELSE 0 END) AS log_main_count,
+                  SUM(CASE WHEN is_deleted = 0 THEN hours ELSE 0 END) AS total_hours
                 FROM work_logs
                 GROUP BY task_id
             ) log_sub ON log_sub.task_id = t.id

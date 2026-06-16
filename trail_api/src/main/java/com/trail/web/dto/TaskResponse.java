@@ -4,7 +4,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 
-/** 任务对外响应。包含 lastLogDate（store 层 LEFT JOIN 派生）+ 5 个聚合计数（store 层 LEFT JOIN + SUM 派生）+ contacts 列表。 */
+/** 任务对外响应。包含 lastLogDate（store 层 LEFT JOIN 派生）+ 6 个聚合计数（store 层 LEFT JOIN + SUM 派生）+ contacts 列表。 */
 public record TaskResponse(
         Long id,
         String title,
@@ -29,5 +29,6 @@ public record TaskResponse(
         int todoAbandonedCount,
         int logCount,
         int logMainCount,
+        Double totalHours,
         List<ContactDto> contacts
 ) {}

@@ -52,6 +52,30 @@ function daysSince(dateStr: string | null): number | null {
   return Math.floor(days)
 }
 
+/** 工时换算：8h=1天、40h=1周、176h(22*8)=1月 */
+function formatHours(hours: number): string {
+  if (!hours || hours <= 0) return '—'
+  const MONTH_HOURS = 22 * 8   // 176
+  const WEEK_HOURS = 40
+  const DAY_HOURS = 8
+
+  const months = Math.floor(hours / MONTH_HOURS)
+  const rem1 = hours % MONTH_HOURS
+  const weeks = Math.floor(rem1 / WEEK_HOURS)
+  const rem2 = rem1 % WEEK_HOURS
+  const days = Math.floor(rem2 / DAY_HOURS)
+  const remainHours = Math.round(rem2 % DAY_HOURS)
+
+  // 优先级：月 > 周 > 天 > 小时
+  const parts: string[] = []
+  if (months) parts.push(`${months} 月`)
+  if (weeks) parts.push(`${weeks} 周`)
+  if (days) parts.push(`${days} 天`)
+  if (remainHours && !months) parts.push(`${remainHours} 小时`)  // 小时只在没月时显示
+
+  return parts.join(' ') || '—'
+}
+
 const NATURE_EN: Record<string, string> = {
   '长期': 'long-term',
   '临时': 'ad-hoc',
@@ -102,6 +126,9 @@ export function TaskCard({ task, logCount = 0, logMainCount = 0 }: TaskCardProps
   const idle = lastDate ? daysSince(lastDate) : null
   const idleLabel = idle != null ? `${idle} 天` : '—'
 
+  // 总工时换算
+  const hoursLabel = formatHours(task.total_hours)
+
   return (
     <div className={styles.cardWrap}>
       <span
@@ -137,6 +164,10 @@ export function TaskCard({ task, logCount = 0, logMainCount = 0 }: TaskCardProps
           <span className={styles.catLabel}>
             {task.nature} · {NATURE_EN[task.nature] || task.nature}
           </span>
+          <div className={styles.hoursBlock}>
+            <span className={styles.hoursTitle}>任务总工时</span>
+            <span className={styles.hoursValue}>{hoursLabel}</span>
+          </div>
           <div className={styles.todoBlock}>
             <span className={styles.todoTitle}>待办事项</span>
             <ul className={styles.todoList}>
