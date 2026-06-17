@@ -1,7 +1,7 @@
 /**
  * MarkdownRenderer · 只读 markdown 渲染器
  *
- * 复用 Milkdown Crepe 的渲染能力,但禁用编辑功能。
+ * 复用 TipTap 的渲染能力,但禁用编辑功能。
  * 用于日志/描述等只读展示场景,保持与编辑器一致的视觉效果。
  *
  * 与 RichText 的关系:
@@ -12,11 +12,11 @@
  *   <MarkdownRenderer text={log.content} className={styles.content} />
  */
 import { useEffect, useRef } from 'react'
-import { CrepeBuilder } from '@milkdown/crepe'
-import { placeholder as placeholderFeature } from '@milkdown/crepe/feature/placeholder'
-import { listItem } from '@milkdown/crepe/feature/list-item'
+import { EditorContent, useEditor } from '@tiptap/react'
+import StarterKit from '@tiptap/starter-kit'
+import Image from '@tiptap/extension-image'
+import { Markdown } from '@tiptap/markdown'
 import styles from './MarkdownRenderer.module.css'
-import '@milkdown/crepe/theme/common/style.css'
 
 interface MarkdownRendererProps {
   text: string | null | undefined
@@ -25,58 +25,42 @@ interface MarkdownRendererProps {
 
 export function MarkdownRenderer({ text, className }: MarkdownRendererProps) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const crepeRef = useRef<CrepeBuilder | null>(null)
-  const initRef = useRef(false)
 
-  useEffect(() => {
-    if (!text || initRef.current) return
-    initRef.current = true
-
-    const container = containerRef.current
-    if (!container) {
-      initRef.current = false
-      return
-    }
-
-    const crepe = new CrepeBuilder({
-      root: container,
-      defaultValue: text,
-    })
-      .addFeature(placeholderFeature, { text: '', mode: 'doc' })
-      .addFeature(listItem)
-
-    crepe.create().then(() => {
-      crepeRef.current = crepe
-      // 设置为只读模式
-      crepe.setReadonly(true)
-    }).catch(() => undefined)
-
-    return () => {
-      void crepe.destroy().catch(() => undefined)
-      crepeRef.current = null
-      container.innerHTML = ''
-      initRef.current = false
-    }
-  }, [text])
+  const editor = useEditor({
+    extensions: [
+      StarterKit.configure({
+        heading: { levels: [1, 2, 3] },
+        link: {
+          openOnClick: true,
+          HTMLAttributes: { class: 'tiptap-link' },
+        },
+      }),
+      Image.configure({
+        inline: true,
+        allowBase64: false,
+        HTMLAttributes: { class: 'tiptap-image' },
+      }),
+      Markdown.configure({
+        html: false,
+        breaks: true,
+      }),
+    ],
+    content: text ?? '',
+    contentType: 'markdown',
+    editable: false,
+  })
 
   // text 变化时更新内容
   useEffect(() => {
-    if (!crepeRef.current || !text) return
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (crepeRef.current as any).editor?.action?.((ctx: any) => {
-      const editor = ctx?.editor
-      if (editor) {
-        editor.commands.replaceAll(text)
-      }
-    })
-  }, [text])
+    if (!editor || !text) return
+    editor.commands.setContent(text, { contentType: 'markdown' })
+  }, [editor, text])
 
   if (!text) return null
 
   return (
-    <div
-      ref={containerRef}
-      className={`${styles.renderer} ${className ?? ''}`}
-    />
+    <div ref={containerRef} className={`${styles.renderer} ${className ?? ''}`}>
+      {editor && <EditorContent editor={editor} />}
+    </div>
   )
 }

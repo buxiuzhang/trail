@@ -1,21 +1,16 @@
 /**
- * DescriptionEditor · 基于 Milkdown Crepe 的 Markdown WYSIWYG 编辑器
+ * DescriptionEditor · 基于 TipTap 的 Markdown WYSIWYG 编辑器
  *
  * 设计原则：
- *   - 外部 props / ref 与旧 textarea+mirror 版本**完全一致**：3 个调用点零改动
- *   - 内部用 Crepe 接管：所见即所得编辑 / 图片粘贴 / ProseMirror 撤销栈
- *   - 图片交互（25/50/75/100 缩放 + 删除 + 409 引用提示）保留，
- *     通过容器 mouseover 监听 + Portal 浮层实现，不 hack Crepe NodeView
+ *   - 外部 props / ref 与旧版本**完全一致**：调用点零改动
+ *   - 内部用 TipTap 接管：所见即所得编辑 / 图片粘贴 / @ 提及
+ *   - 图片交互（25/50/75/100 缩放 + 删除）通过 Portal 浮层实现
+ *   - @ 提及使用 TipTap 官方 Mention 扩展，直接插入 markdown 格式
  *
  * 关键不变量：
- *   - value 同步：lastEmittedRef 防循环 + pendingValueRef 处理 create() 未 resolve
- *   - ref 兼容：useImperativeHandle 返回 Proxy adapter，.focus() 委托 ProseMirror
+ *   - value 同步：lastEmittedRef 防循环
+ *   - ref 兼容：useImperativeHandle 返回 adapter，.focus() 委托 TipTap
  *   - 全局 .logbook textarea 选择器：内部 hidden textarea（视觉隐藏，DOM 存在）
- *   - StrictMode 双 effect：DOM 元素 __milkdownCrepeInit__ 同步标记，cleanup 不清
- *
- * 故意不做：
- *   - 不引新 UI 库（确认弹窗走 useModalContext.openModal）
- *   - 不写裸 fetch（上传走 useUploadAttachment.mutateAsync）
  */
 import {
   forwardRef,
@@ -28,13 +23,12 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 import { useQueries } from '@tanstack/react-query'
-import { CrepeBuilder } from '@milkdown/crepe'
-import { placeholder as placeholderFeature } from '@milkdown/crepe/feature/placeholder'
-import { cursor } from '@milkdown/crepe/feature/cursor'
-import { listItem } from '@milkdown/crepe/feature/list-item'
-import { linkTooltip } from '@milkdown/crepe/feature/link-tooltip'
-import { imageBlock } from '@milkdown/crepe/feature/image-block'
-import { replaceAll } from '@milkdown/kit/utils'
+import { useEditor, EditorContent } from '@tiptap/react'
+import StarterKit from '@tiptap/starter-kit'
+import Image from '@tiptap/extension-image'
+import Placeholder from '@tiptap/extension-placeholder'
+import Mention from '@tiptap/extension-mention'
+import { Markdown } from '@tiptap/markdown'
 import {
   useUploadAttachment,
   useUpdateAttachment,
@@ -44,18 +38,20 @@ import {
 import { useToastContext } from '@/context/ToastContext'
 import { useModalContext } from '@/context/ModalContext'
 import { extractImageRefs } from './richtext-utils'
+import type { TodoOut } from '@/types'
 import styles from './DescriptionEditor.module.css'
-import '@milkdown/crepe/theme/common/style.css'
 
 interface DescriptionEditorProps {
   value: string
   onChange: (v: string) => void
   placeholder?: string
-  /** 保留 prop（textarea 时代的语义，Milkdown 静默忽略） */
+  /** 保留 prop（textarea 时代的语义，TipTap 静默忽略） */
   rows?: number
   minHeight?: number
-  /** 透传给 Milkdown 容器 div 的额外 className（如 "field__textarea"） */
+  /** 透传给容器 div 的额外 className（如 "field__textarea"） */
   textareaClassName?: string
+  /** 当前任务的待办列表（用于 @ 提及） */
+  todos?: TodoOut[]
 }
 
 // 4 档尺寸预设
@@ -66,25 +62,34 @@ export const DescriptionEditor = forwardRef<HTMLTextAreaElement, DescriptionEdit
     value,
     onChange,
     placeholder,
-    rows: _rows = 4, // 保留参数，Milkdown 无行数概念
+    rows: _rows = 4,
     minHeight = 120,
     textareaClassName = 'field__textarea',
+    todos = [],
   },
   ref,
 ) {
+
+  void _rows
   const editorRootRef = useRef<HTMLDivElement>(null)
   const hiddenTaRef = useRef<HTMLTextAreaElement>(null)
-  const crepeRef = useRef<CrepeBuilder | null>(null)
-  const onChangeRef = useRef(onChange)
-
-  // value 同步：lastEmittedRef 跟踪最近一次编辑器吐出的 markdown，
-  // useEffect([value]) 用它防循环（onChange → setValue → useEffect → replaceAll → 回调）
   const lastEmittedRef = useRef<string>(value)
-  // create() 异步未完成时缓存外部 value，resolve 后 flush
-  const pendingValueRef = useRef<string | null>(null)
+  const onChangeRef = useRef(onChange)
+  const isInitializedRef = useRef(false)
 
-  // 保持 onChange 引用最新
-  onChangeRef.current = onChange
+  // 保持 onChange 引用最新（用 useEffect 避免 render 期间修改 ref）
+  useEffect(() => {
+    onChangeRef.current = onChange
+  }, [onChange])
+
+  // 标记初始化完成
+  useEffect(() => {
+    // 使用 queueMicrotask 确保在当前渲染周期完成后标记初始化
+    const id = requestAnimationFrame(() => {
+      isInitializedRef.current = true
+    })
+    return () => cancelAnimationFrame(id)
+  }, [])
 
   // hooks
   const upload = useUploadAttachment()
@@ -120,7 +125,177 @@ export const DescriptionEditor = forwardRef<HTMLTextAreaElement, DescriptionEdit
     return m
   }, [refIds, sizeQueries])
 
-  // 上传闭包：复用 useUploadAttachment 的错误处理
+  // @ 提及候选浮层状态
+  const [mentionState, setMentionState] = useState<{
+    active: boolean
+    query: string
+    items: TodoOut[]
+    selectedIndex: number
+    position: { top: number; left: number }
+    command?: (item: TodoOut) => void
+  }>({
+    active: false,
+    query: '',
+    items: [],
+    selectedIndex: 0,
+    position: { top: 0, left: 0 },
+  })
+
+  // TipTap 编辑器初始化
+  const editor = useEditor({
+    extensions: [
+      StarterKit.configure({
+        heading: { levels: [1, 2, 3] },
+        link: {
+          openOnClick: false,
+          HTMLAttributes: { class: 'tiptap-link' },
+        },
+      }),
+      Image.configure({
+        inline: true,
+        allowBase64: false,
+        HTMLAttributes: { class: 'tiptap-image' },
+      }),
+      Placeholder.configure({
+        placeholder: placeholder ?? '',
+      }),
+      Markdown.configure({
+        html: false, // 禁用 HTML 标签
+        breaks: true, // 单个换行符转换为 <br>
+      }),
+      Mention.configure({
+        HTMLAttributes: { class: 'mention-todo' },
+        suggestion: {
+          items: ({ query }) =>
+            todos.filter(
+              (t) =>
+                !t.is_completed &&
+                !t.is_abandoned &&
+                t.title.toLowerCase().includes(query.toLowerCase()),
+            ),
+          render: () => {
+
+            return {
+              onStart: (props) => {
+                const rect = props.clientRect?.()
+                if (!rect) return
+                setMentionState({
+                  active: true,
+                  query: props.query,
+                  items: props.items,
+                  selectedIndex: 0,
+                  position: { top: rect.bottom, left: rect.left },
+                  command: (item: TodoOut) => {
+                    props.command({ id: String(item.id), label: item.title })
+                  },
+                })
+              },
+              onUpdate: (props) => {
+                const rect = props.clientRect?.()
+                if (!rect) return
+                setMentionState((prev) => ({
+                  ...prev,
+                  active: true,
+                  query: props.query,
+                  items: props.items,
+                  selectedIndex: 0,
+                  position: { top: rect.bottom, left: rect.left },
+                  command: (item: TodoOut) => {
+                    props.command({ id: String(item.id), label: item.title })
+                  },
+                }))
+              },
+              onKeyDown: (props) => {
+                if (props.event.key === 'Escape') {
+                  setMentionState((prev) => ({ ...prev, active: false }))
+                  return true
+                }
+                if (props.event.key === 'ArrowDown') {
+                  setMentionState((prev) => ({
+                    ...prev,
+                    selectedIndex: Math.min(
+                      prev.selectedIndex + 1,
+                      prev.items.length - 1,
+                    ),
+                  }))
+                  return true
+                }
+                if (props.event.key === 'ArrowUp') {
+                  setMentionState((prev) => ({
+                    ...prev,
+                    selectedIndex: Math.max(prev.selectedIndex - 1, 0),
+                  }))
+                  return true
+                }
+                if (props.event.key === 'Enter') {
+                  const item = mentionState.items[mentionState.selectedIndex]
+                  if (item && mentionState.command) {
+                    mentionState.command(item)
+                    setMentionState((prev) => ({ ...prev, active: false }))
+                  }
+                  return true
+                }
+                return false
+              },
+              onExit: () => {
+                setMentionState((prev) => ({ ...prev, active: false }))
+              },
+            }
+          },
+        },
+      }),
+    ],
+    content: value,
+    contentType: 'markdown',
+    onUpdate: ({ editor }) => {
+      // 使用 @tiptap/markdown 提供的 getMarkdown() 方法
+      const md = editor.getMarkdown()
+      lastEmittedRef.current = md
+      if (hiddenTaRef.current) hiddenTaRef.current.value = md
+      // 只在初始化完成后才通知父组件，避免在渲染期间更新状态
+      if (isInitializedRef.current) {
+        queueMicrotask(() => {
+          onChangeRef.current(md)
+        })
+      }
+    },
+    editorProps: {
+      handlePaste: (view, event) => {
+        const items = event.clipboardData?.items
+        if (!items) return false
+
+        for (const item of items) {
+          if (item.type.startsWith('image/')) {
+            const file = item.getAsFile()
+            if (file) {
+              event.preventDefault()
+              uploadImage(file).then((url) => {
+                editor?.chain().focus().setImage({ src: url }).run()
+              })
+              return true
+            }
+          }
+        }
+        return false
+      },
+    },
+  })
+
+  // 更新编辑器内容（当外部 value 变化时）
+  useEffect(() => {
+    if (!editor) return
+    // 防止循环：如果当前内容与 value 相同，跳过
+    const currentMd = editor.getMarkdown()
+    if (value === currentMd) return
+    if (value === lastEmittedRef.current) return
+
+    // 使用 setContent 更新内容，指定 contentType 为 markdown
+    editor.commands.setContent(value, { contentType: 'markdown' })
+    lastEmittedRef.current = value
+    if (hiddenTaRef.current) hiddenTaRef.current.value = value
+  }, [editor, value])
+
+  // 上传图片
   const uploadImage = useCallback(
     async (file: File): Promise<string> => {
       try {
@@ -135,95 +310,18 @@ export const DescriptionEditor = forwardRef<HTMLTextAreaElement, DescriptionEdit
     [upload, showToast],
   )
 
-  // Crepe 初始化 effect（仅挂载一次）
-  // StrictMode 双 effect 处理：useRef 同步标记（cleanup 重置，让第二次 effect 重新初始化），
-  // 不挂在 DOM 上 —— DOM 标记会被 cleanup 的 innerHTML='' 清掉导致 race
-  const initRef = useRef(false)
-
-  useEffect(() => {
-    if (initRef.current) return
-    initRef.current = true
-
-    const container = editorRootRef.current
-    if (!container) {
-      initRef.current = false // 让下次 effect 重试
-      return
-    }
-
-    const crepe = new CrepeBuilder({
-      root: container,
-      defaultValue: value,
-    })
-      .addFeature(placeholderFeature, { text: placeholder ?? '', mode: 'doc' })
-      .addFeature(cursor)
-      .addFeature(listItem)
-      .addFeature(linkTooltip)
-      .addFeature(imageBlock, {
-        onUpload: uploadImage,
-        inlineOnUpload: uploadImage,
-        blockOnUpload: uploadImage,
-      })
-      .on((api) => {
-        api.markdownUpdated((_ctx, md) => {
-          lastEmittedRef.current = md
-          if (hiddenTaRef.current) hiddenTaRef.current.value = md
-          onChangeRef.current(md)
-        })
-      })
-
-    crepe.create().then(() => {
-      crepeRef.current = crepe
-      // flush create() 期间缓存的 value
-      if (
-        pendingValueRef.current != null &&
-        pendingValueRef.current !== lastEmittedRef.current
-      ) {
-        const v = pendingValueRef.current
-        crepe.editor.action(replaceAll(v))
-        lastEmittedRef.current = v
-        pendingValueRef.current = null
-      }
-    }).catch(() => undefined)
-
-    return () => {
-      // destroy 可能已初始化的编辑器
-      void crepe.destroy().catch(() => undefined)
-      crepeRef.current = null
-      container.innerHTML = ''
-      // 重置 initRef：让 StrictMode 第二次 effect 或真实重挂载可以重新初始化
-      initRef.current = false
-    }
-  }, []) // 空依赖，仅挂载
-
-  // value prop 变化时同步进编辑器
-  useEffect(() => {
-    // 与上次 emit 一致，无需操作（onChange 回调循环场景）
-    if (value === lastEmittedRef.current) return
-    if (crepeRef.current) {
-      crepeRef.current.editor.action(replaceAll(value))
-      lastEmittedRef.current = value
-    } else {
-      // create() 还没 resolve，缓存
-      pendingValueRef.current = value
-    }
-    if (hiddenTaRef.current) hiddenTaRef.current.value = value
-  }, [value])
-
-  // ref 兼容：返回 Proxy adapter 伪造 HTMLTextAreaElement，
-  // 外部 .focus() 委托给 ProseMirror
+  // ref 兼容
   useImperativeHandle(
     ref,
     () => {
       const adapter = {
         focus: () => {
-          const pm = editorRootRef.current?.querySelector<HTMLElement>('.ProseMirror')
-          if (pm) pm.focus()
-          else hiddenTaRef.current?.focus()
+          editor?.commands.focus()
         },
       }
       return adapter as unknown as HTMLTextAreaElement
     },
-    [],
+    [editor],
   )
 
   // 图片尺寸变化
@@ -233,7 +331,10 @@ export const DescriptionEditor = forwardRef<HTMLTextAreaElement, DescriptionEdit
 
   // 图片删除
   function handleDeleteClick(id: number) {
-    const refMarkdown = new RegExp(`!\\[[^\\]]*\\]\\(/api/attachments/${id}\\)`, 'g')
+    const refMarkdown = new RegExp(
+      `!\\[[^\\]]*\\]\\(/api/attachments/${id}\\)`,
+      'g',
+    )
     openModal({
       eyebrow: '图片',
       title: '删除图片',
@@ -246,7 +347,9 @@ export const DescriptionEditor = forwardRef<HTMLTextAreaElement, DescriptionEdit
           action: () => {
             deleteAtt.mutate(id, {
               onSuccess: () => {
-                const next = value.replace(refMarkdown, '').replace(/\n{3,}/g, '\n\n')
+                const next = value
+                  .replace(refMarkdown, '')
+                  .replace(/\n{3,}/g, '\n\n')
                 onChange(next)
               },
               onError: (err) => {
@@ -270,13 +373,23 @@ export const DescriptionEditor = forwardRef<HTMLTextAreaElement, DescriptionEdit
     })
   }
 
+  // 提及候选项点击
+  function handleMentionSelect(item: TodoOut) {
+    if (mentionState.command) {
+      mentionState.command(item)
+      setMentionState((prev) => ({ ...prev, active: false }))
+    }
+  }
+
   return (
     <div
       className={`${styles.editorBox} ${textareaClassName ?? ''}`}
       style={{ minHeight }}
     >
-      <div ref={editorRootRef} className={styles.milkdownContainer} />
-      {/* 视觉隐藏的 textarea：DOM 存在以兼容 DetailPage.tsx:475 的 .logbook textarea 选择器 */}
+      <div ref={editorRootRef} className={styles.tiptapContainer}>
+        {editor && <EditorContent editor={editor} />}
+      </div>
+      {/* 视觉隐藏的 textarea：DOM 存在以兼容 .logbook textarea 选择器 */}
       <textarea
         ref={hiddenTaRef}
         className={styles.hiddenTaMirror}
@@ -291,18 +404,82 @@ export const DescriptionEditor = forwardRef<HTMLTextAreaElement, DescriptionEdit
         onSizeChange={handleSizeChange}
         onDelete={handleDeleteClick}
       />
+      {/* @ 提及候选浮层 */}
+      {mentionState.active && mentionState.items.length > 0 && (
+        <MentionPortal
+          items={mentionState.items}
+          selectedIndex={mentionState.selectedIndex}
+          position={mentionState.position}
+          onSelect={handleMentionSelect}
+          onClose={() =>
+            setMentionState((prev) => ({ ...prev, active: false }))
+          }
+        />
+      )}
     </div>
   )
 })
 
 // ---------------------------------------------------------------------------
+// MentionPortal · @ 提及候选浮层
+// ---------------------------------------------------------------------------
+interface MentionPortalProps {
+  items: TodoOut[]
+  selectedIndex: number
+  position: { top: number; left: number }
+  onSelect: (item: TodoOut) => void
+  onClose: () => void
+}
+
+function MentionPortal({
+  items,
+  selectedIndex,
+  position,
+  onSelect,
+  onClose,
+}: MentionPortalProps) {
+  const listRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (listRef.current && !listRef.current.contains(e.target as Node)) {
+        onClose()
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [onClose])
+
+  return createPortal(
+    <div
+      ref={listRef}
+      className={styles.mentionPopup}
+      style={{
+        position: 'fixed',
+        top: position.top,
+        left: position.left,
+        zIndex: 9999,
+      }}
+    >
+      {items.map((item, i) => (
+        <div
+          key={item.id}
+          className={`${styles.mentionItem} ${
+            i === selectedIndex ? styles.mentionItemActive : ''
+          }`}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => onSelect(item)}
+        >
+          <span className={styles.todoTitle}>{item.title}</span>
+        </div>
+      ))}
+    </div>,
+    document.body,
+  )
+}
+
+// ---------------------------------------------------------------------------
 // ImgToolbarPortal · 图片 hover 浮层工具条（25/50/75/100 + 🗑）
-//
-// 实现要点：
-//   - 监听 Milkdown 容器的 mousemove 找 img，从 src 解析 id
-//   - Portal 到 document.body，position: fixed 跟随 img 视口坐标
-//   - 所有按钮 onMouseDown preventDefault 阻止焦点切换，编辑器不中断打字
-//   - 不 hack Crepe imageBlock NodeView（升级安全）
 // ---------------------------------------------------------------------------
 interface ImgToolbarPortalProps {
   rootRef: React.RefObject<HTMLElement | null>
@@ -311,8 +488,15 @@ interface ImgToolbarPortalProps {
   onDelete: (id: number) => void
 }
 
-function ImgToolbarPortal({ rootRef, sizeMap, onSizeChange, onDelete }: ImgToolbarPortalProps) {
-  const [hovered, setHovered] = useState<{ id: number; rect: DOMRect } | null>(null)
+function ImgToolbarPortal({
+  rootRef,
+  sizeMap,
+  onSizeChange,
+  onDelete,
+}: ImgToolbarPortalProps) {
+  const [hovered, setHovered] = useState<{ id: number; rect: DOMRect } | null>(
+    null,
+  )
 
   useEffect(() => {
     const root = rootRef.current
@@ -323,7 +507,10 @@ function ImgToolbarPortal({ rootRef, sizeMap, onSizeChange, onDelete }: ImgToolb
         setHovered(null)
         return
       }
-      const img = t.tagName === 'IMG' ? (t as HTMLImageElement) : t.closest('img') as HTMLImageElement | null
+      const img =
+        t.tagName === 'IMG'
+          ? (t as HTMLImageElement)
+          : (t.closest('img') as HTMLImageElement | null)
       if (!img) {
         setHovered(null)
         return
@@ -338,11 +525,12 @@ function ImgToolbarPortal({ rootRef, sizeMap, onSizeChange, onDelete }: ImgToolb
         setHovered(null)
         return
       }
-      // 同 id 不更新 state，避免每次 mousemove 都 rerender
-      setHovered((prev) => (prev?.id === id ? prev : { id, rect: img.getBoundingClientRect() }))
+      setHovered((prev) =>
+        prev?.id === id ? prev : { id, rect: img.getBoundingClientRect() },
+      )
     }
     const onLeave = () => setHovered(null)
-    const onScroll = () => setHovered(null) // 滚动时收工具条，避免错位
+    const onScroll = () => setHovered(null)
     root.addEventListener('mousemove', onMove)
     root.addEventListener('mouseleave', onLeave)
     window.addEventListener('scroll', onScroll, true)
