@@ -1,15 +1,15 @@
 import { useMemo } from 'react'
 import { useTasks } from '@/api/tasks'
+import { useMotto } from '@/api/settings'
 import { useFilterContext } from '@/context/FilterContext'
 import { STATUS_LIST, NATURE_LIST } from '@/constants'
 import { FilterSection } from './FilterSection'
 import { monthLabel } from '@/constants'
 import styles from './Sidebar.module.css'
 
-const DEFAULT_MOTTO = '凡录入者，皆为正典。\n凡未录者，皆为虚构。'
-
 export function Sidebar() {
   const { data: tasks } = useTasks()
+  const { data: motto } = useMotto()
   const { filter, setStatus, setNature, setTag, setMonth } = useFilterContext()
 
   // 统计各筛选维度的计数
@@ -98,9 +98,12 @@ export function Sidebar() {
       />
 
       <div className={styles.foot}>
-        <div className={styles.footRule} />
+        <div className={styles.footLine}>
+          <span className={styles.footTitle}>卷首语</span>
+          <div className={styles.footRule} />
+        </div>
         <p className={styles.footNote} style={{ whiteSpace: 'pre-line' }}>
-          {DEFAULT_MOTTO}
+          {motto}
         </p>
         <p className={styles.footSig}>— 自 2025</p>
       </div>

@@ -13,8 +13,6 @@ import { DescriptionEditorWithMode, type EditorMode } from '@/components/shared/
 import { useConfirm } from '@/utils/confirm'
 import styles from './SettingsPage.module.css'
 
-export const DEFAULT_MOTTO = '凡录入者，皆为正典。\n凡未录者，皆为虚构.'
-
 export function SettingsPage() {
   const { showToast } = useToastContext()
   const settingsCtx = useSettingsContext()
@@ -904,7 +902,7 @@ export function SettingsPage() {
             className="field__textarea"
             value={mottoDraft}
             onChange={e => setMottoDraft(e.target.value)}
-            placeholder={DEFAULT_MOTTO}
+            placeholder="输入卷首语..."
             rows={3}
             style={{ fontSize: '13px', lineHeight: 1.6 }}
           />

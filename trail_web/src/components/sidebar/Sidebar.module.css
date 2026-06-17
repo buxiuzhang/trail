@@ -9,7 +9,16 @@
 }
 
 .foot { margin-top: 56px; padding-left: 14px; }
-.footRule { height: 0.5px; background: var(--rule); width: 40px; margin-bottom: 18px; }
+.footLine { display: flex; align-items: center; margin-bottom: 18px; }
+.footTitle {
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-ghost);
+}
+.footRule { height: 0.5px; background: var(--rule); width: 40px; }
 .footNote {
   font-family: var(--serif-sc);
   font-size: 12.5px;
