@@ -307,8 +307,6 @@
 
 .content {
   font-family: var(--body);
-  font-size: 14.5px;
-  line-height: 1.65;
   color: var(--ink);
   white-space: pre-wrap;
   overflow-wrap: break-word;
@@ -369,6 +367,86 @@
   font-size: 36px;
   margin-bottom: 8px;
   font-style: normal;
+}
+
+/* 关联待办展示 */
+.todoRefs {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.todoRefsLabel {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink-ghost);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.todoRefChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 6px;
+  background: var(--rule-soft);
+  border-radius: 2px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+.todoRefCompleted {
+  color: var(--green-ink);
+  background: var(--green-bg);
+}
+.todoRefAbandoned {
+  color: var(--ink-ghost);
+  text-decoration: line-through;
+  text-decoration-color: var(--ink-ghost);
+}
+.todoRefDeleted {
+  color: var(--ink-ghost);
+  opacity: 0.6;
+  font-style: italic;
+}
+
+/* 关联任务展示 */
+.taskRefs {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.taskRefsLabel {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink-ghost);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.taskRefChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 6px;
+  background: var(--green-bg);
+  border-radius: 2px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--green-ink);
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 100ms;
+}
+.taskRefChip:hover {
+  background: var(--green-ink);
+  color: var(--paper);
+}
+.taskRefDeleted {
+  color: var(--ink-ghost);
+  opacity: 0.6;
+  font-style: italic;
 }
 
 @media (max-width: 920px) {

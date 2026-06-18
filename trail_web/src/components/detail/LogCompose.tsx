@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import type { LogOut, TaskOut } from '@/types'
+import type { LogOut, TaskOut, TodoOut } from '@/types'
 import { TODAY } from '@/constants'
 import { usePolish, LLM_AVAILABLE } from '@/api/llm'
 import { usePlaceholders, DEFAULT_PLACEHOLDERS } from '@/api/settings'
@@ -8,17 +8,22 @@ import { useModalContext } from '@/context/ModalContext'
 import { Select } from '@/components/shared/Select'
 import { DescriptionEditorWithMode as DescriptionEditor } from '@/components/shared/DescriptionEditorWithMode'
 import { ModeToggleButton } from '@/components/shared/ModeToggleButton'
+import { TodoRefSection } from '@/components/detail/TodoRefSection'
+import { extractTodoMentionIds, extractTaskRefIds } from '@/components/shared/richtext-utils'
 import polishIcon from '@/icons/polish.svg'
 import styles from './Logbook.module.css'
 
 interface LogComposeProps {
   task: TaskOut
+  todos: TodoOut[]
+  /** 全局任务列表（用于 @ 任务引用） */
+  tasks?: TaskOut[]
   editing: LogOut | null
-  onSave: (data: { log_date: string; content: string; phase: string; hours: number }) => Promise<void>
+  onSave: (data: { log_date: string; content: string; phase: string; hours: number; todo_ids: number[]; task_ids: number[] }) => Promise<void>
   onCancel: () => void
 }
 
-export function LogCompose({ task, editing, onSave, onCancel }: LogComposeProps) {
+export function LogCompose({ task, todos, tasks = [], editing, onSave, onCancel }: LogComposeProps) {
   // 封版（已完成+非维护 或 已作废）→ 不渲染日志表单
   if (task.status === '已作废' || (task.status === '已完成' && task.nature !== '维护')) return null
   const isEdit = !!editing
@@ -26,6 +31,8 @@ export function LogCompose({ task, editing, onSave, onCancel }: LogComposeProps)
   const [phase, setPhase] = useState(editing?.phase || (task.nature === '维护' ? 'maintenance' : 'main'))
   const [hours, setHours] = useState(editing?.hours || 1)
   const [content, setContent] = useState(editing?.content || '')
+  const [selectedTodoIds, setSelectedTodoIds] = useState<number[]>(editing?.todo_ids || [])
+  const [selectedTaskIds, setSelectedTaskIds] = useState<number[]>(editing?.task_ids || [])
   const [polishedFrom, setPolishedFrom] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [mode, setMode] = useState<'preview' | 'source'>('preview')
@@ -71,12 +78,19 @@ export function LogCompose({ task, editing, onSave, onCancel }: LogComposeProps)
     await doSave(trimmed)
   }
 
-  async function doSave(trimmed: string) {
+  async function doSave(contentToSave: string) {
     setSubmitting(true)
     try {
-      await onSave({ log_date: logDate, content: trimmed, phase, hours })
+      // 从内容中提取 @ 提及的待办 ID 和任务 ID，与手动选择的合并去重
+      const mentionTodoIds = extractTodoMentionIds(contentToSave)
+      const mentionTaskIds = extractTaskRefIds(contentToSave)
+      const allTodoIds = [...new Set([...mentionTodoIds, ...selectedTodoIds])]
+      const allTaskIds = [...new Set([...mentionTaskIds, ...selectedTaskIds])]
+      await onSave({ log_date: logDate, content: contentToSave, phase, hours, todo_ids: allTodoIds, task_ids: allTaskIds })
       setContent('')
       setPolishedFrom(null)
+      setSelectedTodoIds([])
+      setSelectedTaskIds([])
       if (!isEdit) setLogDate(TODAY)
     } catch {
       // error toasted by parent
@@ -143,6 +157,14 @@ export function LogCompose({ task, editing, onSave, onCancel }: LogComposeProps)
         rows={3}
         minHeight={80}
         textareaClassName=""
+        todos={todos}
+        tasks={tasks}
+      />
+      <TodoRefSection
+        taskId={task.id}
+        todos={todos}
+        selectedIds={selectedTodoIds}
+        onChange={setSelectedTodoIds}
       />
       <div className={styles.composeFoot}>
         <span className={styles.composeHint}>

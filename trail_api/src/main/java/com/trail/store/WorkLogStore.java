@@ -8,20 +8,28 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 /** 工作日志（M8 SQLite 适配版）。is_deleted 改 0/1，log_date 是 TEXT。 */
 @Component
 public class WorkLogStore {
 
     public static final Set<String> PHASES = Set.of("main", "maintenance");
+    private static final ObjectMapper JSON = new ObjectMapper();
 
     private final SqliteDb db;
+    private final LogTodoRefStore logTodoRefStore;
 
-    public WorkLogStore(SqliteDb db) {
+    public WorkLogStore(SqliteDb db, LogTodoRefStore logTodoRefStore) {
         this.db = db;
+        this.logTodoRefStore = logTodoRefStore;
     }
 
     public List<Map<String, Object>> listLogs(long taskId, String phase, boolean includeDeleted,
@@ -73,6 +81,16 @@ public class WorkLogStore {
     }
 
     public Map<String, Object> addLog(long taskId, LocalDate logDate, String content, String phase, Double hours) {
+        return addLog(taskId, logDate, content, phase, hours, null);
+    }
+
+    public Map<String, Object> addLog(long taskId, LocalDate logDate, String content, String phase, Double hours,
+                                       List<Long> todoIds) {
+        return addLog(taskId, logDate, content, phase, hours, todoIds, null);
+    }
+
+    public Map<String, Object> addLog(long taskId, LocalDate logDate, String content, String phase, Double hours,
+                                       List<Long> todoIds, List<Long> taskIds) {
         if (content == null || content.isBlank()) throw new StoreError("日志内容不能为空");
         if (phase == null) phase = "main";
         if (!PHASES.contains(phase)) throw new StoreError("非法 phase：" + phase);
@@ -98,12 +116,18 @@ public class WorkLogStore {
 
         Long newId = db.insertReturningId("""
             INSERT INTO work_logs
-              (task_id, log_date, phase, ordinal, content, hours, is_deleted, edit_count)
-            VALUES (?, ?, ?, ?, ?, ?, 0, 0)
+              (task_id, log_date, phase, ordinal, content, hours, task_ids, is_deleted, edit_count)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0)
             RETURNING id
             """,
-            taskId, logDate, phase, ordinal, content.strip(), hours);
+            taskId, logDate, phase, ordinal, content.strip(), hours, toJsonArray(taskIds));
         if (newId == null) throw new StoreError("写日志失败");
+
+        // 添加待办关联
+        if (todoIds != null && !todoIds.isEmpty()) {
+            logTodoRefStore.addRefs(newId, todoIds, taskId);
+        }
+
         return getLog(newId);
     }
 
@@ -113,9 +137,26 @@ public class WorkLogStore {
         return rows.get(0);
     }
 
+    /** 获取日志关联的待办 ID 列表 */
+    public List<Long> getTodoIdsForLog(long logId) {
+        return logTodoRefStore.getTodoIdsForLog(logId);
+    }
+
     public Map<String, Object> updateLog(long logId, long taskId,
                                          String content, LocalDate logDate, String phase, Double hours) {
-        if (content == null && logDate == null && phase == null && hours == null)
+        return updateLog(logId, taskId, content, logDate, phase, hours, null);
+    }
+
+    public Map<String, Object> updateLog(long logId, long taskId,
+                                         String content, LocalDate logDate, String phase, Double hours,
+                                         List<Long> todoIds) {
+        return updateLog(logId, taskId, content, logDate, phase, hours, todoIds, null);
+    }
+
+    public Map<String, Object> updateLog(long logId, long taskId,
+                                         String content, LocalDate logDate, String phase, Double hours,
+                                         List<Long> todoIds, List<Long> taskIds) {
+        if (content == null && logDate == null && phase == null && hours == null && todoIds == null && taskIds == null)
             throw new StoreError("至少要改一个字段");
         if (content != null && content.isBlank()) throw new StoreError("日志内容不能为空");
         if (phase != null && !PHASES.contains(phase)) throw new StoreError("非法 phase：" + phase);
@@ -169,8 +210,20 @@ public class WorkLogStore {
             sets.append(", ordinal = ?");
             params.add(newOrdinal);
         }
-        params.add(logId);
-        db.update("UPDATE work_logs SET " + sets + " WHERE id = ?", params.toArray());
+        if (taskIds != null) {
+            sets.append(", task_ids = ?");
+            params.add(toJsonArray(taskIds));
+        }
+        if (!sets.toString().equals("updated_at = CURRENT_TIMESTAMP, edit_count = edit_count + 1")) {
+            params.add(logId);
+            db.update("UPDATE work_logs SET " + sets + " WHERE id = ?", params.toArray());
+        }
+
+        // 更新待办关联
+        if (todoIds != null) {
+            logTodoRefStore.replaceRefs(logId, todoIds, taskId);
+        }
+
         return getLog(logId);
     }
 
@@ -217,5 +270,38 @@ public class WorkLogStore {
             WHERE w.log_date >= ? AND w.log_date <= ? AND w.is_deleted = 0
             ORDER BY w.log_date, t.title, w.ordinal
             """, start, end);
+    }
+
+    // ============================================================
+    // task_ids JSON 序列化/反序列化
+    // ============================================================
+
+    /** 将 task_ids 列表序列化为 JSON 字符串 */
+    private String toJsonArray(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) return "[]";
+        try {
+            return JSON.writeValueAsString(ids);
+        } catch (JsonProcessingException e) {
+            return "[]";
+        }
+    }
+
+    /** 从 JSON 字符串解析 task_ids 列表 */
+    public List<Long> parseTaskIds(String json) {
+        if (json == null || json.isBlank() || "[]".equals(json)) return Collections.emptyList();
+        try {
+            return JSON.readValue(json, new TypeReference<List<Long>>() {});
+        } catch (JsonProcessingException e) {
+            return Collections.emptyList();
+        }
+    }
+
+    /** 获取日志关联的任务 ID 列表 */
+    public List<Long> getTaskIdsForLog(long logId) {
+        List<Map<String, Object>> rows = db.query("SELECT task_ids FROM work_logs WHERE id = ?", logId);
+        if (rows.isEmpty()) return Collections.emptyList();
+        Object v = rows.get(0).get("task_ids");
+        if (v == null) return Collections.emptyList();
+        return parseTaskIds(v.toString());
     }
 }

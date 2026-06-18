@@ -21,17 +21,24 @@ interface Props {
   onModeChange: (m: EditorMode) => void
   className?: string
   style?: CSSProperties
+  /** 按钮用途：编辑场景用 'edit'，只读查看用 'view'。默认 'edit' */
+  usage?: 'edit' | 'view'
 }
 
-export function ModeToggleButton({ mode, onModeChange, className, style }: Props) {
+export function ModeToggleButton({ mode, onModeChange, className, style, usage = 'edit' }: Props) {
+  const previewTitle = usage === 'edit' ? '预览编辑' : '预览查看'
+  const sourceTitle = usage === 'edit' ? '源码编辑' : '源码查看'
+  const previewLabel = usage === 'edit' ? '预览编辑(点击切换到源码)' : '预览查看(点击切换到源码)'
+  const sourceLabel = usage === 'edit' ? '源码编辑(点击切换到预览)' : '源码查看(点击切换到预览)'
+
   return (
     <button
       type="button"
       className={className ? `${styles.modeBtn} ${className}` : styles.modeBtn}
       style={style}
       onClick={() => onModeChange(mode === 'preview' ? 'source' : 'preview')}
-      title={mode === 'preview' ? '预览编辑' : '源码编辑'}
-      aria-label={mode === 'preview' ? '预览编辑(点击切换到源码)' : '源码编辑(点击切换到预览)'}
+      title={mode === 'preview' ? previewTitle : sourceTitle}
+      aria-label={mode === 'preview' ? previewLabel : sourceLabel}
       aria-pressed={mode === 'source'}
       // 阻止按钮 click 切走编辑器焦点
       onMouseDown={(e) => e.preventDefault()}

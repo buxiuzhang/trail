@@ -4,8 +4,9 @@
  * 设计原则：
  *   - 外部 props / ref 与旧版本**完全一致**：调用点零改动
  *   - 内部用 TipTap 接管：所见即所得编辑 / 图片粘贴 / @ 提及
- *   - 图片交互（25/50/75/100 缩放 + 删除）通过 Portal 浮层实现
+ *   - 图片预览：点击图片 → 全屏暗色遮罩展示原图
  *   - @ 提及使用 TipTap 官方 Mention 扩展，直接插入 markdown 格式
+ *   - @ 提及显示标题：通过 decoration + CSS ::after 实现
  *
  * 关键不变量：
  *   - value 同步：lastEmittedRef 防循环
@@ -17,29 +18,113 @@ import {
   useCallback,
   useEffect,
   useImperativeHandle,
-  useMemo,
   useRef,
   useState,
 } from 'react'
 import { createPortal } from 'react-dom'
-import { useQueries } from '@tanstack/react-query'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Image from '@tiptap/extension-image'
 import Placeholder from '@tiptap/extension-placeholder'
 import Mention from '@tiptap/extension-mention'
 import { Markdown } from '@tiptap/markdown'
+import { Extension } from '@tiptap/core'
+import { HighlightedCodeBlock } from './HighlightedCodeBlock'
+import { Plugin, PluginKey } from '@tiptap/pm/state'
+import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import {
   useUploadAttachment,
-  useUpdateAttachment,
-  useDeleteAttachment,
-  type DeleteInUseError,
 } from '@/api/attachments'
 import { useToastContext } from '@/context/ToastContext'
-import { useModalContext } from '@/context/ModalContext'
-import { extractImageRefs } from './richtext-utils'
-import type { TodoOut } from '@/types'
+import { normalizeMentions } from './richtext-utils'
+import { ImagePreview } from './ImagePreview'
+import type { TodoOut, TaskOut } from '@/types'
 import styles from './DescriptionEditor.module.css'
+import tiptapStyles from './TipTapContent.module.css'
+
+/** 提及候选项（待办或任务） */
+interface MentionCandidate {
+  type: 'todo' | 'task'
+  id: number
+  title: string
+}
+
+/** 创建装饰器扩展，将 @task:ID 和 @todo:ID 显示为标题
+ *  使用 CSS ::after 显示标题，font-size: 0 隐藏原始文本
+ *  当后面没有空格时，使用 widget decoration 插入空格确保光标可定位
+ */
+export function createMentionDecorationExtension(
+  todosRef: React.MutableRefObject<ReadonlyArray<{ id: number; title: string }>>,
+  tasksRef: React.MutableRefObject<ReadonlyArray<{ id: number; title: string }>>,
+  /** 样式类名，默认使用 DescriptionEditor 的样式 */
+  styleClasses?: { todoMentionDecor: string; taskMentionDecor: string },
+) {
+  const todoClass = styleClasses?.todoMentionDecor ?? styles.todoMentionDecor
+  const taskClass = styleClasses?.taskMentionDecor ?? styles.taskMentionDecor
+
+  return Extension.create({
+    name: 'mentionDecoration',
+    addProseMirrorPlugins() {
+      return [
+        new Plugin({
+          key: new PluginKey('mentionDecoration'),
+          props: {
+            decorations(state) {
+              const decorations: Decoration[] = []
+              const doc = state.doc
+              // 从 ref 获取最新值
+              const todos = todosRef.current
+              const tasks = tasksRef.current
+
+              // 遍历文档中的所有文本节点
+              doc.descendants((node, pos) => {
+                if (!node.isText) return
+
+                const text = node.text ?? ''
+                // 匹配 @todo:ID 或 @task:ID
+                const re = /@(todo|task):(\d+)/g
+                let m: RegExpExecArray | null
+
+                while ((m = re.exec(text)) !== null) {
+                  const type = m[1] as 'todo' | 'task'
+                  const id = parseInt(m[2], 10)
+                  const start = pos + m.index
+                  const end = start + m[0].length
+
+                  // 从数据中查找标题
+                  const items = type === 'todo' ? todos : tasks
+                  const found = items.find((t) => t.id === id)
+                  const title = found?.title || `@${type}:${id}`
+
+                  // 使用 inline decoration 添加样式和数据属性
+                  // CSS 通过 ::after 显示标题，font-size: 0 隐藏原始文本
+                  // inclusiveEnd: false 允许光标落在装饰末尾，不依赖尾部空格
+                  const className = type === 'todo' ? todoClass : taskClass
+                  decorations.push(
+                    Decoration.inline(
+                      start,
+                      end,
+                      {
+                        class: className,
+                        'data-mention-type': type,
+                        'data-mention-id': String(id),
+                        'data-mention-title': title,
+                        'data-mention-end': String(end),
+                      },
+                      { inclusiveEnd: false },
+                    ),
+                  )
+                }
+              })
+
+              return DecorationSet.create(doc, decorations)
+            },
+          },
+        }),
+      ]
+    },
+  })
+}
 
 interface DescriptionEditorProps {
   value: string
@@ -52,10 +137,9 @@ interface DescriptionEditorProps {
   textareaClassName?: string
   /** 当前任务的待办列表（用于 @ 提及） */
   todos?: TodoOut[]
+  /** 全局任务列表（用于 @ 任务引用） */
+  tasks?: TaskOut[]
 }
-
-// 4 档尺寸预设
-const SIZE_PRESETS = [25, 50, 75, 100] as const
 
 export const DescriptionEditor = forwardRef<HTMLTextAreaElement, DescriptionEditorProps>(function DescriptionEditor(
   {
@@ -66,6 +150,7 @@ export const DescriptionEditor = forwardRef<HTMLTextAreaElement, DescriptionEdit
     minHeight = 120,
     textareaClassName = 'field__textarea',
     todos = [],
+    tasks = [],
   },
   ref,
 ) {
@@ -76,11 +161,20 @@ export const DescriptionEditor = forwardRef<HTMLTextAreaElement, DescriptionEdit
   const lastEmittedRef = useRef<string>(value)
   const onChangeRef = useRef(onChange)
   const isInitializedRef = useRef(false)
+  // 使用 ref 存储 todos 和 tasks 的最新值，供 Mention 扩展的 items 函数使用
+  const todosRef = useRef(todos)
+  const tasksRef = useRef(tasks)
 
-  // 保持 onChange 引用最新（用 useEffect 避免 render 期间修改 ref）
+  // 保持 refs 最新
   useEffect(() => {
     onChangeRef.current = onChange
   }, [onChange])
+  useEffect(() => {
+    todosRef.current = todos
+  }, [todos])
+  useEffect(() => {
+    tasksRef.current = tasks
+  }, [tasks])
 
   // 标记初始化完成
   useEffect(() => {
@@ -93,46 +187,19 @@ export const DescriptionEditor = forwardRef<HTMLTextAreaElement, DescriptionEdit
 
   // hooks
   const upload = useUploadAttachment()
-  const updateSize = useUpdateAttachment()
-  const deleteAtt = useDeleteAttachment()
   const { showToast } = useToastContext()
-  const { openModal } = useModalContext()
 
-  // 提取 value 里所有图片 id
-  const refIds = useMemo(() => {
-    const refs = extractImageRefs(value)
-    return Array.from(new Set(refs.map((r) => Number(r.url.split('/').pop()))))
-  }, [value])
-
-  // 拉所有 id 的 displaySize
-  const sizeQueries = useQueries({
-    queries: refIds.map((id) => ({
-      queryKey: ['attachment', id] as const,
-      queryFn: () =>
-        fetch(`/api/attachments/${id}/meta`).then(
-          (r) => r.json() as Promise<{ id: number; displaySize: number }>,
-        ),
-      enabled: id > 0,
-      staleTime: 60_000,
-    })),
-  })
-  const sizeMap = useMemo(() => {
-    const m: Record<number, number> = {}
-    refIds.forEach((id, i) => {
-      const d = sizeQueries[i]?.data
-      if (d) m[id] = d.displaySize
-    })
-    return m
-  }, [refIds, sizeQueries])
+  // 图片预览状态
+  const [previewImage, setPreviewImage] = useState<string | null>(null)
 
   // @ 提及候选浮层状态
   const [mentionState, setMentionState] = useState<{
     active: boolean
     query: string
-    items: TodoOut[]
+    items: MentionCandidate[]
     selectedIndex: number
     position: { top: number; left: number }
-    command?: (item: TodoOut) => void
+    command?: (item: MentionCandidate) => void
   }>({
     active: false,
     query: '',
@@ -150,7 +217,12 @@ export const DescriptionEditor = forwardRef<HTMLTextAreaElement, DescriptionEdit
           openOnClick: false,
           HTMLAttributes: { class: 'tiptap-link' },
         },
+        // 关闭 trailingNode：当内容以列表结尾时 appendTransaction 会崩溃
+        trailingNode: false,
+        // 由 CodeBlockLowlight 接管
+        codeBlock: false,
       }),
+      HighlightedCodeBlock,
       Image.configure({
         inline: true,
         allowBase64: false,
@@ -159,34 +231,52 @@ export const DescriptionEditor = forwardRef<HTMLTextAreaElement, DescriptionEdit
       Placeholder.configure({
         placeholder: placeholder ?? '',
       }),
-      Markdown.configure({
-        html: false, // 禁用 HTML 标签
-        breaks: true, // 单个换行符转换为 <br>
-      }),
+      Markdown,
+      // 装饰器扩展：将 @task:ID 和 @todo:ID 显示为标题
+      createMentionDecorationExtension(todosRef, tasksRef),
       Mention.configure({
-        HTMLAttributes: { class: 'mention-todo' },
+        HTMLAttributes: { class: 'mention-ref' },
         suggestion: {
-          items: ({ query }) =>
-            todos.filter(
-              (t) =>
-                !t.is_completed &&
-                !t.is_abandoned &&
-                t.title.toLowerCase().includes(query.toLowerCase()),
-            ),
+          items: ({ query }) => {
+            const q = query.toLowerCase()
+            // 从 ref 获取最新值（避免闭包陷阱）
+            const currentTodos = todosRef.current
+            const currentTasks = tasksRef.current
+            // 1. 当前任务的待办（优先）
+            const todoItems: MentionCandidate[] = currentTodos
+              .filter(
+                (t) =>
+                  !t.is_completed &&
+                  !t.is_abandoned &&
+                  t.title.toLowerCase().includes(q),
+              )
+              .map((t) => ({ type: 'todo', id: t.id, title: t.title }))
+            // 2. 全局任务（其次）
+            const taskItems: MentionCandidate[] = currentTasks
+              .filter((t) => t.title.toLowerCase().includes(q))
+              .map((t) => ({ type: 'task', id: t.id, title: t.title }))
+            return [...todoItems, ...taskItems]
+          },
           render: () => {
-
             return {
               onStart: (props) => {
                 const rect = props.clientRect?.()
                 if (!rect) return
+                const items = props.items as MentionCandidate[]
                 setMentionState({
                   active: true,
                   query: props.query,
-                  items: props.items,
+                  items,
                   selectedIndex: 0,
                   position: { top: rect.bottom, left: rect.left },
-                  command: (item: TodoOut) => {
-                    props.command({ id: String(item.id), label: item.title })
+                  command: (item: MentionCandidate) => {
+                    // 直接插入 @todo:ID 或 @task:ID 纯文本
+                    const text = `@${item.type}:${item.id} `
+                    props.editor
+                      .chain()
+                      .focus()
+                      .insertContentAt(props.range, text)
+                      .run()
                   },
                 })
               },
@@ -197,11 +287,16 @@ export const DescriptionEditor = forwardRef<HTMLTextAreaElement, DescriptionEdit
                   ...prev,
                   active: true,
                   query: props.query,
-                  items: props.items,
+                  items: props.items as MentionCandidate[],
                   selectedIndex: 0,
                   position: { top: rect.bottom, left: rect.left },
-                  command: (item: TodoOut) => {
-                    props.command({ id: String(item.id), label: item.title })
+                  command: (item: MentionCandidate) => {
+                    const text = `@${item.type}:${item.id} `
+                    props.editor
+                      .chain()
+                      .focus()
+                      .insertContentAt(props.range, text)
+                      .run()
                   },
                 }))
               },
@@ -245,7 +340,7 @@ export const DescriptionEditor = forwardRef<HTMLTextAreaElement, DescriptionEdit
         },
       }),
     ],
-    content: value,
+    content: normalizeMentions(value),
     contentType: 'markdown',
     onUpdate: ({ editor }) => {
       // 使用 @tiptap/markdown 提供的 getMarkdown() 方法
@@ -260,6 +355,16 @@ export const DescriptionEditor = forwardRef<HTMLTextAreaElement, DescriptionEdit
       }
     },
     editorProps: {
+      handleClick: (view, pos, event) => {
+        const target = event.target as HTMLElement
+        const img = target.closest('img')
+        if (img) {
+          event.preventDefault()
+          setPreviewImage(img.getAttribute('src') ?? '')
+          return true
+        }
+        return false
+      },
       handlePaste: (view, event) => {
         const items = event.clipboardData?.items
         if (!items) return false
@@ -295,6 +400,12 @@ export const DescriptionEditor = forwardRef<HTMLTextAreaElement, DescriptionEdit
     if (hiddenTaRef.current) hiddenTaRef.current.value = value
   }, [editor, value])
 
+  // todos/tasks 异步加载后，触发 decoration 重新计算（@ 提及渲染）
+  useEffect(() => {
+    if (!editor) return
+    editor.view.dispatch(editor.state.tr)
+  }, [editor, todos, tasks])
+
   // 上传图片
   const uploadImage = useCallback(
     async (file: File): Promise<string> => {
@@ -324,57 +435,8 @@ export const DescriptionEditor = forwardRef<HTMLTextAreaElement, DescriptionEdit
     [editor],
   )
 
-  // 图片尺寸变化
-  function handleSizeChange(id: number, size: number) {
-    updateSize.mutate({ id, displaySize: size })
-  }
-
-  // 图片删除
-  function handleDeleteClick(id: number) {
-    const refMarkdown = new RegExp(
-      `!\\[[^\\]]*\\]\\(/api/attachments/${id}\\)`,
-      'g',
-    )
-    openModal({
-      eyebrow: '图片',
-      title: '删除图片',
-      body: '确认删除这张图片？文本里的 markdown 引用会一并清掉。',
-      buttons: [
-        { label: '取消', action: () => undefined },
-        {
-          label: '删除',
-          className: 'btn-danger',
-          action: () => {
-            deleteAtt.mutate(id, {
-              onSuccess: () => {
-                const next = value
-                  .replace(refMarkdown, '')
-                  .replace(/\n{3,}/g, '\n\n')
-                onChange(next)
-              },
-              onError: (err) => {
-                const e = err as Error & { inUse?: DeleteInUseError }
-                if (e.inUse) {
-                  const first = e.inUse.references[0]
-                  const where = first?.title
-                    ? `${sourceTypeLabel(first.sourceType)}《${first.title}》(${first.column})`
-                    : `${first?.sourceType}#${first?.sourceId}`
-                  showToast(
-                    `图片被 ${e.inUse.refCount} 处引用：${where}${e.inUse.refCount > 1 ? ' 等' : ''}，未删除。`,
-                  )
-                } else {
-                  showToast('删除失败：' + e.message)
-                }
-              },
-            })
-          },
-        },
-      ],
-    })
-  }
-
   // 提及候选项点击
-  function handleMentionSelect(item: TodoOut) {
+  function handleMentionSelect(item: MentionCandidate) {
     if (mentionState.command) {
       mentionState.command(item)
       setMentionState((prev) => ({ ...prev, active: false }))
@@ -386,7 +448,7 @@ export const DescriptionEditor = forwardRef<HTMLTextAreaElement, DescriptionEdit
       className={`${styles.editorBox} ${textareaClassName ?? ''}`}
       style={{ minHeight }}
     >
-      <div ref={editorRootRef} className={styles.tiptapContainer}>
+      <div ref={editorRootRef} className={`${styles.tiptapContainer} ${tiptapStyles.content}`}>
         {editor && <EditorContent editor={editor} />}
       </div>
       {/* 视觉隐藏的 textarea：DOM 存在以兼容 .logbook textarea 选择器 */}
@@ -397,12 +459,6 @@ export const DescriptionEditor = forwardRef<HTMLTextAreaElement, DescriptionEdit
         aria-hidden
         tabIndex={-1}
         defaultValue={value}
-      />
-      <ImgToolbarPortal
-        rootRef={editorRootRef}
-        sizeMap={sizeMap}
-        onSizeChange={handleSizeChange}
-        onDelete={handleDeleteClick}
       />
       {/* @ 提及候选浮层 */}
       {mentionState.active && mentionState.items.length > 0 && (
@@ -416,6 +472,13 @@ export const DescriptionEditor = forwardRef<HTMLTextAreaElement, DescriptionEdit
           }
         />
       )}
+      {/* 图片预览 */}
+      {previewImage && (
+        <ImagePreview
+          src={previewImage}
+          onClose={() => setPreviewImage(null)}
+        />
+      )}
     </div>
   )
 })
@@ -424,10 +487,10 @@ export const DescriptionEditor = forwardRef<HTMLTextAreaElement, DescriptionEdit
 // MentionPortal · @ 提及候选浮层
 // ---------------------------------------------------------------------------
 interface MentionPortalProps {
-  items: TodoOut[]
+  items: MentionCandidate[]
   selectedIndex: number
   position: { top: number; left: number }
-  onSelect: (item: TodoOut) => void
+  onSelect: (item: MentionCandidate) => void
   onClose: () => void
 }
 
@@ -463,133 +526,20 @@ function MentionPortal({
     >
       {items.map((item, i) => (
         <div
-          key={item.id}
+          key={`${item.type}_${item.id}`}
           className={`${styles.mentionItem} ${
             i === selectedIndex ? styles.mentionItemActive : ''
           }`}
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => onSelect(item)}
         >
-          <span className={styles.todoTitle}>{item.title}</span>
+          <span className={item.type === 'todo' ? styles.todoTag : styles.taskTag}>
+            {item.type === 'todo' ? '待办' : '任务'}
+          </span>
+          <span className={styles.itemTitle}>{item.title}</span>
         </div>
       ))}
     </div>,
     document.body,
   )
-}
-
-// ---------------------------------------------------------------------------
-// ImgToolbarPortal · 图片 hover 浮层工具条（25/50/75/100 + 🗑）
-// ---------------------------------------------------------------------------
-interface ImgToolbarPortalProps {
-  rootRef: React.RefObject<HTMLElement | null>
-  sizeMap: Record<number, number>
-  onSizeChange: (id: number, size: number) => void
-  onDelete: (id: number) => void
-}
-
-function ImgToolbarPortal({
-  rootRef,
-  sizeMap,
-  onSizeChange,
-  onDelete,
-}: ImgToolbarPortalProps) {
-  const [hovered, setHovered] = useState<{ id: number; rect: DOMRect } | null>(
-    null,
-  )
-
-  useEffect(() => {
-    const root = rootRef.current
-    if (!root) return
-    const onMove = (e: MouseEvent) => {
-      const t = e.target as HTMLElement | null
-      if (!t) {
-        setHovered(null)
-        return
-      }
-      const img =
-        t.tagName === 'IMG'
-          ? (t as HTMLImageElement)
-          : (t.closest('img') as HTMLImageElement | null)
-      if (!img) {
-        setHovered(null)
-        return
-      }
-      const m = img.src.match(/\/api\/attachments\/(\d+)/)
-      if (!m) {
-        setHovered(null)
-        return
-      }
-      const id = Number(m[1])
-      if (!id) {
-        setHovered(null)
-        return
-      }
-      setHovered((prev) =>
-        prev?.id === id ? prev : { id, rect: img.getBoundingClientRect() },
-      )
-    }
-    const onLeave = () => setHovered(null)
-    const onScroll = () => setHovered(null)
-    root.addEventListener('mousemove', onMove)
-    root.addEventListener('mouseleave', onLeave)
-    window.addEventListener('scroll', onScroll, true)
-    return () => {
-      root.removeEventListener('mousemove', onMove)
-      root.removeEventListener('mouseleave', onLeave)
-      window.removeEventListener('scroll', onScroll, true)
-    }
-  }, [rootRef])
-
-  if (!hovered) return null
-  const size = sizeMap[hovered.id] ?? 100
-  return createPortal(
-    <div
-      className={styles.imgToolbar}
-      style={{
-        position: 'fixed',
-        top: hovered.rect.top + 4,
-        left: hovered.rect.right - 4,
-        transform: 'translate(-100%, 0)',
-        zIndex: 9999,
-      }}
-    >
-      {SIZE_PRESETS.map((p) => (
-        <button
-          key={p}
-          type="button"
-          className={`${styles.sizeBtn} ${size === p ? styles.sizeBtnActive : ''}`}
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={(e) => {
-            e.preventDefault()
-            e.stopPropagation()
-            onSizeChange(hovered.id, p)
-          }}
-        >
-          {p}
-        </button>
-      ))}
-      <button
-        type="button"
-        className={styles.delBtn}
-        onMouseDown={(e) => e.preventDefault()}
-        onClick={(e) => {
-          e.preventDefault()
-          e.stopPropagation()
-          onDelete(hovered.id)
-        }}
-        title="删除图片"
-        aria-label="删除图片"
-      >
-        🗑
-      </button>
-    </div>,
-    document.body,
-  )
-}
-
-function sourceTypeLabel(t: 'task' | 'log' | 'todo'): string {
-  if (t === 'task') return '任务'
-  if (t === 'log') return '日志'
-  return '待办'
 }

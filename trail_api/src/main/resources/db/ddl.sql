@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS work_logs (
     content           TEXT    NOT NULL,
     polished_content  TEXT,
     hours             REAL    NOT NULL DEFAULT 1.0,    -- 工时（小时），0 < hours < 12
+    task_ids          TEXT    NOT NULL DEFAULT '[]',   -- 关联任务 ID 列表（JSON 数组）
     is_deleted        INTEGER NOT NULL DEFAULT 0,      -- BOOLEAN → INTEGER
     deleted_at        TEXT,
     updated_at        TEXT,
@@ -111,6 +112,19 @@ CREATE INDEX IF NOT EXISTS idx_todos_completed      ON todos(is_completed);
 CREATE INDEX IF NOT EXISTS idx_todos_abandoned      ON todos(is_abandoned);
 CREATE INDEX IF NOT EXISTS idx_todos_status_created ON todos(is_abandoned, is_completed, created_at);
 CREATE INDEX IF NOT EXISTS idx_attachments_sha256  ON attachments(sha256);
+
+-- 8) 日志-待办关联（M12：日志关联待办）
+CREATE TABLE IF NOT EXISTS log_todo_refs (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    log_id      INTEGER NOT NULL,
+    todo_id     INTEGER NOT NULL,
+    created_at  TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (log_id) REFERENCES work_logs(id) ON DELETE CASCADE,
+    FOREIGN KEY (todo_id) REFERENCES todos(id) ON DELETE CASCADE,
+    UNIQUE(log_id, todo_id)
+);
+CREATE INDEX IF NOT EXISTS idx_log_todo_refs_log  ON log_todo_refs(log_id);
+CREATE INDEX IF NOT EXISTS idx_log_todo_refs_todo ON log_todo_refs(todo_id);
 
 -- 3) 1 个视图
 --    DuckDB 版用 CURRENT_DATE - log_date → SQLite 用 julianday('now') - julianday(log_date)

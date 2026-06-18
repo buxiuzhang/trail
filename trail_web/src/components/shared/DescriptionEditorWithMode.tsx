@@ -27,6 +27,7 @@ import {
 import { DescriptionEditor } from './DescriptionEditor'
 import { IconPreview, IconSource } from './ModeIcons'
 import { type EditorMode } from './ModeToggleButton'
+import type { TodoOut, TaskOut } from '@/types'
 import styles from './DescriptionEditorWithMode.module.css'
 
 export type { EditorMode }
@@ -42,6 +43,10 @@ interface Props {
   rows?: number
   minHeight?: number
   textareaClassName?: string
+  /** 当前任务的待办列表（用于 @ 提及） */
+  todos?: TodoOut[]
+  /** 全局任务列表（用于 @ 任务引用） */
+  tasks?: TaskOut[]
 }
 
 export const DescriptionEditorWithMode = forwardRef<HTMLTextAreaElement, Props>(
@@ -56,6 +61,8 @@ export const DescriptionEditorWithMode = forwardRef<HTMLTextAreaElement, Props>(
       rows,
       minHeight = 120,
       textareaClassName = 'field__textarea',
+      todos = [],
+      tasks = [],
     },
     ref,
   ) {
@@ -113,6 +120,8 @@ export const DescriptionEditorWithMode = forwardRef<HTMLTextAreaElement, Props>(
             rows={rows}
             minHeight={minHeight}
             textareaClassName={textareaClassName}
+            todos={todos}
+            tasks={tasks}
           />
         ) : (
           <textarea

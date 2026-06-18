@@ -1,0 +1,133 @@
+/* ============================================================
+   日志关联待办 / TodoRefSection
+   ============================================================ */
+
+.section {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 0.5px solid var(--rule-soft);
+}
+
+.selectedList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.selectedItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px 2px 8px;
+  background: var(--rule-soft);
+  border-radius: 2px;
+}
+
+.selectedTitle {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.removeBtn {
+  background: none;
+  border: none;
+  padding: 0 2px;
+  cursor: pointer;
+  color: var(--ink-ghost);
+  font-size: 14px;
+  line-height: 1;
+  transition: color 150ms;
+}
+
+.removeBtn:hover {
+  color: var(--ink);
+}
+
+.inputRow {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.input {
+  flex: 1;
+  font-family: var(--body);
+  font-size: 14px;
+  padding: 4px 0;
+  background: transparent;
+  border: none;
+  border-bottom: 0.5px solid var(--rule);
+  color: var(--ink);
+  outline: none;
+  transition: border-bottom-color 200ms ease;
+}
+
+.input:focus {
+  border-bottom-color: var(--ink);
+}
+
+.input::placeholder {
+  color: var(--ink-ghost);
+  font-style: italic;
+}
+
+.input:disabled {
+  color: var(--ink-ghost);
+  cursor: not-allowed;
+}
+
+.addBtn {
+  background: none;
+  border: none;
+  padding: 0 4px;
+  cursor: pointer;
+  color: var(--ink-faded);
+  font-size: 18px;
+  font-weight: 300;
+  line-height: 1;
+  transition: color 150ms;
+}
+
+.addBtn:hover:not(:disabled) {
+  color: var(--ink);
+}
+
+.addBtn:disabled {
+  color: var(--ink-ghost);
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* 自动完成下拉 */
+.autocomplete {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 24px;
+  z-index: 100;
+  margin-top: 4px;
+  background: var(--card);
+  border: 0.5px solid var(--rule);
+  box-shadow: 0 8px 24px -12px rgba(60,40,15,0.25);
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.autocompleteItem {
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background 100ms;
+}
+
+.autocompleteItem:hover {
+  background: var(--card-deep);
+}
+
+.itemTitle {
+  font-family: var(--body);
+  font-size: 13px;
+  color: var(--ink);
+}

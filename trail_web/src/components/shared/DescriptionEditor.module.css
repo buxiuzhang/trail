@@ -5,7 +5,6 @@
      .editorBox         相对定位容器，挂 minHeight 与 field__textarea 视觉
      .tiptapContainer   TipTap 挂载点 + 字体度量对齐
      .hiddenTaMirror    视觉隐藏的 textarea 镜像（兼容 .logbook textarea 选择器）
-     .imgToolbar        Portal 浮层工具条（25/50/75/100 + 🗑）
 
    注意：textareaClassName="field__textarea" 被透传到 .editorBox 上，
    下方 `.editorBox.field__textarea` 选择器为容器提供 textarea 风格视觉。
@@ -19,19 +18,11 @@
 /* ---- TipTap 容器：字体度量严格对齐 .field__textarea ----- */
 
 .tiptapContainer {
-  font-family: var(--body);
-  font-size: 16px;
-  line-height: 1.6;
-  color: var(--ink);
   caret-color: var(--ink);
 }
 
 /* TipTap 编辑器样式 */
 .tiptapContainer :global(.tiptap) {
-  font-family: var(--body) !important;
-  font-size: 16px !important;
-  line-height: 1.6 !important;
-  color: var(--ink) !important;
   background: transparent !important;
   outline: none !important;
   padding: 8px 12px !important;
@@ -55,121 +46,6 @@
   background: var(--ink-faded) !important;
 }
 
-/* 标题 */
-.tiptapContainer :global(.tiptap h1),
-.tiptapContainer :global(.tiptap h2),
-.tiptapContainer :global(.tiptap h3),
-.tiptapContainer :global(.tiptap h4),
-.tiptapContainer :global(.tiptap h5),
-.tiptapContainer :global(.tiptap h6) {
-  font-family: var(--serif-sc) !important;
-  color: var(--ink) !important;
-  margin: 1em 0 0.5em !important;
-  text-align: left !important;
-}
-
-/* 段落 */
-.tiptapContainer :global(.tiptap p) {
-  margin: 0.15em 0 !important;
-  text-align: left !important;
-  line-height: 1.6 !important;
-  padding: 0 !important;
-}
-
-/* 列表 */
-.tiptapContainer :global(.tiptap ul),
-.tiptapContainer :global(.tiptap ol) {
-  margin: 0.25em 0 !important;
-  padding-left: 1.5em !important;
-  text-align: left !important;
-  list-style-position: outside !important;
-}
-
-.tiptapContainer :global(.tiptap li) {
-  margin: 0.1em 0 !important;
-  text-align: left !important;
-}
-
-.tiptapContainer :global(.tiptap li p) {
-  margin: 0 !important;
-}
-
-.tiptapContainer :global(.tiptap ul) {
-  list-style-type: disc !important;
-}
-
-.tiptapContainer :global(.tiptap ol) {
-  list-style-type: decimal !important;
-}
-
-/* 代码 */
-.tiptapContainer :global(.tiptap code) {
-  font-family: var(--mono) !important;
-  background: var(--ink-ghost) !important;
-  color: var(--ink) !important;
-  padding: 2px 6px !important;
-  border-radius: 2px !important;
-}
-
-.tiptapContainer :global(.tiptap pre) {
-  background: var(--ink-faded) !important;
-  padding: 12px !important;
-  border-radius: 4px !important;
-  overflow-x: auto;
-  text-align: left !important;
-}
-
-.tiptapContainer :global(.tiptap pre code) {
-  background: transparent !important;
-  padding: 0 !important;
-}
-
-/* 引用 */
-.tiptapContainer :global(.tiptap blockquote) {
-  border-left: 3px solid var(--ink-faded) !important;
-  margin: 1em 0 !important;
-  padding-left: 1em !important;
-  color: var(--ink-soft) !important;
-  text-align: left !important;
-}
-
-/* 链接 */
-.tiptapContainer :global(.tiptap a) {
-  color: var(--green-ink) !important;
-  text-decoration: underline !important;
-}
-
-/* 图片 */
-.tiptapContainer :global(.tiptap img) {
-  max-width: 100%;
-  height: auto;
-  border-radius: 4px;
-  margin: 8px 0;
-  display: block;
-}
-
-/* 粗体 / 斜体 */
-.tiptapContainer :global(.tiptap strong) {
-  font-weight: 700 !important;
-}
-
-.tiptapContainer :global(.tiptap em) {
-  font-style: italic !important;
-}
-
-/* 水平线 */
-.tiptapContainer :global(.tiptap hr) {
-  border: none !important;
-  border-top: 1px solid var(--ink-faded) !important;
-  margin: 1.5em 0 !important;
-}
-
-/* ---- Modal 弹窗内 ::before 干扰修复 ----- */
-/* 注意：不能禁用 li 的 list-style，否则有序/无序列表的编号会消失 */
-.tiptapContainer :global(li)::before,
-.tiptapContainer :global(li)::after {
-  content: none !important;
-}
 
 /* ---- field__textarea 视觉强覆写 -------------------------- */
 
@@ -208,58 +84,6 @@
   opacity: 0;
   pointer-events: none;
 }
-
-/* ---- 图片 hover 浮层工具条（Portal 到 body） ----------- */
-
-.imgToolbar {
-  display: flex;
-  gap: 2px;
-  background: var(--paper);
-  border: 0.5px solid var(--rule);
-  border-radius: 2px;
-  padding: 2px 4px;
-  font: var(--mono);
-  box-shadow: 0 1px 3px rgba(26, 22, 18, 0.08);
-}
-
-.sizeBtn {
-  font: var(--mono);
-  font-size: 10.5px;
-  padding: 2px 6px;
-  color: var(--ink-faded);
-  background: transparent;
-  border: none;
-  border-radius: 1px;
-  cursor: pointer;
-  transition: color 0.12s ease, background 0.12s ease;
-}
-
-.sizeBtn:hover {
-  color: var(--ink);
-}
-
-.sizeBtnActive {
-  color: var(--oxblood);
-  background: var(--oxblood-bg);
-}
-
-.delBtn {
-  font-size: 11px;
-  padding: 2px 6px;
-  color: var(--ink-ghost);
-  background: transparent;
-  border: none;
-  border-left: 0.5px solid var(--rule);
-  margin-left: 2px;
-  padding-left: 6px;
-  cursor: pointer;
-  transition: color 0.12s ease;
-}
-
-.delBtn:hover {
-  color: var(--oxblood);
-}
-
 /* ---- @ 提及候选浮层（Portal 到 body） ----------- */
 
 .mentionPopup {
@@ -292,9 +116,77 @@
   background: var(--card-deep);
 }
 
-.todoTitle {
+.todoTag {
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 1px 4px;
+  background: var(--rule-soft);
+  border-radius: 2px;
+  color: var(--ink-soft);
+}
+
+.taskTag {
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 1px 4px;
+  background: var(--green-bg);
+  border-radius: 2px;
+  color: var(--green-ink);
+}
+
+.itemTitle {
   font-family: var(--serif-sc);
   font-size: 14px;
   color: var(--ink);
   flex: 1;
 }
+
+/* ---- @ 提及装饰样式（编辑器内显示标题而非 ID） ----------- */
+
+/* 待办提及装饰：隐藏原始文本，用 ::after 显示标题 */
+.todoMentionDecor {
+  font-size: 0 !important;
+  color: transparent !important;
+  display: inline;
+  white-space: pre;
+}
+
+.todoMentionDecor::after {
+  content: attr(data-mention-title) !important;
+  font-family: var(--serif-sc) !important;
+  font-size: 16px !important;
+  line-height: 1.6 !important;
+  color: var(--ink) !important;
+  text-decoration: underline !important;
+  text-decoration-color: var(--ink-soft) !important;
+  text-decoration-style: dashed !important;
+  padding: 0 2px;
+  margin-right: 4px;
+}
+
+/* 任务引用装饰：隐藏原始文本，用 ::after 显示标题 */
+.taskMentionDecor {
+  font-size: 0 !important;
+  color: transparent !important;
+  display: inline;
+  white-space: pre;
+}
+
+.taskMentionDecor::after {
+  content: attr(data-mention-title) !important;
+  font-family: var(--serif-sc) !important;
+  font-size: 16px !important;
+  line-height: 1.6 !important;
+  color: var(--green-ink) !important;
+  text-decoration: underline !important;
+  text-decoration-color: var(--green-ink) !important;
+  cursor: pointer;
+  padding: 0 2px;
+  margin-right: 4px;
+}
+
+.taskMentionDecor:hover::after {
+  background: var(--green-bg);
+  border-radius: 2px;
+}
+

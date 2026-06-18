@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { TaskOut, LogOut } from '@/types'
+import type { TaskOut, LogOut, TodoOut } from '@/types'
 import { LogCompose } from './LogCompose'
 import { LogEntry } from './LogEntry'
 import styles from './Logbook.module.css'
@@ -9,13 +9,16 @@ type SortOrder = 'asc' | 'desc'
 interface LogbookProps {
   task: TaskOut
   logs: LogOut[]
-  onSaveNew: (data: { log_date: string; content: string; phase: string; hours: number }) => Promise<void>
-  onSaveEdit: (logId: number, data: { log_date: string; content: string; phase: string; hours: number }) => Promise<void>
+  todos: TodoOut[]
+  /** 全局任务列表（用于 @ 任务引用） */
+  tasks?: TaskOut[]
+  onSaveNew: (data: { log_date: string; content: string; phase: string; hours: number; todo_ids: number[]; task_ids: number[] }) => Promise<void>
+  onSaveEdit: (logId: number, data: { log_date: string; content: string; phase: string; hours: number; todo_ids: number[]; task_ids: number[] }) => Promise<void>
   onDelete: (logId: number) => void
   onAddLogFocus: boolean
 }
 
-export function Logbook({ task, logs, onSaveNew, onSaveEdit, onDelete, onAddLogFocus }: LogbookProps) {
+export function Logbook({ task, logs, todos, tasks = [], onSaveNew, onSaveEdit, onDelete, onAddLogFocus }: LogbookProps) {
   const [editingLogId, setEditingLogId] = useState<number | null>(null)
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc')
 
@@ -36,6 +39,8 @@ export function Logbook({ task, logs, onSaveNew, onSaveEdit, onDelete, onAddLogF
       {(task.status !== '已作废' && !(task.status === '已完成' && task.nature !== '维护')) ? (
         <LogCompose
           task={task}
+          todos={todos}
+          tasks={tasks}
           editing={null}
           onSave={onSaveNew}
           onCancel={() => {}}
@@ -80,6 +85,8 @@ export function Logbook({ task, logs, onSaveNew, onSaveEdit, onDelete, onAddLogF
               key={l.id}
               task={task}
               log={l}
+              todos={todos}
+              tasks={tasks}
               isEditing={editingLogId === l.id}
               onEdit={() => setEditingLogId(l.id)}
               onDelete={() => onDelete(l.id)}

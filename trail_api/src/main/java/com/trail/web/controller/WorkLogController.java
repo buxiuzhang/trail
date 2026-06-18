@@ -38,7 +38,13 @@ public class WorkLogController {
             @Parameter(description = "是否包含已删除的日志")
             @RequestParam(defaultValue = "false") boolean includeDeleted) {
         return logs.listLogs(taskId, phase, includeDeleted, null, null).stream()
-                .map(LogMapper::toResponse).toList();
+                .map(row -> {
+                    long logId = ((Number) row.get("id")).longValue();
+                    List<Long> todoIds = logs.getTodoIdsForLog(logId);
+                    List<Long> taskIds = logs.getTaskIdsForLog(logId);
+                    return LogMapper.toResponse(row, todoIds, taskIds);
+                })
+                .toList();
     }
 
     @Operation(summary = "添加工作日志（日报）", description = "为指定任务添加一条工作日志。如果是该任务的第一条日志，任务状态会自动从「未开始」变为「进行中」。")
@@ -46,28 +52,34 @@ public class WorkLogController {
     public ResponseEntity<LogResponse> add(
             @Parameter(description = "任务 ID")
             @PathVariable long taskId,
-            @Parameter(description = "日志内容，包含 log_date（日期 YYYY-MM-DD）、content（日志内容）、phase（阶段，默认 main）、hours（工时，默认 1.0）")
+            @Parameter(description = "日志内容，包含 log_date（日期 YYYY-MM-DD）、content（日志内容）、phase（阶段，默认 main）、hours（工时，默认 1.0）、todoIds（关联待办 ID 列表）、taskIds（关联任务 ID 列表）")
             @RequestBody LogCreateRequest req) {
         String phase = req.phase() == null ? "main" : req.phase();
-        var created = logs.addLog(taskId, req.logDate(), req.content(), phase, req.hours());
+        var created = logs.addLog(taskId, req.logDate(), req.content(), phase, req.hours(), req.todoIds(), req.taskIds());
         // 首日志：未开始 → 进行中
         var task = tasks.getTask(taskId);
         if ("未开始".equals(task.get("status"))) {
             tasks.changeStatus(taskId, "进行中", null, false);
         }
-        return ResponseEntity.status(HttpStatus.CREATED).body(LogMapper.toResponse(created));
+        long logId = ((Number) created.get("id")).longValue();
+        List<Long> todoIds = logs.getTodoIdsForLog(logId);
+        List<Long> taskIds = logs.getTaskIdsForLog(logId);
+        return ResponseEntity.status(HttpStatus.CREATED).body(LogMapper.toResponse(created, todoIds, taskIds));
     }
 
-    @Operation(summary = "编辑工作日志", description = "修改已有工作日志的内容、日期、阶段或工时。")
+    @Operation(summary = "编辑工作日志", description = "修改已有工作日志的内容、日期、阶段、工时或关联待办。")
     @PutMapping("/{logId}")
     public LogResponse update(
             @Parameter(description = "任务 ID")
             @PathVariable long taskId,
             @Parameter(description = "日志 ID")
             @PathVariable long logId,
-            @Parameter(description = "要修改的字段，包含 content（内容）、log_date（日期）、phase（阶段）、hours（工时）")
+            @Parameter(description = "要修改的字段，包含 content（内容）、log_date（日期）、phase（阶段）、hours（工时）、todoIds（关联待办 ID 列表）、taskIds（关联任务 ID 列表）")
             @RequestBody LogUpdateRequest req) {
-        return LogMapper.toResponse(logs.updateLog(logId, taskId, req.content(), req.logDate(), req.phase(), req.hours()));
+        var updated = logs.updateLog(logId, taskId, req.content(), req.logDate(), req.phase(), req.hours(), req.todoIds(), req.taskIds());
+        List<Long> todoIds = logs.getTodoIdsForLog(logId);
+        List<Long> taskIds = logs.getTaskIdsForLog(logId);
+        return LogMapper.toResponse(updated, todoIds, taskIds);
     }
 
     @Operation(summary = "删除工作日志", description = "删除指定的工作日志。默认软删除（标记为已删除），hard=true 时永久删除。")

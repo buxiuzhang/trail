@@ -8,6 +8,7 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 import java.time.LocalDate;
+import java.util.List;
 
 public record LogCreateRequest(
         @NotNull LocalDate logDate,
@@ -18,5 +19,9 @@ public record LogCreateRequest(
         // M11：工时（小时），可选，默认 1.0
         @DecimalMin(value = "0.0", inclusive = false, message = "工时必须大于 0")
         @DecimalMax(value = "12.0", inclusive = false, message = "工时必须小于 12")
-        Double hours
+        Double hours,
+        // M12：关联待办 ID 列表
+        List<Long> todoIds,
+        // 关联任务 ID 列表
+        List<Long> taskIds
 ) {}

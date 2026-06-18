@@ -1,0 +1,134 @@
+/* ============================================================
+   TipTapContent.module.css · TipTap 内容区域共享排版样式
+   ============================================================
+   MarkdownRenderer（只读预览）和 DescriptionEditor（编辑器）
+   共用此样式，确保同一份 markdown 在两处渲染视觉一致。
+
+   容器专属样式（padding / min-height / cursor 等）保留在各自
+   CSS 模块中。
+
+   修改此文件时无需同步其他 CSS。
+   ============================================================ */
+
+.content :global(.tiptap) {
+  font-family: var(--body);
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--ink);
+  background: transparent;
+}
+
+.content :global(.tiptap .ProseMirror) {
+  outline: none;
+}
+
+/* 标题 */
+.content :global(.tiptap h1),
+.content :global(.tiptap h2),
+.content :global(.tiptap h3),
+.content :global(.tiptap h4),
+.content :global(.tiptap h5),
+.content :global(.tiptap h6) {
+  font-family: var(--serif-sc);
+  color: var(--ink);
+  margin: 1em 0 0.5em;
+}
+
+/* 段落 */
+.content :global(.tiptap p) {
+  margin: 0.15em 0;
+  line-height: 1.6;
+}
+
+/* 列表 */
+.content :global(.tiptap ul),
+.content :global(.tiptap ol) {
+  margin: 0.25em 0;
+  padding-left: 1.5em;
+}
+
+.content :global(.tiptap ul) {
+  list-style-type: disc;
+}
+
+.content :global(.tiptap ol) {
+  list-style-type: decimal;
+}
+
+.content :global(.tiptap li) {
+  margin: 0.1em 0;
+}
+
+.content :global(.tiptap li p) {
+  margin: 0;
+}
+
+/* 防止 Modal 的 ::before 干扰列表编号 */
+.content :global(li)::before,
+.content :global(li)::after {
+  content: none !important;
+}
+
+/* 文本格式 */
+.content :global(.tiptap strong) {
+  font-weight: 700;
+}
+
+.content :global(.tiptap em) {
+  font-style: italic;
+}
+
+/* 链接 */
+.content :global(.tiptap a) {
+  color: var(--green-ink);
+  text-decoration: underline;
+}
+
+/* 图片 */
+.content :global(.tiptap img) {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+  margin: 8px 0;
+  display: block;
+}
+
+/* 代码（行内） */
+.content :global(.tiptap code) {
+  font-family: var(--mono);
+  font-size: 13px;
+  background: var(--ink-ghost);
+  color: var(--ink);
+  padding: 2px 6px;
+  border-radius: 2px;
+}
+
+/* 代码块 */
+.content :global(.tiptap pre) {
+  font-family: var(--mono);
+  font-size: 13px;
+  background: var(--ink-faded);
+  padding: 12px;
+  border-radius: 4px;
+  overflow-x: auto;
+}
+
+.content :global(.tiptap pre code) {
+  background: transparent;
+  padding: 0;
+}
+
+/* 引用 */
+.content :global(.tiptap blockquote) {
+  border-left: 3px solid var(--ink-faded);
+  padding-left: 1em;
+  margin: 1em 0;
+  color: var(--ink-soft);
+}
+
+/* 水平线 */
+.content :global(.tiptap hr) {
+  border: none;
+  border-top: 1px solid var(--ink-faded);
+  margin: 1.5em 0;
+}

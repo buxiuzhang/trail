@@ -7,6 +7,8 @@ export interface LogCreate {
   content: string;
   phase?: string;     // 默认 "main"
   hours?: number;     // M11：工时（小时），默认 1.0
+  todo_ids?: number[];  // M12：关联待办 ID 列表
+  task_ids?: number[];  // 关联任务 ID 列表
 }
 
 /** 更新日志请求（全部字段可选） */
@@ -15,6 +17,8 @@ export interface LogUpdate {
   log_date?: string;
   phase?: string;
   hours?: number;     // M11：工时（小时）
+  todo_ids?: number[];  // M12：关联待办 ID 列表（null = 不改，空数组 = 清空）
+  task_ids?: number[];  // 关联任务 ID 列表（null = 不改，空数组 = 清空）
 }
 
 /** 日志输出（API 返回） */
@@ -32,4 +36,6 @@ export interface LogOut {
   updated_at: string | null;
   edit_count: number;
   created_at: string | null;
+  todo_ids: number[];  // M12：关联待办 ID 列表
+  task_ids: number[];  // 关联任务 ID 列表
 }

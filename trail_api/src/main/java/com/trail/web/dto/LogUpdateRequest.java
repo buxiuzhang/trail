@@ -6,6 +6,7 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 import java.time.LocalDate;
+import java.util.List;
 
 /** 全 Optional；至少一项非 null。 */
 public record LogUpdateRequest(
@@ -16,5 +17,9 @@ public record LogUpdateRequest(
         // M11：工时（小时），可选
         @DecimalMin(value = "0.0", inclusive = false, message = "工时必须大于 0")
         @DecimalMax(value = "12.0", inclusive = false, message = "工时必须小于 12")
-        Double hours
+        Double hours,
+        // M12：关联待办 ID 列表（null = 不改，空列表 = 清空关联）
+        List<Long> todoIds,
+        // 关联任务 ID 列表（null = 不改，空列表 = 清空关联）
+        List<Long> taskIds
 ) {}

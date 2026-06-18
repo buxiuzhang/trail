@@ -1,7 +1,7 @@
 import type { TaskOut } from '@/types'
 import { Stamp } from '@/components/task/Stamp'
 import { NatureBadge } from '@/components/task/NatureBadge'
-import { CollapsibleText } from '@/components/shared/CollapsibleText'
+import { ContentViewer } from '@/components/shared/ContentViewer'
 
 interface DetailHeaderProps {
   task: TaskOut
@@ -10,6 +10,7 @@ interface DetailHeaderProps {
 }
 
 export function DetailHeader({ task, catalog, logCount }: DetailHeaderProps) {
+
   return (
     <header className="detail__hd">
       <div className="detail__cat-row">
@@ -20,10 +21,9 @@ export function DetailHeader({ task, catalog, logCount }: DetailHeaderProps) {
       <h1 className="detail__title detail__title-zh">{task.title}</h1>
       {task.alias && <p className="detail__alias">ALIAS · <em>{task.alias}</em></p>}
       {task.description && (
-        <CollapsibleText
+        <ContentViewer
           text={task.description}
           maxHeight={200}
-          maxImgHeight={120}
           className="detail__lede"
         />
       )}

@@ -1,4 +1,4 @@
-import { RichText } from '@/components/shared/RichText'
+import { MarkdownRenderer } from '@/components/shared/MarkdownRenderer'
 
 interface SummaryBoxProps {
   label: string
@@ -11,7 +11,7 @@ export function SummaryBox({ label, content, variant = 'main' }: SummaryBoxProps
   return (
     <div className={className}>
       <span className="summary-box__label">{label}</span>
-      <RichText text={content} />
+      <MarkdownRenderer text={content} />
     </div>
   )
 }

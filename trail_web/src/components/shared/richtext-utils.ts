@@ -1,67 +1,44 @@
 /**
- * 描述/正文里识别 markdown 图片引用的纯函数。
+ * 描述/正文里识别 markdown 图片引用和待办/任务提及的纯函数。
  * 单独成文件是因为 react-refresh/only-export-components 不允许 .tsx 组件文件同时 export 非组件。
  */
-export interface ImageRef {
-  alt: string
-  url: string
-}
 
-const IMG_RE = /!\[([^\]]*)\]\((\/api\/attachments\/\d+)(?:\s+"[^"]*")?\)/g
-
-/** 提取文本里所有 `![]()` 图片引用（描述/正文回显用，DescriptionEditor 也用） */
-export function extractImageRefs(text: string): ImageRef[] {
-  const out: ImageRef[] = []
+/** 提取文本里所有待办提及的 ID（用于保存关联） */
+export function extractTodoMentionIds(text: string): number[] {
+  const ids: number[] = []
+  const re = /@todo:(\d+)/g
   let m: RegExpExecArray | null
-  IMG_RE.lastIndex = 0  // 安全：避免调用方传了 stateful regex
-  const re = /!\[([^\]]*)\]\((\/api\/attachments\/\d+)(?:\s+"[^"]*")?\)/g
   while ((m = re.exec(text)) !== null) {
-    out.push({ alt: m[1] || '', url: m[2] })
+    ids.push(parseInt(m[1], 10))
   }
-  return out
+  return [...new Set(ids)] // 去重
 }
 
-/** 把文本切成 [textPart, imgPart, ...] 序列，供 RichText 渲染。 */
-export function parseRichText(text: string): Array<
-  | { kind: 'text'; value: string }
-  | { kind: 'img'; alt: string; url: string; inlineCount?: number }
-> {
-  // 先按换行符分割成行
-  const lines = text.split('\n')
-  const out: Array<
-    | { kind: 'text'; value: string }
-    | { kind: 'img'; alt: string; url: string; inlineCount?: number }
-  > = []
+/** 提取文本里所有任务引用的 ID */
+export function extractTaskRefIds(text: string): number[] {
+  const ids: number[] = []
+  const re = /@task:(\d+)/g
+  let m: RegExpExecArray | null
+  while ((m = re.exec(text)) !== null) {
+    ids.push(parseInt(m[1], 10))
+  }
+  return [...new Set(ids)] // 去重
+}
 
-  lines.forEach((line, lineIdx) => {
-    // 统计这一行有多少张图片
-    const imgMatches = [...line.matchAll(/!\[([^\]]*)\]\((\/api\/attachments\/\d+)(?:\s+"[^"]*")?\)/g)]
-    const imgCount = imgMatches.length
-
-    let last = 0
-    const re = /!\[([^\]]*)\]\((\/api\/attachments\/\d+)(?:\s+"[^"]*")?\)/g
-    let m: RegExpExecArray | null
-
-    while ((m = re.exec(line)) !== null) {
-      // 图片前的文本
-      if (m.index > last) {
-        out.push({ kind: 'text', value: line.slice(last, m.index) })
-      }
-      // 图片，附加上同行图片数量
-      out.push({ kind: 'img', alt: m[1] || '', url: m[2], inlineCount: imgCount })
-      last = re.lastIndex
+/** 规范化提及格式：确保每个提及后面有空格
+ *  在保存前调用，让保存的内容包含空格，便于后续编辑时光标定位
+ */
+export function normalizeMentions(text: string): string {
+  // 匹配所有 @todo:ID 或 @task:ID，检查后面是否有空格/换行
+  // 如果没有则添加空格（包括末尾的引用）
+  return text.replace(/@(todo|task):(\d+)/g, (match, _type, _id, offset, str) => {
+    const afterIdx = offset + match.length
+    const afterChar = str[afterIdx]
+    // 如果后面是空格或换行，不处理
+    if (afterChar === ' ' || afterChar === '\n') {
+      return match
     }
-
-    // 行末剩余文本
-    if (last < line.length) {
-      out.push({ kind: 'text', value: line.slice(last) })
-    }
-
-    // 非最后一行，补上换行符
-    if (lineIdx < lines.length - 1) {
-      out.push({ kind: 'text', value: '\n' })
-    }
+    // 否则添加空格（包括后面没有字符的情况，即行末）
+    return match + ' '
   })
-
-  return out
 }

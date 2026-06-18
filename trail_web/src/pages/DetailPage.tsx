@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { useTask, useUpdateTask, useChangeTaskStatus, useCancelTask } from '@/api/tasks'
+import { useTask, useUpdateTask, useChangeTaskStatus, useCancelTask, useTasks } from '@/api/tasks'
 import { useLogs, useCreateLog, useUpdateLog, useDeleteLog } from '@/api/logs'
 import { useTodos, useCreateTodo, useUpdateTodo, useCompleteTodo, useAbandonTodo, useDeleteTodo } from '@/api/todos'
 import { usePlaceholders, DEFAULT_PLACEHOLDERS } from '@/api/settings'
@@ -213,6 +213,7 @@ export function DetailPage() {
   const { data: task, isLoading, error } = useTask(taskId)
   const { data: logs = [] } = useLogs(taskId)
   const { data: todos = [] } = useTodos(taskId)
+  const { data: allTasks = [] } = useTasks()
   const [metaCollapsed, setMetaCollapsed] = useState(false)
   const updateTask = useUpdateTask(taskId)
   const createLog = useCreateLog(taskId)
@@ -234,7 +235,7 @@ export function DetailPage() {
   const catalog = catalogOf(task.id, task.created_at)
 
   // ── 日志操作 ──
-  async function handleSaveNew(data: { log_date: string; content: string; phase: string; hours: number }) {
+  async function handleSaveNew(data: { log_date: string; content: string; phase: string; hours: number; todo_ids: number[]; task_ids: number[] }) {
     await createLog.mutateAsync(data)
     // 首次记录时自动设置 processing_date
     if (!task!.processing_date) {
@@ -243,7 +244,7 @@ export function DetailPage() {
     showToast('已落档')
   }
 
-  async function handleSaveEdit(logId: number, data: { log_date: string; content: string; phase: string; hours: number }) {
+  async function handleSaveEdit(logId: number, data: { log_date: string; content: string; phase: string; hours: number; todo_ids: number[]; task_ids: number[] }) {
     await updateLog.mutateAsync({ logId, data })
     showToast('已保存')
   }
@@ -573,6 +574,8 @@ export function DetailPage() {
         <Logbook
           task={task}
           logs={activeLogs}
+          todos={todos}
+          tasks={allTasks}
           onSaveNew={handleSaveNew}
           onSaveEdit={handleSaveEdit}
           onDelete={handleDelete}

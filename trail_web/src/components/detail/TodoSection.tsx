@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { TaskOut, TodoOut } from '@/types'
 import addTodoIcon from '@/assets/add-todo.svg'
-import { RichText } from '@/components/shared/RichText'
+import { ContentViewer } from '@/components/shared/ContentViewer'
 import styles from './TodoSection.module.css'
 
 interface TodoSectionProps {
@@ -120,7 +120,10 @@ export function TodoSection({
                 {expanded && (
                   <div className={styles.descBlock}>
                     {t.description && (
-                      <RichText text={t.description} className={styles.descText} maxImgHeight={80} />
+                      <ContentViewer
+                        text={t.description}
+                        className={styles.descText}
+                      />
                     )}
                     {!isCompleted && !isClosed && (
                       <div className={styles.descActions}>

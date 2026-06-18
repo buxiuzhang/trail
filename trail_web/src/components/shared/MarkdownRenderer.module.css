@@ -1,106 +1,77 @@
 /* ============================================================
-   MarkdownRenderer · 只读 markdown 渲染样式
+   MarkdownRenderer · 容器专属样式
+   TipTap 内容排版样式统一在 TipTapContent.module.css 中定义
    ============================================================ */
 
 .renderer {
   width: 100%;
 }
 
-/* 与 field__textarea 字体一致 */
-.renderer :global(.milkdown) {
-  font-family: var(--body);
-  font-size: 14.5px;
-  line-height: 1.6;
-  color: var(--ink);
-  background: transparent;
+/* TipTap 只读容器 */
+.renderer :global(.tiptap) {
   padding: 0;
 }
 
-.renderer :global(.milkdown .ProseMirror) {
-  outline: none;
-  padding: 0;
+.renderer :global(.tiptap .ProseMirror) {
   cursor: default;
   user-select: text;
 }
 
-/* 标题 */
-.renderer :global(.milkdown .ProseMirror h1),
-.renderer :global(.milkdown .ProseMirror h2),
-.renderer :global(.milkdown .ProseMirror h3),
-.renderer :global(.milkdown .ProseMirror h4),
-.renderer :global(.milkdown .ProseMirror h5),
-.renderer :global(.milkdown .ProseMirror h6) {
-  font-family: var(--serif-sc);
-  color: var(--ink);
-  margin: 0.5em 0 0.25em;
-}
-
-/* 段落 */
-.renderer :global(.milkdown p) {
-  margin: 0.15em 0;
-  line-height: 1.6;
-}
-
-/* 列表 */
-.renderer :global(.milkdown ul),
-.renderer :global(.milkdown ol) {
-  margin: 0.25em 0;
-  padding-left: 0.5em;
-}
-
-.renderer :global(.milkdown li) {
-  margin: 0.1em 0;
-}
-
-/* 加粗 */
-.renderer :global(.milkdown strong) {
-  font-weight: 700;
-}
-
-/* 斜体 */
-.renderer :global(.milkdown em) {
-  font-style: italic;
-}
-
-/* 链接 */
-.renderer :global(.milkdown a) {
-  color: var(--green-ink);
+/* 链接点击（只读模式下可点击跳转） */
+.renderer :global(.tiptap a) {
   text-decoration: none;
   pointer-events: auto;
 }
 
-.renderer :global(.milkdown a:hover) {
+.renderer :global(.tiptap a:hover) {
   text-decoration: underline;
 }
 
-/* 图片 */
-.renderer :global(.milkdown img) {
-  max-width: 100%;
-  border-radius: 4px;
+/* ---- @ 提及装饰样式（编辑器内显示标题而非 ID） ----------- */
+
+/* 待办提及装饰：隐藏原始文本，用 ::after 显示标题 */
+.todoMentionDecor {
+  font-size: 0 !important;
+  color: transparent !important;
+  display: inline;
+  white-space: pre;
 }
 
-/* 代码 */
-.renderer :global(.milkdown code) {
-  font-family: var(--mono);
-  font-size: 13px;
-  background: var(--card-deep);
-  padding: 1px 4px;
+.todoMentionDecor::after {
+  content: attr(data-mention-title) !important;
+  font-family: var(--serif-sc) !important;
+  font-size: 16px !important;
+  line-height: 1.6 !important;
+  color: var(--ink) !important;
+  text-decoration: underline !important;
+  text-decoration-color: var(--ink-soft) !important;
+  text-decoration-style: dashed !important;
+  padding: 0 2px;
+  margin-right: 4px;
+}
+
+/* 任务引用装饰：隐藏原始文本，用 ::after 显示标题 */
+.taskMentionDecor {
+  font-size: 0 !important;
+  color: transparent !important;
+  display: inline;
+  white-space: pre;
+}
+
+.taskMentionDecor::after {
+  content: attr(data-mention-title) !important;
+  font-family: var(--serif-sc) !important;
+  font-size: 16px !important;
+  line-height: 1.6 !important;
+  color: var(--green-ink) !important;
+  text-decoration: underline !important;
+  text-decoration-color: var(--green-ink) !important;
+  cursor: pointer;
+  padding: 0 2px;
+  margin-right: 4px;
+}
+
+.taskMentionDecor:hover::after {
+  background: var(--green-bg);
   border-radius: 2px;
-}
-
-.renderer :global(.milkdown pre) {
-  font-family: var(--mono);
-  font-size: 13px;
-  background: var(--card-deep);
-  padding: 8px 12px;
-  border-radius: 4px;
-  overflow-x: auto;
-}
-
-/* 引用 */
-.renderer :global(.milkdown blockquote) {
-  border-left: 2px solid var(--rule);
-  padding-left: 8px;
-  margin: 0.5em 0;
-  color: var(--ink-faded);
 }

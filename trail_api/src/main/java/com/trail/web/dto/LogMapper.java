@@ -6,6 +6,8 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 
 /** work_logs 行 → LogResponse。 */
@@ -13,6 +15,14 @@ public final class LogMapper {
     private LogMapper() {}
 
     public static LogResponse toResponse(Map<String, Object> row) {
+        return toResponse(row, Collections.emptyList(), Collections.emptyList());
+    }
+
+    public static LogResponse toResponse(Map<String, Object> row, List<Long> todoIds) {
+        return toResponse(row, todoIds, Collections.emptyList());
+    }
+
+    public static LogResponse toResponse(Map<String, Object> row, List<Long> todoIds, List<Long> taskIds) {
         return new LogResponse(
                 asLong(row.get("id")),
                 asLong(row.get("task_id")),
@@ -26,7 +36,9 @@ public final class LogMapper {
                 asInstant(row.get("deleted_at")),
                 asInstant(row.get("updated_at")),
                 asInt(row.get("edit_count")),
-                asInstant(row.get("created_at"))
+                asInstant(row.get("created_at")),
+                todoIds != null ? todoIds : Collections.emptyList(),
+                taskIds != null ? taskIds : Collections.emptyList()
         );
     }
 

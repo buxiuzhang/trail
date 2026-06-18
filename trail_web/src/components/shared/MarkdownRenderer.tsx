@@ -11,20 +11,39 @@
  * 用法:
  *   <MarkdownRenderer text={log.content} className={styles.content} />
  */
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { EditorContent, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Image from '@tiptap/extension-image'
 import { Markdown } from '@tiptap/markdown'
+import { HighlightedCodeBlock } from './HighlightedCodeBlock'
+import { createMentionDecorationExtension } from './DescriptionEditor'
+import { ImagePreview } from './ImagePreview'
 import styles from './MarkdownRenderer.module.css'
+import tiptapStyles from './TipTapContent.module.css'
 
 interface MarkdownRendererProps {
   text: string | null | undefined
   className?: string
+  /** 待办列表（用于渲染 @todo:ID） */
+  todos?: { id: number; title: string }[]
+  /** 任务列表（用于渲染 @task:ID） */
+  tasks?: { id: number; title: string }[]
 }
 
-export function MarkdownRenderer({ text, className }: MarkdownRendererProps) {
+export function MarkdownRenderer({ text, className, todos = [], tasks = [] }: MarkdownRendererProps) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const todosRef = useRef(todos)
+  const tasksRef = useRef(tasks)
+  const [previewImage, setPreviewImage] = useState<string | null>(null)
+
+  // 保持 ref 最新
+  useEffect(() => {
+    todosRef.current = todos
+  }, [todos])
+  useEffect(() => {
+    tasksRef.current = tasks
+  }, [tasks])
 
   const editor = useEditor({
     extensions: [
@@ -34,15 +53,20 @@ export function MarkdownRenderer({ text, className }: MarkdownRendererProps) {
           openOnClick: true,
           HTMLAttributes: { class: 'tiptap-link' },
         },
+        trailingNode: false,
+        codeBlock: false,
       }),
+      HighlightedCodeBlock,
       Image.configure({
         inline: true,
         allowBase64: false,
         HTMLAttributes: { class: 'tiptap-image' },
       }),
-      Markdown.configure({
-        html: false,
-        breaks: true,
+      Markdown,
+      // 添加 mention decoration 扩展，渲染 @todo:ID 和 @task:ID
+      createMentionDecorationExtension(todosRef, tasksRef, {
+        todoMentionDecor: styles.todoMentionDecor,
+        taskMentionDecor: styles.taskMentionDecor,
       }),
     ],
     content: text ?? '',
@@ -56,11 +80,44 @@ export function MarkdownRenderer({ text, className }: MarkdownRendererProps) {
     editor.commands.setContent(text, { contentType: 'markdown' })
   }, [editor, text])
 
+  // todos/tasks 异步加载后，触发 decoration 重新计算（@ 提及渲染）
+  useEffect(() => {
+    if (!editor) return
+    editor.view.dispatch(editor.state.tr)
+  }, [editor, todos, tasks])
+
   if (!text) return null
 
+  const handleClick = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement
+    // 图片预览
+    const img = target.closest('img')
+    if (img) {
+      e.preventDefault()
+      setPreviewImage(img.getAttribute('src') ?? '')
+      return
+    }
+    // 任务引用导航
+    const el = target.closest('[data-mention-type="task"]')
+    if (!el) return
+    const id = el.getAttribute('data-mention-id')
+    if (id) {
+      window.location.hash = `#/task/${id}`
+    }
+  }
+
   return (
-    <div ref={containerRef} className={`${styles.renderer} ${className ?? ''}`}>
-      {editor && <EditorContent editor={editor} />}
-    </div>
+    <>
+      <div ref={containerRef} className={`${styles.renderer} ${className ?? ''} ${tiptapStyles.content}`} onClick={handleClick}>
+        {editor && <EditorContent editor={editor} />}
+      </div>
+      {/* 图片预览 */}
+      {previewImage && (
+        <ImagePreview
+          src={previewImage}
+          onClose={() => setPreviewImage(null)}
+        />
+      )}
+    </>
   )
 }

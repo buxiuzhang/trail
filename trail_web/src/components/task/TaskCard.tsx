@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import type { TaskOut } from '@/types'
 import { usePinTask, useUnpinTask } from '@/api/tasks'
 import { useToastContext } from '@/context/ToastContext'
-import { CollapsibleText } from '@/components/shared/CollapsibleText'
+import { ContentViewer } from '@/components/shared/ContentViewer'
 import { Stamp } from './Stamp'
 import { NatureBadge } from './NatureBadge'
 import styles from './TaskCard.module.css'
@@ -190,11 +190,10 @@ export function TaskCard({ task, logCount = 0, logMainCount = 0 }: TaskCardProps
         </div>
         <h3 className={styles.title}>{task.title}</h3>
         {task.description && (
-          <CollapsibleText
+          <ContentViewer
             text={task.description}
             maxHeight={124}
-            className={styles.desc}
-            maxImgHeight={60}
+            previewClassName={styles.desc}
           />
         )}
         {task.tags.length > 0 && (

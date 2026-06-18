@@ -1,8 +1,14 @@
-/**
- * CollapsibleText 样式
- */
+/* ============================================================
+   ContentViewer · 预览/源码查看器（只读）
+   ============================================================ */
 
-.content {
+.wrapper {
+  position: relative;
+  width: 100%;
+}
+
+/* 折叠容器 */
+.collapseWrap {
   position: relative;
   overflow: hidden;
 }
@@ -81,4 +87,20 @@
 .collapseBtn:hover img {
   opacity: 0.85;
   transform: scale(1.1);
+}
+
+/* 源码模式只读展示 */
+.source {
+  margin: 0;
+  padding: 8px 0;
+  padding-right: 44px; /* 给右上角按钮让位 */
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink);
+  background: transparent;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  user-select: text;
 }
