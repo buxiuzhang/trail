@@ -45,6 +45,10 @@ public class InsightStore {
         List<Map<String, Object>> natureRows = db.query("SELECT nature, COUNT(*) AS n FROM tasks GROUP BY nature");
         List<Map<String, Object>> logCountRow = db.query("SELECT COUNT(*) AS n FROM work_logs WHERE is_deleted = 0");
         List<Map<String, Object>> taskCountRow = db.query("SELECT COUNT(*) AS n FROM tasks");
+        List<Map<String, Object>> tagRows = db.query("SELECT tags FROM tasks");
+        List<Map<String, Object>> monthRows = db.query(
+            "SELECT strftime('%Y-%m', COALESCE(processing_date, start_date)) AS m, COUNT(*) AS n" +
+            " FROM tasks WHERE COALESCE(processing_date, start_date) IS NOT NULL GROUP BY m ORDER BY m DESC");
 
         Map<String, Integer> byStatus = new HashMap<>();
         for (String s : TaskStore.TASK_STATUSES) byStatus.put(s, 0);
@@ -58,10 +62,30 @@ public class InsightStore {
             byNature.put((String) r.get("nature"), ((Number) r.get("n")).intValue());
         }
 
+        // 展开 tags JSON 数组统计
+        Map<String, Integer> byTag = new HashMap<>();
+        for (Map<String, Object> r : tagRows) {
+            String tagsJson = r.get("tags") != null ? r.get("tags").toString().trim() : "[]";
+            if (tagsJson.equals("[]") || tagsJson.isEmpty()) continue;
+            String inner = tagsJson.substring(1, tagsJson.length() - 1);
+            for (String part : inner.split(",")) {
+                String tag = part.trim().replaceAll("^\"|\"$", "");
+                if (!tag.isEmpty()) byTag.merge(tag, 1, Integer::sum);
+            }
+        }
+
+        Map<String, Integer> byMonth = new HashMap<>();
+        for (Map<String, Object> r : monthRows) {
+            String m = (String) r.get("m");
+            if (m != null) byMonth.put(m, ((Number) r.get("n")).intValue());
+        }
+
         Map<String, Object> out = new HashMap<>();
         out.put("total_tasks", ((Number) taskCountRow.get(0).get("n")).intValue());
         out.put("by_status", byStatus);
         out.put("by_nature", byNature);
+        out.put("by_tag", byTag);
+        out.put("by_month", byMonth);
         out.put("total_logs", ((Number) logCountRow.get(0).get("n")).intValue());
         return out;
     }

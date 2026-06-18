@@ -14,6 +14,7 @@ pnpm dev                # http://localhost:5173，/api 走 proxy → 后端 127.
 pnpm build              # tsc -b && vite build，产物 dist/
 pnpm preview            # 预览 dist/
 pnpm lint               # eslint .
+pnpm exec tsc --noEmit  # TypeScript 类型检查（不生成文件）
 ```
 
 后端必须先跑（`../trail_api` 目录 `java -jar target/trail-api.jar`）——`pnpm dev` 才有数据。
@@ -72,3 +73,18 @@ HashRouter
 - 不绕过 HashRouter 写 `<a href="/…">`——用 `<a href="#/…">` 或 `Link to="/…"`，保持 hash 路由。
 - 不引新 UI 库。Button / Select / Toast / Crumbs 都在 `src/components/shared/`，先看有没有现成的。
 - 不在 `src/api/client.ts` 之外的组件里写 SSE 解析——统一用 `streamPost`。
+
+## TipTap 编辑器
+
+`DescriptionEditor` 是基于 TipTap 的 Markdown WYSIWYG 编辑器，核心扩展：
+
+- **StarterKit**：基础格式（加粗/斜体/标题/列表/引用等），`trailingNode: false`（避免列表结尾崩溃）
+- **@tiptap/markdown**：Markdown 解析/序列化
+- **HighlightedCodeBlock**：代码块语法高亮（扩展自 CodeBlockLowlight，注册 `parseMarkdown`/`renderMarkdown`）
+- **Mention**：`@` 触发待办/任务引用候选，已引用项自动过滤
+- **mentionDecoration**：装饰器扩展，将 `@todo:ID`/`@task:ID` 显示为对应标题
+
+@mention 候选弹窗：
+- ↑/↓ 键导航，Enter 确认
+- 选中项自动滚动到可视区域
+- 已出现在文档中的引用不再出现在候选中

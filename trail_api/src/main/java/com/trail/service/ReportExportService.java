@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -125,14 +126,19 @@ public class ReportExportService {
      */
     private String buildLogsJson(List<Map<String, Object>> logs) {
         try {
-            // 简化数据，只保留必要字段
-            List<Map<String, Object>> simplified = logs.stream()
-                .map(log -> Map.of(
-                    "log_date", log.get("log_date"),
-                    "task_title", log.get("task_title"),
-                    "phase", log.get("phase"),
-                    "content", log.get("content")
-                ))
+            List<Map<String, Object>> enriched = workLogStore.enrichLogs(logs);
+            List<Map<String, Object>> simplified = enriched.stream()
+                .map(log -> {
+                    Map<String, Object> item = new LinkedHashMap<>();
+                    item.put("log_date", log.get("log_date"));
+                    item.put("task_title", log.get("task_title"));
+                    item.put("phase", log.get("phase"));
+                    item.put("hours", log.getOrDefault("hours", 1.0));
+                    item.put("content", log.get("content"));
+                    if (log.containsKey("related_todos")) item.put("related_todos", log.get("related_todos"));
+                    if (log.containsKey("related_tasks")) item.put("related_tasks", log.get("related_tasks"));
+                    return item;
+                })
                 .collect(Collectors.toList());
             return mapper.writeValueAsString(simplified);
         } catch (Exception e) {

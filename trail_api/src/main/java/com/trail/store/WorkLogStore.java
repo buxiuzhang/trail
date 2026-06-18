@@ -9,9 +9,11 @@ import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -26,10 +28,12 @@ public class WorkLogStore {
 
     private final SqliteDb db;
     private final LogTodoRefStore logTodoRefStore;
+    private final TaskStore taskStore;
 
-    public WorkLogStore(SqliteDb db, LogTodoRefStore logTodoRefStore) {
+    public WorkLogStore(SqliteDb db, LogTodoRefStore logTodoRefStore, TaskStore taskStore) {
         this.db = db;
         this.logTodoRefStore = logTodoRefStore;
+        this.taskStore = taskStore;
     }
 
     public List<Map<String, Object>> listLogs(long taskId, String phase, boolean includeDeleted,
@@ -250,7 +254,7 @@ public class WorkLogStore {
     public List<Map<String, Object>> getByDate(LocalDate date) {
         return db.query("""
             SELECT
-                w.id, w.task_id, w.log_date, w.phase, w.ordinal, w.content, w.polished_content,
+                w.id, w.task_id, w.log_date, w.phase, w.ordinal, w.hours, w.task_ids, w.content, w.polished_content,
                 t.title AS task_title, t.alias AS task_alias, t.status, t.nature
             FROM work_logs w
             JOIN tasks t ON t.id = w.task_id
@@ -263,7 +267,7 @@ public class WorkLogStore {
     public List<Map<String, Object>> getByDateRange(LocalDate start, LocalDate end) {
         return db.query("""
             SELECT
-                w.id, w.task_id, w.log_date, w.phase, w.ordinal, w.content, w.polished_content,
+                w.id, w.task_id, w.log_date, w.phase, w.ordinal, w.hours, w.task_ids, w.content, w.polished_content,
                 t.title AS task_title, t.alias AS task_alias, t.status, t.nature
             FROM work_logs w
             JOIN tasks t ON t.id = w.task_id
@@ -272,9 +276,77 @@ public class WorkLogStore {
             """, start, end);
     }
 
-    // ============================================================
-    // task_ids JSON 序列化/反序列化
-    // ============================================================
+    /**
+     * 批量解析日志列表的 @todo/@task 引用，就地附加 related_todos / related_tasks 字段。
+     * getByDate / getByDateRange 查出来的日志调此方法后，LLM 可直接读到关联标题。
+     */
+    public List<Map<String, Object>> enrichLogs(List<Map<String, Object>> logs) {
+        if (logs == null || logs.isEmpty()) return logs;
+
+        // 批量查所有日志的关联待办，避免 N+1
+        List<Long> logIds = logs.stream()
+            .map(log -> ((Number) log.get("id")).longValue())
+            .collect(Collectors.toList());
+        Map<Long, List<Map<String, Object>>> todosByLogId = logTodoRefStore.getTodosForLogs(logIds);
+
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Map<String, Object> log : logs) {
+            long logId = ((Number) log.get("id")).longValue();
+            Map<String, Object> enriched = new LinkedHashMap<>(log);
+
+            // 关联待办（从 log_todo_refs 查）
+            List<Map<String, Object>> todos = todosByLogId.getOrDefault(logId, List.of());
+            if (!todos.isEmpty()) {
+                enriched.put("related_todos", todos.stream()
+                    .map(t -> Map.of(
+                        "title", t.get("title"),
+                        "done", Integer.valueOf(1).equals(t.get("is_completed"))
+                    ))
+                    .collect(Collectors.toList()));
+            }
+
+            // 关联任务（从 task_ids JSON 字段查）
+            Map<Long, String> taskIdToTitle = new LinkedHashMap<>();
+            List<Long> taskIds = parseTaskIds(
+                log.getOrDefault("task_ids", "[]").toString());
+            if (!taskIds.isEmpty()) {
+                List<String> taskTitles = new ArrayList<>();
+                for (Long tid : taskIds) {
+                    try {
+                        Map<String, Object> task = taskStore.getTask(tid);
+                        String title = (String) task.get("title");
+                        taskIdToTitle.put(tid, title);
+                        taskTitles.add(title);
+                    } catch (Exception ignored) {}
+                }
+                if (!taskTitles.isEmpty()) {
+                    enriched.put("related_tasks", taskTitles);
+                }
+            }
+
+            // 替换 content 里的 @todo:id / @task:id 为真实标题
+            Object contentObj = enriched.get("content");
+            if (contentObj != null) {
+                String content = contentObj.toString();
+                // 替换 @todo:id
+                for (Map<String, Object> todo : todos) {
+                    long tid = ((Number) todo.get("id")).longValue();
+                    String title = (String) todo.get("title");
+                    content = content.replace("@todo:" + tid, "@todo「" + title + "」");
+                }
+                // 替换 @task:id
+                for (Map.Entry<Long, String> entry : taskIdToTitle.entrySet()) {
+                    content = content.replace("@task:" + entry.getKey(), "@task「" + entry.getValue() + "」");
+                }
+                enriched.put("content", content);
+            }
+
+            result.add(enriched);
+        }
+        return result;
+    }
+
+
 
     /** 将 task_ids 列表序列化为 JSON 字符串 */
     private String toJsonArray(List<Long> ids) {

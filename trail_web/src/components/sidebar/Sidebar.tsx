@@ -1,5 +1,4 @@
-import { useMemo } from 'react'
-import { useTasks } from '@/api/tasks'
+import { useTaskCounts } from '@/api/tasks'
 import { useMotto } from '@/api/settings'
 import { useFilterContext } from '@/context/FilterContext'
 import { STATUS_LIST, NATURE_LIST } from '@/constants'
@@ -8,37 +7,15 @@ import { monthLabel } from '@/constants'
 import styles from './Sidebar.module.css'
 
 export function Sidebar() {
-  const { data: tasks } = useTasks()
+  const { data: counts } = useTaskCounts()
   const { data: motto } = useMotto()
   const { filter, setStatus, setNature, setTag, setMonth } = useFilterContext()
 
-  // 统计各筛选维度的计数
-  const counts = useMemo(() => {
-    if (!tasks) return { status: {} as Record<string, number>, nature: {} as Record<string, number>, tag: {} as Record<string, number>, month: {} as Record<string, number> }
-
-    const status: Record<string, number> = {}
-    const nature: Record<string, number> = {}
-    const tag: Record<string, number> = {}
-    const month: Record<string, number> = {}
-
-    for (const t of tasks) {
-      status[t.status] = (status[t.status] || 0) + 1
-      nature[t.nature] = (nature[t.nature] || 0) + 1
-      for (const tg of t.tags) {
-        tag[tg] = (tag[tg] || 0) + 1
-      }
-      // 按 processing_date || start_date 提取月份
-      const d = t.processing_date || t.start_date
-      if (d) {
-        const m = d.slice(0, 7) // "YYYY-MM"
-        month[m] = (month[m] || 0) + 1
-      }
-    }
-
-    return { status, nature, tag, month }
-  }, [tasks])
-
-  const totalCount = tasks?.length || 0
+  const totalCount = counts?.total_tasks || 0
+  const byStatus = counts?.by_status || {}
+  const byNature = counts?.by_nature || {}
+  const byTag = counts?.by_tag || {}
+  const byMonth = counts?.by_month || {}
 
   // 构建筛选项（首项为"全部"）
   function withAll<T extends { key: string; label: string; count: number }>(
@@ -49,24 +26,24 @@ export function Sidebar() {
   }
 
   const statusItems = withAll('全部条目', STATUS_LIST.map(s => ({
-    key: s, label: s, count: counts.status[s] || 0,
+    key: s, label: s, count: byStatus[s] || 0,
   })))
 
   const natureItems = withAll('全部', NATURE_LIST.map(n => ({
-    key: n, label: n, count: counts.nature[n] || 0,
+    key: n, label: n, count: byNature[n] || 0,
   })))
 
-  const tagItems = withAll('全部标签', Object.entries(counts.tag)
+  const tagItems = withAll('全部标签', Object.entries(byTag)
     .sort((a, b) => b[1] - a[1])
     .map(([k, c]) => ({ key: k, label: `#${k}`, count: c })))
 
-  // 月份：格式 "6 月 June"
-  const monthItemsAll = withAll('全部月份', Object.entries(counts.month)
-    .sort((a, b) => b[0].localeCompare(a[0])) // 倒序
+  const monthItemsAll = withAll('全部月份', Object.entries(byMonth)
+    .sort((a, b) => b[0].localeCompare(a[0]))
     .map(([k, c]) => {
       const lbl = monthLabel(k)
       return { key: k, label: `${lbl.zh} ${lbl.en}`, count: c }
     }))
+
 
   return (
     <aside className={styles.sidebar} aria-label="查找助手">

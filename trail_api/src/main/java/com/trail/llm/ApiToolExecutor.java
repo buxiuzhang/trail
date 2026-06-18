@@ -2,6 +2,7 @@ package com.trail.llm;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.trail.db.SqliteDb;
+import com.trail.store.WorkLogStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -12,9 +13,12 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 
 /**
  * API 工具执行器
@@ -29,12 +33,14 @@ public class ApiToolExecutor {
     private final SqliteDb db;
     private final ObjectMapper mapper;
     private final HttpClient client;
+    private final WorkLogStore workLogStore;
 
-    public ApiToolExecutor(OpenApiService openApiService, SqliteDb db, ObjectMapper mapper) {
+    public ApiToolExecutor(OpenApiService openApiService, SqliteDb db, ObjectMapper mapper, WorkLogStore workLogStore) {
         this.openApiService = openApiService;
         this.db = db;
         this.mapper = mapper;
         this.client = HttpClient.newHttpClient();
+        this.workLogStore = workLogStore;
     }
 
     /**
@@ -46,6 +52,7 @@ public class ApiToolExecutor {
                 case "list_controllers" -> executeListControllers();
                 case "list_endpoints" -> executeListEndpoints(input);
                 case "get_api_docs" -> executeGetApiDocs(input);
+                case "get_logs_by_date" -> executeGetLogsByDate(input);
                 case "call_api" -> executeCallApi(input);
                 case "export_daily_report" -> executeExportDailyReport(input);
                 case "export_weekly_report" -> executeExportWeeklyReport(input);
@@ -171,6 +178,114 @@ public class ApiToolExecutor {
                 ? "找到多个匹配的 API，请确认您要操作的是哪一个"
                 : "找到匹配的 API"
         );
+    }
+
+    // ============================================================
+    // get_logs_by_date 执行
+    // ============================================================
+
+    private Map<String, Object> executeGetLogsByDate(Map<String, Object> input) {
+        String dateStr = (String) input.get("date");
+        String startStr = (String) input.get("start_date");
+        String endStr = (String) input.get("end_date");
+
+        LocalDate today = LocalDate.now();
+        LocalDate start;
+        LocalDate end;
+
+        if (dateStr != null && !dateStr.isBlank()) {
+            LocalDate d = switch (dateStr.toLowerCase()) {
+                case "today", "今天" -> today;
+                case "yesterday", "昨天" -> today.minusDays(1);
+                default -> LocalDate.parse(dateStr);
+            };
+            start = d;
+            end = d;
+        } else if (startStr != null && !startStr.isBlank()) {
+            start = LocalDate.parse(startStr);
+            end = (endStr != null && !endStr.isBlank()) ? LocalDate.parse(endStr) : today;
+        } else {
+            start = today;
+            end = today;
+        }
+
+        List<Map<String, Object>> rows = start.equals(end)
+            ? workLogStore.getByDate(start)
+            : workLogStore.getByDateRange(start, end);
+        rows = workLogStore.enrichLogs(rows);
+
+        if (rows.isEmpty()) {
+            return Map.of(
+                "start_date", start.toString(),
+                "end_date", end.toString(),
+                "total_hours", 0.0,
+                "task_count", 0,
+                "log_count", 0,
+                "days", List.of(),
+                "message", "该时间段内没有工作日志记录"
+            );
+        }
+
+        // 按日期 → task_id 两级聚合，TreeMap 保证日期有序
+        TreeMap<String, Map<Long, Map<String, Object>>> byDate = new TreeMap<>();
+        for (Map<String, Object> row : rows) {
+            String logDate = row.get("log_date").toString();
+            long taskId = ((Number) row.get("task_id")).longValue();
+
+            byDate.computeIfAbsent(logDate, k -> new LinkedHashMap<>())
+                  .computeIfAbsent(taskId, k -> {
+                      Map<String, Object> t = new LinkedHashMap<>();
+                      t.put("task_id", taskId);
+                      t.put("title", row.get("task_title"));
+                      t.put("status", row.get("status"));
+                      t.put("task_hours", 0.0);
+                      t.put("logs", new ArrayList<>());
+                      return t;
+                  });
+
+            Map<String, Object> taskEntry = byDate.get(logDate).get(taskId);
+            double h = row.get("hours") != null ? ((Number) row.get("hours")).doubleValue() : 1.0;
+            taskEntry.put("task_hours", (double) taskEntry.get("task_hours") + h);
+
+            Map<String, Object> logEntry = new LinkedHashMap<>();
+            logEntry.put("log_id", row.get("id"));
+            logEntry.put("hours", h);
+            Object polished = row.get("polished_content");
+            logEntry.put("content", (polished != null && !polished.toString().isBlank())
+                ? polished : row.get("content"));
+            if (row.containsKey("related_todos")) logEntry.put("related_todos", row.get("related_todos"));
+            if (row.containsKey("related_tasks")) logEntry.put("related_tasks", row.get("related_tasks"));
+            ((List<Map<String, Object>>) taskEntry.get("logs")).add(logEntry);
+        }
+
+        // 构建 days 列表
+        List<Map<String, Object>> days = new ArrayList<>();
+        double totalHours = 0.0;
+        int totalTasks = 0;
+
+        for (Map.Entry<String, Map<Long, Map<String, Object>>> dayEntry : byDate.entrySet()) {
+            double dayHours = 0.0;
+            List<Map<String, Object>> taskList = new ArrayList<>(dayEntry.getValue().values());
+            for (Map<String, Object> t : taskList) {
+                dayHours += (double) t.get("task_hours");
+            }
+            Map<String, Object> dayMap = new LinkedHashMap<>();
+            dayMap.put("date", dayEntry.getKey());
+            dayMap.put("day_hours", dayHours);
+            dayMap.put("tasks", taskList);
+            days.add(dayMap);
+            totalHours += dayHours;
+            totalTasks += taskList.size();
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("start_date", start.toString());
+        result.put("end_date", end.toString());
+        result.put("total_hours", totalHours);
+        result.put("task_count", totalTasks);
+        result.put("log_count", rows.size());
+        result.put("days", days);
+        return result;
     }
 
     // ============================================================

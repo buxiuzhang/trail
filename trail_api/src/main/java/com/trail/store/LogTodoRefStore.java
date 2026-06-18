@@ -78,6 +78,36 @@ public class LogTodoRefStore {
     }
 
     /**
+     * 批量获取多条日志关联的待办详情，避免 N+1。
+     * 返回 Map<logId, List<{id, title, is_completed, is_abandoned}>>
+     */
+    public Map<Long, List<Map<String, Object>>> getTodosForLogs(List<Long> logIds) {
+        if (logIds == null || logIds.isEmpty()) return java.util.Collections.emptyMap();
+
+        String placeholders = logIds.stream().map(id -> "?").collect(java.util.stream.Collectors.joining(","));
+        List<Map<String, Object>> rows = db.query(
+            "SELECT r.log_id, t.id, t.title, t.is_completed, t.is_abandoned" +
+            " FROM log_todo_refs r" +
+            " JOIN todos t ON t.id = r.todo_id" +
+            " WHERE r.log_id IN (" + placeholders + ")" +
+            " ORDER BY r.log_id, r.id",
+            logIds.toArray());
+
+        Map<Long, List<Map<String, Object>>> result = new java.util.LinkedHashMap<>();
+        for (Map<String, Object> row : rows) {
+            long logId = ((Number) row.get("log_id")).longValue();
+            result.computeIfAbsent(logId, k -> new ArrayList<>())
+                  .add(Map.of(
+                      "id", row.get("id"),
+                      "title", row.get("title"),
+                      "is_completed", row.get("is_completed"),
+                      "is_abandoned", row.get("is_abandoned")
+                  ));
+        }
+        return result;
+    }
+
+    /**
      * 获取日志关联的待办详情（含标题、状态等）。
      * 用于日志展示时显示关联待办。
      */

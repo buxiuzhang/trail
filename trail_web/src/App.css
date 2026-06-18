@@ -468,6 +468,9 @@ body::before {
 .archive-search-btn:hover {
   color: var(--ink);
 }
+.archive-search-btn.active {
+  color: var(--stamp);
+}
 .archive-search-btn svg {
   width: 16px;
   height: 16px;

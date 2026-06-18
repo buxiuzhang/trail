@@ -22,6 +22,7 @@ public class ToolRegistry {
             listControllers(),
             listEndpoints(),
             getApiDocs(),
+            getLogsByDate(),
             callApi(),
             exportDailyReport(),
             exportWeeklyReport()
@@ -85,6 +86,28 @@ public class ToolRegistry {
         return new Tool(
             "get_api_docs",
             "查询具体接口的参数详情。传入 path 参数获取接口的完整参数定义，包括 path 参数、query 参数、request body 等。",
+            new Tool.InputSchema("object", props, null)
+        );
+    }
+
+    /**
+     * 按日期查询工作日志（直接数据库查询，无需 API 发现）
+     */
+    private Tool getLogsByDate() {
+        ObjectNode props = mapper.createObjectNode();
+        props.set("date", mapper.createObjectNode()
+            .put("type", "string")
+            .put("description", "查询单天，格式 YYYY-MM-DD，或传 \"today\"/\"yesterday\"。与 start_date/end_date 互斥。"));
+        props.set("start_date", mapper.createObjectNode()
+            .put("type", "string")
+            .put("description", "区间起始日期，格式 YYYY-MM-DD。"));
+        props.set("end_date", mapper.createObjectNode()
+            .put("type", "string")
+            .put("description", "区间结束日期，格式 YYYY-MM-DD，默认今天。"));
+
+        return new Tool(
+            "get_logs_by_date",
+            "按日期查询工作日志，返回按日期和任务分组的日志明细及工时统计。适合「今天工作情况」「本周日志」「某天做了什么」等查询。不传参数默认查今天。",
             new Tool.InputSchema("object", props, null)
         );
     }
