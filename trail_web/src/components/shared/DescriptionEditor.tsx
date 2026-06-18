@@ -164,6 +164,8 @@ export const DescriptionEditor = forwardRef<HTMLTextAreaElement, DescriptionEdit
   // 使用 ref 存储 todos 和 tasks 的最新值，供 Mention 扩展的 items 函数使用
   const todosRef = useRef(todos)
   const tasksRef = useRef(tasks)
+  /** 已出现在文档中的 @mention 键集合，防止重复引用 */
+  const usedMentionKeysRef = useRef(new Set<string>())
 
   // 保持 refs 最新
   useEffect(() => {
@@ -175,6 +177,17 @@ export const DescriptionEditor = forwardRef<HTMLTextAreaElement, DescriptionEdit
   useEffect(() => {
     tasksRef.current = tasks
   }, [tasks])
+
+  // value 变化时，解析已使用的 @mention 键（用于过滤候选列表）
+  useEffect(() => {
+    const keys = new Set<string>()
+    const re = /@(todo|task):(\d+)/g
+    let m: RegExpExecArray | null
+    while ((m = re.exec(value)) !== null) {
+      keys.add(`${m[1]}:${m[2]}`)
+    }
+    usedMentionKeysRef.current = keys
+  }, [value])
 
   // 标记初始化完成
   useEffect(() => {
@@ -207,6 +220,9 @@ export const DescriptionEditor = forwardRef<HTMLTextAreaElement, DescriptionEdit
     selectedIndex: 0,
     position: { top: 0, left: 0 },
   })
+  /** ref 镜像，供 onKeyDown 闭包读取最新值（避免闭包陷阱） */
+  const mentionStateRef = useRef(mentionState)
+  useEffect(() => { mentionStateRef.current = mentionState }, [mentionState])
 
   // TipTap 编辑器初始化
   const editor = useEditor({
@@ -239,21 +255,27 @@ export const DescriptionEditor = forwardRef<HTMLTextAreaElement, DescriptionEdit
         suggestion: {
           items: ({ query }) => {
             const q = query.toLowerCase()
+            const used = usedMentionKeysRef.current
             // 从 ref 获取最新值（避免闭包陷阱）
             const currentTodos = todosRef.current
             const currentTasks = tasksRef.current
-            // 1. 当前任务的待办（优先）
+            // 1. 当前任务的待办（优先），过滤已引用的
             const todoItems: MentionCandidate[] = currentTodos
               .filter(
                 (t) =>
+                  !used.has(`todo:${t.id}`) &&
                   !t.is_completed &&
                   !t.is_abandoned &&
                   t.title.toLowerCase().includes(q),
               )
               .map((t) => ({ type: 'todo', id: t.id, title: t.title }))
-            // 2. 全局任务（其次）
+            // 2. 全局任务（其次），过滤已引用的
             const taskItems: MentionCandidate[] = currentTasks
-              .filter((t) => t.title.toLowerCase().includes(q))
+              .filter(
+                (t) =>
+                  !used.has(`task:${t.id}`) &&
+                  t.title.toLowerCase().includes(q),
+              )
               .map((t) => ({ type: 'task', id: t.id, title: t.title }))
             return [...todoItems, ...taskItems]
           },
@@ -323,9 +345,10 @@ export const DescriptionEditor = forwardRef<HTMLTextAreaElement, DescriptionEdit
                   return true
                 }
                 if (props.event.key === 'Enter') {
-                  const item = mentionState.items[mentionState.selectedIndex]
-                  if (item && mentionState.command) {
-                    mentionState.command(item)
+                  const state = mentionStateRef.current
+                  const item = state.items[state.selectedIndex]
+                  if (item && state.command) {
+                    state.command(item)
                     setMentionState((prev) => ({ ...prev, active: false }))
                   }
                   return true
@@ -502,6 +525,13 @@ function MentionPortal({
   onClose,
 }: MentionPortalProps) {
   const listRef = useRef<HTMLDivElement>(null)
+
+  // 选中项变化时滚动到可视区域
+  useEffect(() => {
+    if (!listRef.current) return
+    const el = listRef.current.children[selectedIndex] as HTMLElement | undefined
+    el?.scrollIntoView({ block: 'nearest' })
+  }, [selectedIndex])
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {

@@ -48,6 +48,12 @@ export function LogCompose({ task, todos, tasks = [], editing, onSave, onCancel 
     }
   }, [isEdit])
 
+  // 内容变化时同步 @ 提及 ID，使 TodoRefSection 与编辑器联动（双向）
+  useEffect(() => {
+    setSelectedTodoIds(extractTodoMentionIds(content))
+    setSelectedTaskIds(extractTaskRefIds(content))
+  }, [content])
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     const trimmed = content.trim()
@@ -154,17 +160,45 @@ export function LogCompose({ task, todos, tasks = [], editing, onSave, onCancel 
         placeholder={placeholders?.log || DEFAULT_PLACEHOLDERS.log}
         value={content}
         onChange={setContent}
-        rows={3}
-        minHeight={80}
+        rows={5}
+        minHeight={150}
         textareaClassName=""
         todos={todos}
         tasks={tasks}
       />
+      {/* 内部 onChange 同时清理编辑器中的 @mention 文本，保持联动 */}
       <TodoRefSection
-        taskId={task.id}
         todos={todos}
-        selectedIds={selectedTodoIds}
-        onChange={setSelectedTodoIds}
+        selectedTodoIds={selectedTodoIds}
+        onChangeTodo={(ids) => {
+          const removed = selectedTodoIds.filter(id => !ids.includes(id))
+          setSelectedTodoIds(ids)
+          if (removed.length === 0) return
+          setContent(c => {
+            let cleaned = c
+            for (const id of removed) {
+              cleaned = cleaned.replace(new RegExp(`@todo:${id}\\s?`, 'g'), '')
+            }
+            // 清理残缺引用（无合法整数 ID 的 @todo: 片段）
+            cleaned = cleaned.replace(/@todo:(?!\d+(?:\s|$))\S*\s?/g, '')
+            return cleaned.trim()
+          })
+        }}
+        tasks={tasks}
+        selectedTaskIds={selectedTaskIds}
+        onChangeTask={(ids) => {
+          const removed = selectedTaskIds.filter(id => !ids.includes(id))
+          setSelectedTaskIds(ids)
+          if (removed.length === 0) return
+          setContent(c => {
+            let cleaned = c
+            for (const id of removed) {
+              cleaned = cleaned.replace(new RegExp(`@task:${id}\\s?`, 'g'), '')
+            }
+            cleaned = cleaned.replace(/@task:(?!\d+(?:\s|$))\S*\s?/g, '')
+            return cleaned.trim()
+          })
+        }}
       />
       <div className={styles.composeFoot}>
         <span className={styles.composeHint}>
