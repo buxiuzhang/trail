@@ -6,6 +6,7 @@ import com.trail.web.dto.LogCreateRequest;
 import com.trail.web.dto.LogMapper;
 import com.trail.web.dto.LogResponse;
 import com.trail.web.dto.LogUpdateRequest;
+import com.trail.web.dto.PagedResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -28,16 +29,23 @@ public class WorkLogController {
         this.tasks = tasks;
     }
 
-    @Operation(summary = "查询任务的工作日志", description = "获取指定任务的所有工作日志，可按阶段筛选，可选择是否包含已删除的日志。")
+    @Operation(summary = "查询任务的工作日志", description = "获取指定任务的工作日志，支持分页。默认 limit=5；不传 limit 时返回全量。")
     @GetMapping
-    public List<LogResponse> list(
+    public PagedResponse<LogResponse> list(
             @Parameter(description = "任务 ID")
             @PathVariable long taskId,
             @Parameter(description = "按阶段筛选：main（主体阶段）或 maintenance（维护阶段）")
             @RequestParam(required = false) String phase,
             @Parameter(description = "是否包含已删除的日志")
-            @RequestParam(defaultValue = "false") boolean includeDeleted) {
-        return logs.listLogs(taskId, phase, includeDeleted, null, null).stream()
+            @RequestParam(defaultValue = "false") boolean includeDeleted,
+            @Parameter(description = "每页条数，不传返回全量")
+            @RequestParam(required = false) Integer limit,
+            @Parameter(description = "偏移量")
+            @RequestParam(defaultValue = "0") int offset) {
+        int effectiveLimit = (limit == null) ? Integer.MAX_VALUE : limit;
+        long total = logs.countLogs(taskId, phase, includeDeleted);
+        List<LogResponse> items = logs.listLogs(taskId, phase, includeDeleted, null, effectiveLimit, offset)
+                .stream()
                 .map(row -> {
                     long logId = ((Number) row.get("id")).longValue();
                     List<Long> todoIds = logs.getTodoIdsForLog(logId);
@@ -45,6 +53,7 @@ public class WorkLogController {
                     return LogMapper.toResponse(row, todoIds, taskIds);
                 })
                 .toList();
+        return new PagedResponse<>(items, total);
     }
 
     @Operation(summary = "添加工作日志（日报）", description = "为指定任务添加一条工作日志。如果是该任务的第一条日志，任务状态会自动从「未开始」变为「进行中」。")

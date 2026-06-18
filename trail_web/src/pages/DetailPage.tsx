@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useTask, useUpdateTask, useChangeTaskStatus, useCancelTask, useTasks } from '@/api/tasks'
-import { useLogs, useCreateLog, useUpdateLog, useDeleteLog } from '@/api/logs'
+import { useInfiniteLogs, useCreateLog, useUpdateLog, useDeleteLog } from '@/api/logs'
 import { useTodos, useCreateTodo, useUpdateTodo, useCompleteTodo, useAbandonTodo, useDeleteTodo } from '@/api/todos'
 import { usePlaceholders, DEFAULT_PLACEHOLDERS } from '@/api/settings'
 import { usePolish, LLM_AVAILABLE } from '@/api/llm'
@@ -207,11 +207,12 @@ export function DetailPage() {
   const { id } = useParams<{ id: string }>()
   const taskId = Number(id)
   const navigate = useNavigate()
+  const { hash } = useLocation()
   const { openModal, closeModal } = useModalContext()
   const { showToast } = useToastContext()
 
   const { data: task, isLoading, error } = useTask(taskId)
-  const { data: logs = [] } = useLogs(taskId)
+  const { data: logsData, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteLogs(taskId)
   const { data: todos = [] } = useTodos(taskId)
   const { data: allTasks = [] } = useTasks()
   const [metaCollapsed, setMetaCollapsed] = useState(false)
@@ -227,11 +228,14 @@ export function DetailPage() {
   const abandonTodo = useAbandonTodo(taskId)
   const deleteTodo = useDeleteTodo(taskId)
 
+  const revealLogId = hash?.startsWith('#log-') ? Number(hash.slice(5)) || undefined : undefined
+
   if (isLoading) return <EmptyState glyph="⋯" title="调阅中..." subtitle="正在调取档案" />
   if (error || !task) return <EmptyState glyph="!" title="档案不存在" subtitle={(error as Error)?.message || '该任务可能已被删除'} />
 
-  const activeLogs = logs.filter((l: LogOut) => !l.is_deleted)
-  const lastLogDate = activeLogs.length > 0 ? activeLogs[activeLogs.length - 1].log_date : null
+  const activeLogs = logsData?.pages.flatMap(p => p.items) ?? []
+
+  const lastLogDate = activeLogs.length > 0 ? activeLogs[0].log_date : null
   const catalog = catalogOf(task.id, task.created_at)
 
   // ── 日志操作 ──
@@ -544,7 +548,7 @@ export function DetailPage() {
       <DetailHeader
         task={task}
         catalog={catalog}
-        logCount={activeLogs.length}
+        logCount={logsData?.pages[0]?.total ?? 0}
       />
 
       <TodoSection
@@ -580,6 +584,10 @@ export function DetailPage() {
           onSaveEdit={handleSaveEdit}
           onDelete={handleDelete}
           onAddLogFocus={false}
+          revealLogId={revealLogId}
+          fetchNextPage={fetchNextPage}
+          hasNextPage={hasNextPage}
+          isFetchingNextPage={isFetchingNextPage}
         />
       </div>
     </article>

@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useInfiniteTasks } from '@/api/tasks'
 import { useFilterContext } from '@/context/FilterContext'
 import { monthLabel } from '@/constants'
 import { TaskCardList } from '@/components/task/TaskCardList'
 import { Crumbs } from '@/components/shared/Crumbs'
 import { EmptyState } from '@/components/detail/EmptyState'
+import { useInfiniteScroll } from '@/hooks/useInfiniteScroll'
 import type { TaskOut } from '@/types'
 
 /** 用于排序和分组的日期：processing_date || start_date */
@@ -85,27 +86,7 @@ export function IndexPage() {
   }, [sorted, sortOrder])
 
   // 哨兵：距底 200px 时预拉下一页（用户无感）
-  const sentinelRef = useRef<HTMLDivElement>(null)
-  const hasNextPageRef = useRef(hasNextPage)
-  const isFetchingNextPageRef = useRef(isFetchingNextPage)
-  hasNextPageRef.current = hasNextPage
-  isFetchingNextPageRef.current = isFetchingNextPage
-
-  useEffect(() => {
-    const el = sentinelRef.current
-    if (!el) return
-    const io = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting && hasNextPageRef.current && !isFetchingNextPageRef.current) {
-          fetchNextPage()
-        }
-      },
-      { rootMargin: '200px 0px' }
-    )
-    io.observe(el)
-    return () => io.disconnect()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fetchNextPage])
+  const sentinelRef = useInfiniteScroll(fetchNextPage, hasNextPage, isFetchingNextPage)
 
   if (isLoading) return <EmptyState glyph="⋯" title="载入中..." subtitle="正在调阅档案" />
   if (error) return <EmptyState glyph="!" title="调阅失败" subtitle={(error as Error).message} />

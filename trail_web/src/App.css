@@ -746,3 +746,14 @@ body::before {
   .detail__title { font-size: 28px; }
   .detail__title-zh { font-size: 26px; }
 }
+
+/* 日志高亮特效（待办跳转触发） */
+@keyframes logHighlightPulse {
+  0%   { box-shadow: none; background-color: transparent; }
+  18%  { box-shadow: 0 0 0 2px var(--amber); background-color: rgba(139, 105, 20, 0.07); }
+  65%  { box-shadow: 0 0 0 2px var(--amber); background-color: rgba(139, 105, 20, 0.07); }
+  100% { box-shadow: none; background-color: transparent; }
+}
+.log-highlight {
+  animation: logHighlightPulse 1.6s ease forwards;
+}

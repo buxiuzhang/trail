@@ -120,4 +120,22 @@ public class LogTodoRefStore {
             ORDER BY r.id
             """, logId);
     }
+
+    /**
+     * 反向查询：获取引用了指定待办的所有日志 ID，最新日期在前。
+     * 过滤软删除的日志（is_deleted = 0）。
+     */
+    public List<Long> getLogIdsForTodo(long todoId) {
+        List<Map<String, Object>> rows = db.query(
+            "SELECT r.log_id FROM log_todo_refs r" +
+            " JOIN work_logs w ON w.id = r.log_id" +
+            " WHERE r.todo_id = ? AND w.is_deleted = 0" +
+            " ORDER BY w.log_date DESC, w.ordinal DESC",
+            todoId);
+        List<Long> ids = new ArrayList<>();
+        for (Map<String, Object> row : rows) {
+            ids.add(((Number) row.get("log_id")).longValue());
+        }
+        return ids;
+    }
 }

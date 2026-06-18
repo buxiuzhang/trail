@@ -65,3 +65,21 @@ export function useDeleteTodo(taskId: number) {
     },
   })
 }
+
+export interface TodoLogItem {
+  id: number
+  task_id: number
+  task_title: string
+  log_date: string
+  hours: number
+  content: string
+}
+
+/** 展开待办时懒加载关联日志（enabled=expanded）。 */
+export function useLogsForTodo(taskId: number, todoId: number, enabled: boolean) {
+  return useQuery({
+    queryKey: ['todo-logs', taskId, todoId],
+    queryFn: () => api.get<TodoLogItem[]>(`/api/tasks/${taskId}/todos/${todoId}/logs`),
+    enabled,
+  })
+}

@@ -46,7 +46,7 @@ export function LogEntry({ task, log, todos, tasks = [], isEditing, onEdit, onDe
   const getTaskTitle = (id: number) => tasks.find(t => t.id === id)?.title
 
   return (
-    <div className={`${styles.entry} ${isMt ? styles.entryMt : ''}`}>
+    <div id={`log-${log.id}`} className={`${styles.entry} ${isMt ? styles.entryMt : ''}`}>
       <div className={styles.date}>
         <span className={styles.dateDay}>{log.log_date.slice(8, 10)}</span>
         <span>{log.log_date.slice(5, 7)}/{log.log_date.slice(2, 4)}</span>

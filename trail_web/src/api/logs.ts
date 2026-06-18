@@ -1,11 +1,21 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from './client'
 import type { LogOut, LogCreate, LogUpdate } from '@/types'
 
-export function useLogs(taskId: number) {
-  return useQuery({
+const LOG_PAGE_SIZE = 5
+
+export function useInfiniteLogs(taskId: number) {
+  return useInfiniteQuery({
     queryKey: ['logs', taskId],
-    queryFn: () => api.get<LogOut[]>(`/api/tasks/${taskId}/logs`),
+    queryFn: ({ pageParam }) =>
+      api.get<{ items: LogOut[]; total: number }>(
+        `/api/tasks/${taskId}/logs?limit=${LOG_PAGE_SIZE}&offset=${pageParam}`
+      ),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => {
+      const loaded = allPages.reduce((sum, p) => sum + p.items.length, 0)
+      return loaded < lastPage.total ? loaded : undefined
+    },
     enabled: !isNaN(taskId) && taskId > 0,
   })
 }

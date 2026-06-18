@@ -1,5 +1,8 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import type { TaskOut, TodoOut } from '@/types'
+import { useLogsForTodo } from '@/api/todos'
+import type { TodoLogItem } from '@/api/todos'
 import addTodoIcon from '@/assets/add-todo.svg'
 import { ContentViewer } from '@/components/shared/ContentViewer'
 import styles from './TodoSection.module.css'
@@ -14,6 +17,75 @@ interface TodoSectionProps {
   onRequestEdit: (todoId: number) => void
   onAbandon: (todoId: number) => void
   onDelete: (todoId: number) => void
+}
+
+const PAGE_SIZE = 5
+
+function truncate(text: string, max = 20): string {
+  const plain = text.replace(/@\w+「([^」]*)」/g, '$1').replace(/\s+/g, ' ').trim()
+  return plain.length > max ? plain.slice(0, max) + '…' : plain
+}
+
+function TodoLogList({ taskId, todoId }: { taskId: number; todoId: number }) {
+  const navigate = useNavigate()
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
+  const { data: logs, isLoading } = useLogsForTodo(taskId, todoId, true)
+
+  const total = logs?.length ?? 0
+  const visible = logs?.slice(0, visibleCount) ?? []
+  const hasMore = visibleCount < total
+
+  function handleLogClick(log: TodoLogItem) {
+    navigate(`/task/${log.task_id}#log-${log.id}`)
+  }
+
+  return (
+    <div className={styles.logsSection}>
+      <span className={styles.logsSectionTitle}>
+        关联日志{!isLoading && total > 0 && <span className={styles.logsCount}>（{total}）</span>}
+      </span>
+      {isLoading && <p className={styles.logsLoading}>载入中…</p>}
+      {!isLoading && total === 0 && <p className={styles.logsEmpty}>暂无关联日志</p>}
+      {visible.length > 0 && (
+        <ul className={styles.logList}>
+          {visible.map((log: TodoLogItem) => (
+            <li key={log.id} className={styles.logItem}>
+              <button
+                type="button"
+                className={styles.logBtn}
+                onClick={() => handleLogClick(log)}
+              >
+                <span className={styles.logContent}>{truncate(log.content)}</span>
+                <span className={styles.logMeta}>
+                  {log.log_date} · {log.hours}h
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {!isLoading && total > PAGE_SIZE && (
+        <button
+          type="button"
+          className={styles.logsMore}
+          disabled={!hasMore}
+          onClick={() => setVisibleCount(c => c + PAGE_SIZE)}
+        >
+          {hasMore ? (
+            <>
+              <svg className={styles.logsMoreIcon} viewBox="0 0 16 16" fill="none">
+                <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.2"/>
+                <path d="M8 5v3l2 1.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+              </svg>
+              加载更多
+            </>
+          ) : (
+            '已全部加载'
+          )}
+        </button>
+      )}
+    </div>
+  )
 }
 
 export function TodoSection({
@@ -125,6 +197,7 @@ export function TodoSection({
                         className={styles.descText}
                       />
                     )}
+                    <TodoLogList taskId={task.id} todoId={t.id} />
                     {!isCompleted && !isClosed && (
                       <div className={styles.descActions}>
                         {!isAbandoned && (
@@ -164,3 +237,4 @@ export function TodoSection({
     </section>
   )
 }
+

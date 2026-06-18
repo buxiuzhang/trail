@@ -38,6 +38,11 @@ public class WorkLogStore {
 
     public List<Map<String, Object>> listLogs(long taskId, String phase, boolean includeDeleted,
                                               Integer sinceDays, Integer limit) {
+        return listLogs(taskId, phase, includeDeleted, sinceDays, limit, null);
+    }
+
+    public List<Map<String, Object>> listLogs(long taskId, String phase, boolean includeDeleted,
+                                              Integer sinceDays, Integer limit, Integer offset) {
         StringBuilder where = new StringBuilder("task_id = ?");
         List<Object> params = new ArrayList<>();
         params.add(taskId);
@@ -55,12 +60,32 @@ public class WorkLogStore {
         }
         StringBuilder sql = new StringBuilder("SELECT * FROM work_logs WHERE ")
                 .append(where)
-                .append(" ORDER BY log_date, ordinal");
+                .append(" ORDER BY log_date DESC, ordinal DESC");
         if (limit != null) {
             sql.append(" LIMIT ?");
             params.add(limit);
+            if (offset != null && offset > 0) {
+                sql.append(" OFFSET ?");
+                params.add(offset);
+            }
         }
         return db.query(sql.toString(), params.toArray());
+    }
+
+    public long countLogs(long taskId, String phase, boolean includeDeleted) {
+        StringBuilder where = new StringBuilder("task_id = ?");
+        List<Object> params = new ArrayList<>();
+        params.add(taskId);
+        if (phase != null && !phase.isBlank()) {
+            where.append(" AND phase = ?");
+            params.add(phase);
+        }
+        if (!includeDeleted) {
+            where.append(" AND is_deleted = 0");
+        }
+        List<Map<String, Object>> rows = db.query(
+            "SELECT COUNT(*) AS n FROM work_logs WHERE " + where, params.toArray());
+        return ((Number) rows.get(0).get("n")).longValue();
     }
 
     public LocalDate latestLogDate(long taskId) {
@@ -274,6 +299,35 @@ public class WorkLogStore {
             WHERE w.log_date >= ? AND w.log_date <= ? AND w.is_deleted = 0
             ORDER BY w.log_date, t.title, w.ordinal
             """, start, end);
+    }
+
+    /**
+     * 查询引用了指定待办的所有日志，经 enrichLogs 处理后返回。
+     * 最新日期在前（由 LogTodoRefStore.getLogIdsForTodo 保证顺序）。
+     */
+    public List<Map<String, Object>> getLogsForTodo(long todoId) {
+        List<Long> logIds = logTodoRefStore.getLogIdsForTodo(todoId);
+        if (logIds.isEmpty()) return Collections.emptyList();
+
+        String placeholders = logIds.stream().map(id -> "?").collect(Collectors.joining(","));
+        List<Map<String, Object>> rows = db.query(
+            "SELECT w.id, w.task_id, w.log_date, w.phase, w.ordinal, w.hours, w.task_ids, w.content," +
+            " t.title AS task_title" +
+            " FROM work_logs w JOIN tasks t ON t.id = w.task_id" +
+            " WHERE w.id IN (" + placeholders + ") AND w.is_deleted = 0",
+            logIds.toArray());
+
+        // 按 logIds 顺序（log_date DESC）重排，IN 查询不保证顺序
+        Map<Long, Map<String, Object>> byId = new LinkedHashMap<>();
+        for (Map<String, Object> row : rows) {
+            byId.put(((Number) row.get("id")).longValue(), row);
+        }
+        List<Map<String, Object>> ordered = new ArrayList<>();
+        for (Long id : logIds) {
+            if (byId.containsKey(id)) ordered.add(byId.get(id));
+        }
+
+        return enrichLogs(ordered);
     }
 
     /**

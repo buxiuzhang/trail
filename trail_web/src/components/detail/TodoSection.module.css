@@ -212,6 +212,105 @@
   opacity: 0.7;
 }
 
+/* 关联日志区块 */
+.logsSection {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 0.5px solid var(--rule-soft);
+}
+.logsSectionTitle {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-ghost);
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-bottom: 6px;
+}
+.logsCount {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink-ghost);
+  letter-spacing: 0;
+  text-transform: none;
+}
+.logsLoading,
+.logsEmpty {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-ghost);
+  margin: 4px 0 0 0;
+}
+.logList {
+  list-style: none;
+  margin: 0; padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.logItem {
+  display: block;
+}
+.logBtn {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  background: none;
+  border: none;
+  padding: 5px 6px;
+  cursor: pointer;
+  border-radius: 3px;
+  text-align: left;
+  transition: background 150ms ease;
+}
+.logBtn:hover {
+  background: var(--card-deep);
+}
+.logContent {
+  font-family: var(--body);
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--ink-soft);
+  word-break: break-word;
+}
+.logMeta {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink-ghost);
+  margin-top: 2px;
+  letter-spacing: 0.05em;
+}
+.logsMore {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  background: none;
+  border: none;
+  padding: 2px 4px;
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--ink-ghost);
+  transition: color 150ms ease;
+}
+.logsMore:hover:not(:disabled) {
+  color: var(--ink);
+}
+.logsMore:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+.logsMoreIcon {
+  width: 11px;
+  height: 11px;
+  flex-shrink: 0;
+}
+
 .actions {
   display: flex; gap: 4px; align-items: center;
   flex-shrink: 0;

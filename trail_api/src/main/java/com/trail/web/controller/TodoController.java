@@ -1,6 +1,7 @@
 package com.trail.web.controller;
 
 import com.trail.store.TodoStore;
+import com.trail.store.WorkLogStore;
 import com.trail.web.dto.TodoMapper;
 import com.trail.web.dto.TodoRequest;
 import com.trail.web.dto.TodoResponse;
@@ -14,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 任务待办管理
@@ -25,9 +27,11 @@ import java.util.List;
 public class TodoController {
 
     private final TodoStore todos;
+    private final WorkLogStore workLogs;
 
-    public TodoController(TodoStore todos) {
+    public TodoController(TodoStore todos, WorkLogStore workLogs) {
         this.todos = todos;
+        this.workLogs = workLogs;
     }
 
     @Operation(summary = "查询任务的待办列表", description = "获取指定任务的所有待办事项，包括未完成、已完成、已废弃三种状态。")
@@ -91,5 +95,15 @@ public class TodoController {
             @PathVariable long todoId) {
         todos.deleteTodo(todoId, taskId);
         return ResponseEntity.noContent().build();
+    }
+
+    @Operation(summary = "查询待办关联的日志", description = "返回所有引用了该待办的工作日志，最新在前，content 已替换 @todo/@task 为真实标题。")
+    @GetMapping("/{todoId}/logs")
+    public List<Map<String, Object>> logsForTodo(
+            @Parameter(description = "任务 ID")
+            @PathVariable long taskId,
+            @Parameter(description = "待办 ID")
+            @PathVariable long todoId) {
+        return workLogs.getLogsForTodo(todoId);
     }
 }
