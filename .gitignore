@@ -24,3 +24,16 @@ trail_api/target/
 trail_web/dist/
 trail_web/node_modules/
 .qoder/
+
+# 隐藏目录（除了 .git）
+.claude/
+.github/
+.playwright-mcp/
+
+# 文档目录（开发计划、架构设计等）
+docs/
+
+# Markdown 文件（除了 README）
+CLAUDE.md
+*.md
+!README.md
