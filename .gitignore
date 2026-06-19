@@ -37,3 +37,6 @@ docs/
 CLAUDE.md
 *.md
 !README.md
+e2e/
+playwright.config.ts
+test-results/
