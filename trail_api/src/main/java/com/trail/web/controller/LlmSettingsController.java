@@ -44,9 +44,11 @@ public class LlmSettingsController {
                 all.getOrDefault("chat_system_prompt", ""),
                 all.getOrDefault("polish_system_prompt", ""),
                 all.getOrDefault("polish_todo_system_prompt", ""),
+                all.getOrDefault("polish_task_desc_system_prompt", ""),
                 all.getOrDefault("summarize_system_prompt", ""),
                 all.getOrDefault("summarize_maintenance_prompt", ""),
                 all.getOrDefault("ask_maintenance_prompt", ""),
+                all.getOrDefault("draft_log_system_prompt", ""),
                 all.getOrDefault("tools_desc", ""),
                 all.getOrDefault("daily_report_template", ""),
                 all.getOrDefault("weekly_report_template", ""),
@@ -78,9 +80,11 @@ public class LlmSettingsController {
         saveIfPresent(data, "chat_system_prompt");
         saveIfPresent(data, "polish_system_prompt");
         saveIfPresent(data, "polish_todo_system_prompt");
+        saveIfPresent(data, "polish_task_desc_system_prompt");
         saveIfPresent(data, "summarize_system_prompt");
         saveIfPresent(data, "summarize_maintenance_prompt");
         saveIfPresent(data, "ask_maintenance_prompt");
+        saveIfPresent(data, "draft_log_system_prompt");
         saveIfPresent(data, "tools_desc");
 
         saveIfPresent(data, "daily_report_template");

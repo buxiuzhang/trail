@@ -73,8 +73,8 @@ export function useInfiniteTasks(params: TaskListParams = {}) {
     // 下一页 pageParam = 已加载总数（累加所有 pages 的 items.length）
     // < pageSize 表示最后一页，不再拉
     getNextPageParam: (lastPage, allPages) => {
-      if (lastPage.items.length < TASK_PAGE_SIZE) return undefined
-      return allPages.reduce((sum, p) => sum + p.items.length, 0)
+      const loaded = allPages.reduce((sum, p) => sum + p.items.length, 0)
+      return loaded < lastPage.total ? loaded : undefined
     },
     staleTime: 30_000,
   })

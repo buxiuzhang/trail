@@ -18,9 +18,11 @@ public record LlmSettingsDto(
         String chatSystemPrompt,
         String polishSystemPrompt,
         String polishTodoSystemPrompt,
+        String polishTaskDescSystemPrompt,
         String summarizeSystemPrompt,
         String summarizeMaintenancePrompt,
         String askMaintenancePrompt,
+        String draftLogSystemPrompt,
         String toolsDesc,
         // 日报/周报模板
         String dailyReportTemplate,

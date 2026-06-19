@@ -54,6 +54,8 @@ export function SettingsPage() {
   const [chatPrompt, setChatPrompt] = useState('')
   const [polishPrompt, setPolishPrompt] = useState('')
   const [polishTodoPrompt, setPolishTodoPrompt] = useState('')
+  const [polishTaskDescPrompt, setPolishTaskDescPrompt] = useState('')
+  const [draftLogPrompt, setDraftLogPrompt] = useState('')
   const [summarizePrompt, setSummarizePrompt] = useState('')
   const [summarizeMaintenancePrompt, setSummarizeMaintenancePrompt] = useState('')
   const [askMaintenancePrompt, setAskMaintenancePrompt] = useState('')
@@ -63,6 +65,8 @@ export function SettingsPage() {
   const [chatPromptMode, setChatPromptMode] = useState<EditorMode>('source')
   const [polishPromptMode, setPolishPromptMode] = useState<EditorMode>('source')
   const [polishTodoPromptMode, setPolishTodoPromptMode] = useState<EditorMode>('source')
+  const [polishTaskDescPromptMode, setPolishTaskDescPromptMode] = useState<EditorMode>('source')
+  const [draftLogPromptMode, setDraftLogPromptMode] = useState<EditorMode>('source')
   const [summarizePromptMode, setSummarizePromptMode] = useState<EditorMode>('source')
   const [summarizeMaintenancePromptMode, setSummarizeMaintenancePromptMode] = useState<EditorMode>('source')
   const [askMaintenancePromptMode, setAskMaintenancePromptMode] = useState<EditorMode>('source')
@@ -109,6 +113,8 @@ export function SettingsPage() {
       setChatPrompt(settings.chat_system_prompt || '')
       setPolishPrompt(settings.polish_system_prompt || '')
       setPolishTodoPrompt(settings.polish_todo_system_prompt || '')
+      setPolishTaskDescPrompt(settings.polish_task_desc_system_prompt || '')
+      setDraftLogPrompt(settings.draft_log_system_prompt || '')
       setSummarizePrompt(settings.summarize_system_prompt || '')
       setSummarizeMaintenancePrompt(settings.summarize_maintenance_prompt || '')
       setAskMaintenancePrompt(settings.ask_maintenance_prompt || '')
@@ -171,6 +177,8 @@ export function SettingsPage() {
         chat_system_prompt: chatPrompt.trim(),
         polish_system_prompt: polishPrompt.trim(),
         polish_todo_system_prompt: polishTodoPrompt.trim(),
+        polish_task_desc_system_prompt: polishTaskDescPrompt.trim(),
+        draft_log_system_prompt: draftLogPrompt.trim(),
         summarize_system_prompt: summarizePrompt.trim(),
         summarize_maintenance_prompt: summarizeMaintenancePrompt.trim(),
         ask_maintenance_prompt: askMaintenancePrompt.trim(),
@@ -561,13 +569,99 @@ export function SettingsPage() {
                   {polishPromptMode === 'source' ? '预览模式' : '源码模式'}
                 </button>
               </div>
-              <p className={styles.promptDesc}>润色工作日志，使其书面化、正式化</p>
+              <p className={styles.promptDesc}>润色工作日志，使其书面化、正式化。后端会自动注入任务标题和描述作为上下文。</p>
               <div style={{ marginTop: '8px' }}>
                 <DescriptionEditorWithMode
                   value={polishPrompt || ''}
                   onChange={setPolishPrompt}
                   mode={polishPromptMode}
                   onModeChange={setPolishPromptMode}
+                  minHeight={150}
+                  textareaClassName="field__textarea"
+                  hideInlineToggle
+                />
+              </div>
+            </div>
+
+            {/* 任务描述润色提示词 */}
+            <div className={styles.promptField}>
+              <div className={styles.promptLabel}>
+                <span className={styles.promptName}>
+                  任务描述润色提示词
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const ok = await confirm({
+                        level: 'moderate',
+                        title: '重置任务描述润色提示词？',
+                        body: <p>将恢复为系统默认值，您的自定义内容将被覆盖。</p>,
+                        confirmLabel: '重置',
+                      })
+                      if (ok) setPolishTaskDescPrompt('')
+                    }}
+                    className={styles.resetBtn}
+                  >
+                    重置
+                  </button>
+                </span>
+                <button
+                  type="button"
+                  className={styles.modeToggle}
+                  onClick={() => setPolishTaskDescPromptMode(polishTaskDescPromptMode === 'source' ? 'preview' : 'source')}
+                >
+                  {polishTaskDescPromptMode === 'source' ? '预览模式' : '源码模式'}
+                </button>
+              </div>
+              <p className={styles.promptDesc}>润色任务描述，后端自动注入任务标题、全部日志摘要和未完成待办。</p>
+              <div style={{ marginTop: '8px' }}>
+                <DescriptionEditorWithMode
+                  value={polishTaskDescPrompt || ''}
+                  onChange={setPolishTaskDescPrompt}
+                  mode={polishTaskDescPromptMode}
+                  onModeChange={setPolishTaskDescPromptMode}
+                  minHeight={150}
+                  textareaClassName="field__textarea"
+                  hideInlineToggle
+                />
+              </div>
+            </div>
+
+            {/* 草稿生成提示词 */}
+            <div className={styles.promptField}>
+              <div className={styles.promptLabel}>
+                <span className={styles.promptName}>
+                  草稿生成提示词
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const ok = await confirm({
+                        level: 'moderate',
+                        title: '重置草稿生成提示词？',
+                        body: <p>将恢复为系统默认值，您的自定义内容将被覆盖。</p>,
+                        confirmLabel: '重置',
+                      })
+                      if (ok) setDraftLogPrompt('')
+                    }}
+                    className={styles.resetBtn}
+                  >
+                    重置
+                  </button>
+                </span>
+                <button
+                  type="button"
+                  className={styles.modeToggle}
+                  onClick={() => setDraftLogPromptMode(draftLogPromptMode === 'source' ? 'preview' : 'source')}
+                >
+                  {draftLogPromptMode === 'source' ? '预览模式' : '源码模式'}
+                </button>
+              </div>
+              <p className={styles.promptDesc}>根据粗糙描述和任务背景生成日志草稿。后端会自动注入任务标题、描述、最近日志和待办。</p>
+              <div style={{ marginTop: '8px' }}>
+                <DescriptionEditorWithMode
+                  value={draftLogPrompt || ''}
+                  onChange={setDraftLogPrompt}
+                  mode={draftLogPromptMode}
+                  onModeChange={setDraftLogPromptMode}
                   minHeight={150}
                   textareaClassName="field__textarea"
                   hideInlineToggle

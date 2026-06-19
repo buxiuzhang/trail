@@ -24,10 +24,12 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
 
 /**
  * LLM 服务层
@@ -76,6 +78,7 @@ public class LlmService {
     // Prompt 缓存（启动时加载）
     private volatile String cachedPolishPrompt;
     private volatile String cachedPolishTodoPrompt;
+    private volatile String cachedPolishTaskDescPrompt;
     private volatile String cachedSummarizePrompt;
     private volatile String cachedSummarizeMaintenancePrompt;
     private volatile String cachedAskMaintenancePrompt;
@@ -101,6 +104,7 @@ public class LlmService {
         Map<String, String> settings = settingsStore.getAll();
         cachedPolishPrompt = settings.get("polish_system_prompt");
         cachedPolishTodoPrompt = settings.get("polish_todo_system_prompt");
+        cachedPolishTaskDescPrompt = settings.get("polish_task_desc_system_prompt");
         cachedSummarizePrompt = settings.get("summarize_system_prompt");
         cachedSummarizeMaintenancePrompt = settings.get("summarize_maintenance_prompt");
         cachedAskMaintenancePrompt = settings.get("ask_maintenance_prompt");
@@ -162,13 +166,52 @@ public class LlmService {
     // 润色
     // ============================================================
 
-    /** 润色文本，支持日志和待办两种类型 */
+    /** 润色文本，支持三种类型：log（日志）、todo（待办）、task_desc（任务描述） */
     public String polish(String content, Long taskId, String type) {
         ensurePromptsLoaded();
         LlmConfig cfg = getConfig();
-        String system = "todo".equals(type) ? cachedPolishTodoPrompt : cachedPolishPrompt;
-        String user = POLISH_USER_TEMPLATE.replace("{content}", content);
 
+        String system;
+        if ("todo".equals(type)) {
+            system = cachedPolishTodoPrompt;
+        } else if ("task_desc".equals(type)) {
+            system = cachedPolishTaskDescPrompt;
+        } else {
+            system = cachedPolishPrompt;
+        }
+
+        // 自动注入任务上下文
+        if (taskId != null) {
+            try {
+                Map<String, Object> task = taskStore.getTask(taskId);
+                String title = task.get("title") != null ? task.get("title").toString() : "";
+                String desc  = task.get("description") != null ? task.get("description").toString() : "";
+
+                if ("task_desc".equals(type)) {
+                    String[] parts = buildTaskDescParts(system, cfg, taskId, title, desc);
+                    system = parts[0];
+                    // 把任务上下文追加到 user prompt
+                    String userContext = parts[1];
+                    String user = POLISH_USER_TEMPLATE.replace("{content}", content)
+                        + (userContext.isBlank() ? "" : "\n\n---\n【参考背景（仅用于理解任务范围，禁止复述其中任何细节内容）】\n" + userContext);
+                    AnthropicResponse resp = callAnthropic(cfg, system, List.of(userMessage(user)));
+                    String promptText = "[system]\n" + system + "\n\n[user]\n" + user;
+                    aiRecordStore.addRecord(taskId, null, "polish", promptText, resp.raw(), false);
+                    return cleanTaskDesc(resp.text());
+
+                } else {
+                    // log / todo：注入任务标题和描述
+                    if (system.contains("{task_title}") || system.contains("{task_desc}")) {
+                        system = system.replace("{task_title}", title).replace("{task_desc}", desc);
+                    } else if (!title.isBlank()) {
+                        system = system + "\n\n当前任务：「" + title + "」"
+                               + (desc.isBlank() ? "" : "\n任务描述：" + desc);
+                    }
+                }
+            } catch (Exception ignored) {}
+        }
+
+        String user = POLISH_USER_TEMPLATE.replace("{content}", content);
         AnthropicResponse resp = callAnthropic(cfg, system, List.of(userMessage(user)));
         String promptText = "[system]\n" + system + "\n\n[user]\n" + user;
         aiRecordStore.addRecord(taskId, null, "polish", promptText, resp.raw(), false);
@@ -578,6 +621,127 @@ public class LlmService {
         if (first == null) return "";
         if (first.equals(last)) return first;
         return first + " ~ " + last;
+    }
+
+    private static final int LOG_CHUNK_SIZE = 15;
+
+    private static final String CHUNK_SUMMARY_SYSTEM =
+        "你是任务进展提炼助手。任务「{task_title}」的工作日志片段如下，" +
+        "提炼关键工作职责和推进方向，精炼准确，不要逐条复述。" +
+        "只描述做了哪类工作、达成了什么目标，不要出现具体的故障名称、系统参数、错误信息、数据量等技术细节。";
+
+    private static final String FINAL_SUMMARY_SYSTEM =
+        "你是任务进展提炼助手。以下是任务「{task_title}」的各阶段进展摘要，" +
+        "请综合提炼为一段完整的任务进展总结，精炼准确，去除重复。" +
+        "只描述工作职责和任务方向，不要出现具体的故障名称、系统参数、错误信息、数据量等技术细节。";
+
+    /** 过滤 Markdown 代码块（``` ... ```） */
+    private String stripCodeBlocks(String text) {
+        if (text == null) return "";
+        return text.replaceAll("(?s)```.*?```", "").trim();
+    }
+
+    /**
+     * 清理 task_desc 润色结果：
+     * 1. 去掉 Markdown 标题（### / ## / #）
+     * 2. 去掉加粗（**text** → text）
+     * 3. 去掉水平分割线（--- / ***）
+     * 4. 把列表项（- xxx 或 数字. xxx）转为普通行
+     * 5. 去掉末尾客套话（"如需…" "欢迎…" "请告知…" 等）
+     * 6. 合并多余空行
+     */
+    private String cleanTaskDesc(String text) {
+        if (text == null) return "";
+        // 去掉 Markdown 标题
+        text = text.replaceAll("(?m)^#{1,6}\\s+", "");
+        // 去掉加粗/斜体
+        text = text.replaceAll("\\*{1,2}([^*]+)\\*{1,2}", "$1");
+        // 去掉水平分割线
+        text = text.replaceAll("(?m)^[-*]{3,}\\s*$", "");
+        // 列表项 "- " 或 "* " 或 "数字. " 开头，去掉符号保留内容
+        text = text.replaceAll("(?m)^[-*]\\s+", "");
+        text = text.replaceAll("(?m)^\\d+\\.\\s+", "");
+        // 去掉末尾客套话（最后一段包含"如需""欢迎""请告知""随时"等）
+        text = text.replaceAll("(?m)^[^\n]*(?:如需|欢迎|请告知|随时|如果需要|可以随时|如有)[^\n]*$", "").trim();
+        // 合并多余空行（超过2个换行压缩为1个空行）
+        text = text.replaceAll("\n{3,}", "\n\n").trim();
+        return text;
+    }
+
+    /**
+     * 为 task_desc 润色准备 system prompt 和 user 侧上下文。
+     * 返回 String[2]：[0] = system, [1] = user context（摘要放 user 侧，避免 LLM 照搬）
+     */
+    private String[] buildTaskDescParts(String systemTpl, LlmConfig cfg,
+                                         long taskId, String title, String desc) {
+        // 1. 全量日志，时间正序
+        List<Map<String, Object>> allLogs = workLogStore.listLogs(taskId, null, false, null, null, null, "asc");
+        allLogs = workLogStore.enrichLogs(allLogs);
+
+        String logSummary;
+        if (allLogs.isEmpty()) {
+            logSummary = "（暂无日志）";
+        } else {
+            List<List<Map<String, Object>>> chunks = new ArrayList<>();
+            for (int i = 0; i < allLogs.size(); i += LOG_CHUNK_SIZE) {
+                chunks.add(allLogs.subList(i, Math.min(i + LOG_CHUNK_SIZE, allLogs.size())));
+            }
+
+            String chunkSystem = CHUNK_SUMMARY_SYSTEM.replace("{task_title}", title);
+            List<String> chunkSummaries = new ArrayList<>();
+            for (List<Map<String, Object>> chunk : chunks) {
+                StringBuilder sb = new StringBuilder();
+                for (Map<String, Object> log : chunk) {
+                    String date = log.get("log_date") != null ? log.get("log_date").toString() : "";
+                    String content = stripCodeBlocks(
+                        log.get("content") != null ? log.get("content").toString() : "");
+                    if (!content.isBlank()) {
+                        sb.append("[").append(date).append("] ").append(content).append("\n\n");
+                    }
+                }
+                if (sb.isEmpty()) continue;
+                AnthropicResponse r = callAnthropic(cfg, chunkSystem, List.of(userMessage(sb.toString())));
+                chunkSummaries.add(r.text());
+            }
+
+            if (chunkSummaries.isEmpty()) {
+                logSummary = "（暂无日志）";
+            } else if (chunkSummaries.size() == 1) {
+                logSummary = chunkSummaries.get(0);
+            } else {
+                String merged = String.join("\n\n---\n\n", chunkSummaries);
+                String finalSystem = FINAL_SUMMARY_SYSTEM.replace("{task_title}", title);
+                AnthropicResponse r = callAnthropic(cfg, finalSystem, List.of(userMessage(merged)));
+                logSummary = r.text();
+            }
+        }
+
+        // 2. 待办（含描述，过滤代码块）
+        List<Map<String, Object>> activeTodos = todoStore.listTodos(taskId).stream()
+            .filter(t -> Integer.valueOf(0).equals(t.get("is_completed"))
+                      && Integer.valueOf(0).equals(t.get("is_abandoned")))
+            .toList();
+        String todosText = activeTodos.isEmpty() ? "（暂无待办）"
+            : activeTodos.stream().map(t -> {
+                String todoTitle = t.get("title") != null ? t.get("title").toString() : "";
+                String todoDesc = t.get("description") != null
+                    ? stripCodeBlocks(t.get("description").toString()) : "";
+                return "- " + todoTitle + (todoDesc.isBlank() ? "" : "（" + todoDesc + "）");
+            }).collect(Collectors.joining("\n"));
+
+        // 3. system：只做占位符替换
+        if (systemTpl.contains("{task_title}")) systemTpl = systemTpl.replace("{task_title}", title);
+        if (systemTpl.contains("{task_desc}")) systemTpl = systemTpl.replace("{task_desc}", desc);
+        if (systemTpl.contains("{log_summary}")) systemTpl = systemTpl.replace("{log_summary}", logSummary);
+        if (systemTpl.contains("{todos}")) systemTpl = systemTpl.replace("{todos}", todosText);
+
+        // 4. user context：摘要放 user 侧
+        String userContext = "任务名称：「" + title + "」"
+            + (desc.isBlank() ? "" : "\n历史描述：" + desc)
+            + "\n工作进展摘要：\n" + logSummary
+            + "\n未完成待办：\n" + todosText;
+
+        return new String[]{ systemTpl, userContext };
     }
 
     private String buildLogsText(List<Map<String, Object>> logs) {

@@ -98,7 +98,7 @@ export function TaskForm({ mode, task }: TaskFormProps) {
       return
     }
     try {
-      const result = await polishMutation.mutateAsync({ content: raw, task_id: taskId })
+      const result = await polishMutation.mutateAsync({ content: raw, task_id: taskId, type: 'task_desc' })
       setPolishedDescFrom(raw)
       setDescription(result.polished)
     } catch (err: any) {

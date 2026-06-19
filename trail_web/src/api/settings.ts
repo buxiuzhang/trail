@@ -14,9 +14,11 @@ export interface LLMSettings {
   chat_system_prompt: string
   polish_system_prompt: string
   polish_todo_system_prompt: string
+  polish_task_desc_system_prompt: string
   summarize_system_prompt: string
   summarize_maintenance_prompt: string
   ask_maintenance_prompt: string
+  draft_log_system_prompt: string
   // 工具说明
   tools_desc: string
   // 日报/周报模板
