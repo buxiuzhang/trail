@@ -64,6 +64,61 @@
 }
 
 /* —— Prompt 字段样式（档案风） —— */
+/* 折叠分组 */
+.promptGroup {
+  margin-bottom: 24px;
+  border: 0.5px solid var(--rule-soft);
+}
+.promptGroupHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--card);
+  cursor: pointer;
+  user-select: none;
+  border: none;
+  width: 100%;
+  text-align: left;
+  transition: background 150ms;
+}
+.promptGroupHeader:hover {
+  background: var(--card-deep);
+}
+.promptGroupTitle {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-faded);
+  flex: 1;
+}
+.promptGroupChevron {
+  font-size: 10px;
+  color: var(--ink-ghost);
+  transition: transform 200ms ease;
+}
+.promptGroupChevronOpen {
+  transform: rotate(180deg);
+}
+.promptGroupBadge {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  color: var(--ink-ghost);
+  background: var(--card-deep);
+  padding: 2px 6px;
+  border: 0.5px solid var(--rule-soft);
+}
+.promptGroupBody {
+  padding: 20px 14px 8px;
+  border-top: 0.5px solid var(--rule-soft);
+}
+.promptGroupBodyDisabled {
+  background: var(--paper-warm);
+  opacity: 0.7;
+}
+
 .promptField {
   margin-bottom: var(--space-xl);
 }

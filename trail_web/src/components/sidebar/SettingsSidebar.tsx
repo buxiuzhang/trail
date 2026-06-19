@@ -4,6 +4,7 @@
  * 进入设置页面后显示，替代任务筛选侧边栏。
  * 点击导航项切换不同设置分类。
  */
+import { useState } from 'react'
 import styles from './SettingsSidebar.module.css'
 
 interface SettingsSidebarProps {
@@ -18,22 +19,62 @@ const SECTIONS = [
   { key: 'data', label: '数据目录' },
 ]
 
+const LLM_SUB = [
+  { id: 'llm-record', label: '工作记录' },
+  { id: 'llm-dialog', label: '对话与报表' },
+  { id: 'llm-disabled', label: '暂不可用' },
+]
+
 export function SettingsSidebar({ activeSection, onSectionChange }: SettingsSidebarProps) {
+  const [activeSubId, setActiveSubId] = useState<string | null>(null)
+
+  function handleSubClick(id: string) {
+    setActiveSubId(id)
+    if (activeSection !== 'llm') {
+      onSectionChange('llm')
+      // 等 DOM 渲染后再滚动
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        })
+      })
+    } else {
+      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }
+
   return (
     <aside className={styles.sidebar} aria-label="设置导航">
       <section className={styles.block}>
         <h2 className={styles.title}>设置</h2>
         <ul className={styles.list} role="list">
           {SECTIONS.map(item => (
-            <li
-              key={item.key}
-              className={`${styles.item} ${activeSection === item.key ? styles.isActive : ''}`}
-              onClick={() => onSectionChange(item.key)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onSectionChange(item.key) }}
-            >
-              <span>{item.label}</span>
+            <li key={item.key}>
+              <div
+                className={`${styles.item} ${activeSection === item.key ? styles.isActive : ''}`}
+                onClick={() => { onSectionChange(item.key); setActiveSubId(null) }}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { onSectionChange(item.key); setActiveSubId(null) } }}
+              >
+                <span>{item.label}</span>
+              </div>
+              {item.key === 'llm' && activeSection === 'llm' && (
+                <ul className={styles.subList} role="list">
+                  {LLM_SUB.map(sub => (
+                    <li
+                      key={sub.id}
+                      className={`${styles.subItem} ${activeSubId === sub.id ? styles.subItemActive : ''}`}
+                      onClick={() => handleSubClick(sub.id)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleSubClick(sub.id) }}
+                    >
+                      <span>{sub.label}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </li>
           ))}
         </ul>

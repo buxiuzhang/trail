@@ -1,52 +1,42 @@
 /**
  * DescriptionEditorWithMode · 在 DescriptionEditor 外面包一层 "预览 / 源码" 切换
- *
- * 设计要点：
- *   - 复用 DescriptionEditor，**不动**它的内部逻辑（Crepe 初始化稳定）
- *   - 切换模式时通过 conditional render 让 DescriptionEditor 自然卸载/重挂，
- *     useEffect cleanup → initRef 重置 → 下次 mount Crepe 重建
- *   - value 双向同步：preview 和 source 共享一份 value，切换不丢内容
- *   - 受控 mode:父组件管 state,本组件只渲染分支 + 转发 onModeChange
- *   - 内置按钮默认在右上角(overlay 模式),传 hideInlineToggle=true 时不渲染
- *     ——父组件可独立用 <ModeToggleButton /> 放到任意位置(如 .composeRow 行尾)
- *
- * ref 处理：
- *   - 外部 .focus() 在 preview 模式委托给 DescriptionEditor (内部最终走 ProseMirror)
- *   - source 模式委托给可见的 textarea
- *
- * 故意不做：
- *   - 不引新依赖
- *   - source 模式不解析 markdown（就是纯 textarea），跟 demo 一致
  */
 import {
   forwardRef,
   useCallback,
+  useEffect,
   useImperativeHandle,
   useRef,
+  useState,
 } from 'react'
 import { DescriptionEditor } from './DescriptionEditor'
 import { IconPreview, IconSource } from './ModeIcons'
 import { type EditorMode } from './ModeToggleButton'
 import type { TodoOut, TaskOut } from '@/types'
+import expandIcon from '@/icons/expand.svg'
+import collapseIcon from '@/icons/collapse.svg'
 import styles from './DescriptionEditorWithMode.module.css'
+import viewerStyles from './ContentViewer.module.css'
 
 export type { EditorMode }
+
+const THRESHOLD = 20
 
 interface Props {
   value: string
   onChange: (v: string) => void
   mode: EditorMode
   onModeChange: (m: EditorMode) => void
-  /** 传 true 则不在编辑器内部渲染按钮,由父组件自己用 <ModeToggleButton /> 放置 */
   hideInlineToggle?: boolean
   placeholder?: string
   rows?: number
   minHeight?: number
+  /** preview 模式下超出此高度折叠，传 0 或不传则不折叠 */
+  maxHeight?: number
   textareaClassName?: string
-  /** 当前任务的待办列表（用于 @ 提及） */
   todos?: TodoOut[]
-  /** 全局任务列表（用于 @ 任务引用） */
   tasks?: TaskOut[]
+  autoGrow?: boolean
 }
 
 export const DescriptionEditorWithMode = forwardRef<HTMLTextAreaElement, Props>(
@@ -60,15 +50,19 @@ export const DescriptionEditorWithMode = forwardRef<HTMLTextAreaElement, Props>(
       placeholder,
       rows,
       minHeight = 120,
+      maxHeight,
       textareaClassName = 'field__textarea',
       todos = [],
       tasks = [],
+      autoGrow = false,
     },
     ref,
   ) {
-    // 模式各自的 focus 入口
     const previewRef = useRef<HTMLTextAreaElement>(null)
     const sourceRef = useRef<HTMLTextAreaElement>(null)
+    const collapseRef = useRef<HTMLDivElement>(null)
+    const [expanded, setExpanded] = useState(false)
+    const [needsTruncate, setNeedsTruncate] = useState(false)
 
     useImperativeHandle(
       ref,
@@ -84,11 +78,60 @@ export const DescriptionEditorWithMode = forwardRef<HTMLTextAreaElement, Props>(
       [mode],
     )
 
+    // 折叠检测（preview 模式 + maxHeight 时）
+    useEffect(() => {
+      if (!maxHeight || mode !== 'preview' || expanded) return
+      const el = collapseRef.current
+      if (!el) return
+      const check = () => {
+        setNeedsTruncate(el.scrollHeight > maxHeight + THRESHOLD)
+      }
+      check()
+      const observer = new ResizeObserver(check)
+      observer.observe(el)
+      const child = el.firstElementChild
+      if (child) observer.observe(child)
+      return () => observer.disconnect()
+    }, [maxHeight, mode, value, expanded])
+
+    // 切换到 preview 时重置折叠状态
+    useEffect(() => {
+      if (mode === 'preview') setExpanded(false)
+    }, [mode])
+
+    // autoGrow：source 模式切入或 value 变化时同步高度
+    useEffect(() => {
+      if (!autoGrow || mode !== 'source') return
+      const el = sourceRef.current
+      if (!el) return
+      el.style.height = 'auto'
+      el.style.height = el.scrollHeight + 'px'
+    }, [autoGrow, mode, value])
+
     const handleSourceChange = useCallback(
       (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         onChange(e.target.value)
+        if (autoGrow) {
+          const el = e.currentTarget
+          el.style.height = 'auto'
+          el.style.height = el.scrollHeight + 'px'
+        }
       },
-      [onChange],
+      [onChange, autoGrow],
+    )
+
+    const editorNode = (
+      <DescriptionEditor
+        ref={previewRef}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        rows={rows}
+        minHeight={minHeight}
+        textareaClassName={textareaClassName}
+        todos={todos}
+        tasks={tasks}
+      />
     )
 
     return (
@@ -112,17 +155,41 @@ export const DescriptionEditorWithMode = forwardRef<HTMLTextAreaElement, Props>(
         )}
 
         {mode === 'preview' ? (
-          <DescriptionEditor
-            ref={previewRef}
-            value={value}
-            onChange={onChange}
-            placeholder={placeholder}
-            rows={rows}
-            minHeight={minHeight}
-            textareaClassName={textareaClassName}
-            todos={todos}
-            tasks={tasks}
-          />
+          maxHeight ? (
+            <>
+              <div
+                ref={collapseRef}
+                className={viewerStyles.collapseWrap}
+                style={{ maxHeight: expanded ? 'none' : `${maxHeight}px` }}
+              >
+                {editorNode}
+                {!expanded && needsTruncate && (
+                  <div className={viewerStyles.fade}>
+                    <button
+                      type="button"
+                      className={viewerStyles.expandBtn}
+                      onClick={() => setExpanded(true)}
+                      title="展开"
+                    >
+                      <img src={expandIcon} alt="展开" />
+                    </button>
+                  </div>
+                )}
+              </div>
+              {expanded && needsTruncate && (
+                <button
+                  type="button"
+                  className={viewerStyles.collapseBtn}
+                  onClick={() => setExpanded(false)}
+                  title="收起"
+                >
+                  <img src={collapseIcon} alt="收起" />
+                </button>
+              )}
+            </>
+          ) : (
+            editorNode
+          )
         ) : (
           <textarea
             ref={sourceRef}
@@ -131,7 +198,10 @@ export const DescriptionEditorWithMode = forwardRef<HTMLTextAreaElement, Props>(
             onChange={handleSourceChange}
             placeholder={placeholder}
             rows={rows}
-            style={{ minHeight }}
+            style={{
+              minHeight,
+              ...(autoGrow ? { overflow: 'hidden', resize: 'none' } : {}),
+            }}
             spellCheck={false}
           />
         )}
@@ -139,3 +209,5 @@ export const DescriptionEditorWithMode = forwardRef<HTMLTextAreaElement, Props>(
     )
   },
 )
+
+

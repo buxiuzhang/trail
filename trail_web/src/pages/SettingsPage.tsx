@@ -62,23 +62,28 @@ export function SettingsPage() {
   const [toolsDesc, setToolsDesc] = useState('')
 
   // Prompt 模板编辑器模式（默认源码模式）
-  const [chatPromptMode, setChatPromptMode] = useState<EditorMode>('source')
-  const [polishPromptMode, setPolishPromptMode] = useState<EditorMode>('source')
-  const [polishTodoPromptMode, setPolishTodoPromptMode] = useState<EditorMode>('source')
-  const [polishTaskDescPromptMode, setPolishTaskDescPromptMode] = useState<EditorMode>('source')
-  const [draftLogPromptMode, setDraftLogPromptMode] = useState<EditorMode>('source')
-  const [summarizePromptMode, setSummarizePromptMode] = useState<EditorMode>('source')
-  const [summarizeMaintenancePromptMode, setSummarizeMaintenancePromptMode] = useState<EditorMode>('source')
-  const [askMaintenancePromptMode, setAskMaintenancePromptMode] = useState<EditorMode>('source')
-  const [toolsDescMode, setToolsDescMode] = useState<EditorMode>('source')
+  const [chatPromptMode, setChatPromptMode] = useState<EditorMode>('preview')
+  const [polishPromptMode, setPolishPromptMode] = useState<EditorMode>('preview')
+  const [polishTodoPromptMode, setPolishTodoPromptMode] = useState<EditorMode>('preview')
+  const [polishTaskDescPromptMode, setPolishTaskDescPromptMode] = useState<EditorMode>('preview')
+  const [draftLogPromptMode, setDraftLogPromptMode] = useState<EditorMode>('preview')
+  const [summarizePromptMode, setSummarizePromptMode] = useState<EditorMode>('preview')
+  const [summarizeMaintenancePromptMode, setSummarizeMaintenancePromptMode] = useState<EditorMode>('preview')
+  const [askMaintenancePromptMode, setAskMaintenancePromptMode] = useState<EditorMode>('preview')
+  const [toolsDescMode, setToolsDescMode] = useState<EditorMode>('preview')
+
+  // Prompt 折叠分组状态
+  const [groupRecord, setGroupRecord] = useState(true)
+  const [groupDialog, setGroupDialog] = useState(true)
+  const [groupDisabled, setGroupDisabled] = useState(false)
 
   // 日报/周报模板
   const [dailyReportTemplate, setDailyReportTemplate] = useState('')
   const [weeklyReportTemplate, setWeeklyReportTemplate] = useState('')
 
   // 日报/周报模板编辑器模式
-  const [dailyReportTemplateMode, setDailyReportTemplateMode] = useState<EditorMode>('source')
-  const [weeklyReportTemplateMode, setWeeklyReportTemplateMode] = useState<EditorMode>('source')
+  const [dailyReportTemplateMode, setDailyReportTemplateMode] = useState<EditorMode>('preview')
+  const [weeklyReportTemplateMode, setWeeklyReportTemplateMode] = useState<EditorMode>('preview')
 
   // 语音输入时长
   const [speechDuration, setSpeechDuration] = useState('10')
@@ -153,8 +158,6 @@ export function SettingsPage() {
 
   async function handleSaveLLM(e: React.SyntheticEvent) {
     e.preventDefault()
-
-    // 二次确认
     const ok = await confirm({
       level: 'moderate',
       title: '保存 LLM 设置？',
@@ -162,32 +165,59 @@ export function SettingsPage() {
       confirmLabel: '保存',
     })
     if (!ok) return
-
-    // API Key 可以为空（用户不修改时）
     try {
       await saveLLM.mutateAsync({
-        // 只有用户输入了新的 API Key 才传递
         ...(apiKey.trim() ? { api_key: apiKey.trim() } : {}),
         base_url: baseUrl.trim(),
         model: model.trim(),
         auth_type: authType,
         max_tokens: maxTokens.trim(),
         min_tokens: minTokens.trim(),
-        // Prompt 模板
-        chat_system_prompt: chatPrompt.trim(),
+        speech_duration: speechDuration.trim(),
+      })
+      showToast('已保存')
+    } catch (err: any) {
+      showToast('保存失败：' + err.message)
+    }
+  }
+
+  async function handleSaveRecord(e: React.SyntheticEvent) {
+    e.preventDefault()
+    try {
+      await saveLLM.mutateAsync({
         polish_system_prompt: polishPrompt.trim(),
+        draft_log_system_prompt: draftLogPrompt.trim(),
         polish_todo_system_prompt: polishTodoPrompt.trim(),
         polish_task_desc_system_prompt: polishTaskDescPrompt.trim(),
-        draft_log_system_prompt: draftLogPrompt.trim(),
+      })
+      showToast('已保存')
+    } catch (err: any) {
+      showToast('保存失败：' + err.message)
+    }
+  }
+
+  async function handleSaveDialog(e: React.SyntheticEvent) {
+    e.preventDefault()
+    try {
+      await saveLLM.mutateAsync({
+        chat_system_prompt: chatPrompt.trim(),
+        tools_desc: toolsDesc.trim(),
+        daily_report_template: dailyReportTemplate.trim(),
+        weekly_report_template: weeklyReportTemplate.trim(),
+      })
+      showToast('已保存')
+    } catch (err: any) {
+      showToast('保存失败：' + err.message)
+    }
+  }
+
+  async function handleSaveDisabled(e: React.SyntheticEvent) {
+    e.preventDefault()
+    try {
+      await saveLLM.mutateAsync({
         summarize_system_prompt: summarizePrompt.trim(),
         summarize_maintenance_prompt: summarizeMaintenancePrompt.trim(),
         ask_maintenance_prompt: askMaintenancePrompt.trim(),
-        tools_desc: toolsDesc.trim(),
-        // 日报/周报模板
-        daily_report_template: dailyReportTemplate.trim(),
-        weekly_report_template: weeklyReportTemplate.trim(),
-        // 语音输入时长
-        speech_duration: speechDuration.trim(),
       })
       showToast('已保存')
     } catch (err: any) {
@@ -489,490 +519,189 @@ export function SettingsPage() {
         )}
       </section>
 
-      {/* 卡片 2：Prompt 模板 */}
-      <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Prompt 模板</h2>
-        <p className={styles.sectionHint}>自定义各场景的 AI 提示词，留空则使用默认值。</p>
+      {/* 卡片 2：工作记录 Prompt */}
+      <section id="llm-record" className={styles.section}>
+        <h2 className={styles.sectionTitle}>工作记录</h2>
+        <p className={styles.sectionHint}>日志润色、草稿生成、待办润色、任务描述润色的提示词，留空则使用默认值。</p>
         {isLoading ? (
           <p className={styles.sectionHint}>载入中...</p>
         ) : (
-          <form onSubmit={handleSaveLLM}>
-            {/* 润色提示词 */}
+          <form onSubmit={handleSaveRecord}>
             <div className={styles.promptField}>
               <div className={styles.promptLabel}>
                 <span className={styles.promptName}>
-                  待办润色提示词
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const ok = await confirm({
-                        level: 'moderate',
-                        title: '重置待办润色提示词？',
-                        body: <p>将恢复为系统默认值，您的自定义内容将被覆盖。</p>,
-                        confirmLabel: '重置',
-                      })
-                      if (ok) setPolishTodoPrompt('')
-                    }}
-                    className={styles.resetBtn}
-                  >
-                    重置
-                  </button>
+                  日志润色
+                  <button type="button" onClick={async () => { if (await confirm({ level: 'moderate', title: '重置日志润色提示词？', body: <p>将恢复为系统默认值。</p>, confirmLabel: '重置' })) setPolishPrompt('') }} className={styles.resetBtn}>重置</button>
                 </span>
-                <button
-                  type="button"
-                  className={styles.modeToggle}
-                  onClick={() => setPolishTodoPromptMode(polishTodoPromptMode === 'source' ? 'preview' : 'source')}
-                >
-                  {polishTodoPromptMode === 'source' ? '预览模式' : '源码模式'}
-                </button>
+                <button type="button" className={styles.modeToggle} onClick={() => setPolishPromptMode(polishPromptMode === 'source' ? 'preview' : 'source')}>{polishPromptMode === 'source' ? '预览模式' : '源码模式'}</button>
               </div>
-              <p className={styles.promptDesc}>润色待办事项的补充说明，使其更清晰简洁</p>
+              <p className={styles.promptDesc}>润色工作日志，使其书面化、正式化。后端自动注入任务标题和描述。</p>
               <div style={{ marginTop: '8px' }}>
-                <DescriptionEditorWithMode
-                  value={polishTodoPrompt || ''}
-                  onChange={setPolishTodoPrompt}
-                  mode={polishTodoPromptMode}
-                  onModeChange={setPolishTodoPromptMode}
-                  minHeight={150}
-                  textareaClassName="field__textarea"
-                  hideInlineToggle
-                />
+                <DescriptionEditorWithMode value={polishPrompt || ''} onChange={setPolishPrompt} mode={polishPromptMode} onModeChange={setPolishPromptMode} minHeight={150} textareaClassName="field__textarea" hideInlineToggle autoGrow maxHeight={300} />
               </div>
             </div>
-
-            {/* 润色提示词 */}
             <div className={styles.promptField}>
               <div className={styles.promptLabel}>
                 <span className={styles.promptName}>
-                  润色提示词
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const ok = await confirm({
-                        level: 'moderate',
-                        title: '重置润色提示词？',
-                        body: <p>将恢复为系统默认值，您的自定义内容将被覆盖。</p>,
-                        confirmLabel: '重置',
-                      })
-                      if (ok) setPolishPrompt('')
-                    }}
-                    className={styles.resetBtn}
-                  >
-                    重置
-                  </button>
+                  草稿生成
+                  <button type="button" onClick={async () => { if (await confirm({ level: 'moderate', title: '重置草稿生成提示词？', body: <p>将恢复为系统默认值。</p>, confirmLabel: '重置' })) setDraftLogPrompt('') }} className={styles.resetBtn}>重置</button>
                 </span>
-                <button
-                  type="button"
-                  className={styles.modeToggle}
-                  onClick={() => setPolishPromptMode(polishPromptMode === 'source' ? 'preview' : 'source')}
-                >
-                  {polishPromptMode === 'source' ? '预览模式' : '源码模式'}
-                </button>
+                <button type="button" className={styles.modeToggle} onClick={() => setDraftLogPromptMode(draftLogPromptMode === 'source' ? 'preview' : 'source')}>{draftLogPromptMode === 'source' ? '预览模式' : '源码模式'}</button>
               </div>
-              <p className={styles.promptDesc}>润色工作日志，使其书面化、正式化。后端会自动注入任务标题和描述作为上下文。</p>
+              <p className={styles.promptDesc}>根据粗糙描述和任务背景生成日志草稿。后端自动注入任务标题、描述、最近日志和待办。</p>
               <div style={{ marginTop: '8px' }}>
-                <DescriptionEditorWithMode
-                  value={polishPrompt || ''}
-                  onChange={setPolishPrompt}
-                  mode={polishPromptMode}
-                  onModeChange={setPolishPromptMode}
-                  minHeight={150}
-                  textareaClassName="field__textarea"
-                  hideInlineToggle
-                />
+                <DescriptionEditorWithMode value={draftLogPrompt || ''} onChange={setDraftLogPrompt} mode={draftLogPromptMode} onModeChange={setDraftLogPromptMode} minHeight={150} textareaClassName="field__textarea" hideInlineToggle autoGrow maxHeight={300} />
               </div>
             </div>
-
-            {/* 任务描述润色提示词 */}
             <div className={styles.promptField}>
               <div className={styles.promptLabel}>
                 <span className={styles.promptName}>
-                  任务描述润色提示词
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const ok = await confirm({
-                        level: 'moderate',
-                        title: '重置任务描述润色提示词？',
-                        body: <p>将恢复为系统默认值，您的自定义内容将被覆盖。</p>,
-                        confirmLabel: '重置',
-                      })
-                      if (ok) setPolishTaskDescPrompt('')
-                    }}
-                    className={styles.resetBtn}
-                  >
-                    重置
-                  </button>
+                  待办润色
+                  <button type="button" onClick={async () => { if (await confirm({ level: 'moderate', title: '重置待办润色提示词？', body: <p>将恢复为系统默认值。</p>, confirmLabel: '重置' })) setPolishTodoPrompt('') }} className={styles.resetBtn}>重置</button>
                 </span>
-                <button
-                  type="button"
-                  className={styles.modeToggle}
-                  onClick={() => setPolishTaskDescPromptMode(polishTaskDescPromptMode === 'source' ? 'preview' : 'source')}
-                >
-                  {polishTaskDescPromptMode === 'source' ? '预览模式' : '源码模式'}
-                </button>
+                <button type="button" className={styles.modeToggle} onClick={() => setPolishTodoPromptMode(polishTodoPromptMode === 'source' ? 'preview' : 'source')}>{polishTodoPromptMode === 'source' ? '预览模式' : '源码模式'}</button>
               </div>
-              <p className={styles.promptDesc}>润色任务描述，后端自动注入任务标题、全部日志摘要和未完成待办。</p>
+              <p className={styles.promptDesc}>润色待办事项的补充说明，使其更清晰简洁。后端自动注入任务标题和描述。</p>
               <div style={{ marginTop: '8px' }}>
-                <DescriptionEditorWithMode
-                  value={polishTaskDescPrompt || ''}
-                  onChange={setPolishTaskDescPrompt}
-                  mode={polishTaskDescPromptMode}
-                  onModeChange={setPolishTaskDescPromptMode}
-                  minHeight={150}
-                  textareaClassName="field__textarea"
-                  hideInlineToggle
-                />
+                <DescriptionEditorWithMode value={polishTodoPrompt || ''} onChange={setPolishTodoPrompt} mode={polishTodoPromptMode} onModeChange={setPolishTodoPromptMode} minHeight={150} textareaClassName="field__textarea" hideInlineToggle autoGrow maxHeight={300} />
               </div>
             </div>
-
-            {/* 草稿生成提示词 */}
             <div className={styles.promptField}>
               <div className={styles.promptLabel}>
                 <span className={styles.promptName}>
-                  草稿生成提示词
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const ok = await confirm({
-                        level: 'moderate',
-                        title: '重置草稿生成提示词？',
-                        body: <p>将恢复为系统默认值，您的自定义内容将被覆盖。</p>,
-                        confirmLabel: '重置',
-                      })
-                      if (ok) setDraftLogPrompt('')
-                    }}
-                    className={styles.resetBtn}
-                  >
-                    重置
-                  </button>
+                  任务描述润色
+                  <button type="button" onClick={async () => { if (await confirm({ level: 'moderate', title: '重置任务描述润色提示词？', body: <p>将恢复为系统默认值。</p>, confirmLabel: '重置' })) setPolishTaskDescPrompt('') }} className={styles.resetBtn}>重置</button>
                 </span>
-                <button
-                  type="button"
-                  className={styles.modeToggle}
-                  onClick={() => setDraftLogPromptMode(draftLogPromptMode === 'source' ? 'preview' : 'source')}
-                >
-                  {draftLogPromptMode === 'source' ? '预览模式' : '源码模式'}
-                </button>
+                <button type="button" className={styles.modeToggle} onClick={() => setPolishTaskDescPromptMode(polishTaskDescPromptMode === 'source' ? 'preview' : 'source')}>{polishTaskDescPromptMode === 'source' ? '预览模式' : '源码模式'}</button>
               </div>
-              <p className={styles.promptDesc}>根据粗糙描述和任务背景生成日志草稿。后端会自动注入任务标题、描述、最近日志和待办。</p>
+              <p className={styles.promptDesc}>润色任务描述。后端自动注入任务标题、全部日志摘要（分段）和未完成待办。</p>
               <div style={{ marginTop: '8px' }}>
-                <DescriptionEditorWithMode
-                  value={draftLogPrompt || ''}
-                  onChange={setDraftLogPrompt}
-                  mode={draftLogPromptMode}
-                  onModeChange={setDraftLogPromptMode}
-                  minHeight={150}
-                  textareaClassName="field__textarea"
-                  hideInlineToggle
-                />
+                <DescriptionEditorWithMode value={polishTaskDescPrompt || ''} onChange={setPolishTaskDescPrompt} mode={polishTaskDescPromptMode} onModeChange={setPolishTaskDescPromptMode} minHeight={150} textareaClassName="field__textarea" hideInlineToggle autoGrow maxHeight={300} />
               </div>
             </div>
-
-            {/* 总结提示词 */}
-            <div className={styles.promptField}>
-              <div className={styles.promptLabel}>
-                <span className={styles.promptName}>
-                  总结提示词
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const ok = await confirm({
-                        level: 'moderate',
-                        title: '重置总结提示词？',
-                        body: <p>将恢复为系统默认值，您的自定义内容将被覆盖。</p>,
-                        confirmLabel: '重置',
-                      })
-                      if (ok) setSummarizePrompt('')
-                    }}
-                    className={styles.resetBtn}
-                  >
-                    重置
-                  </button>
-                </span>
-                <button
-                  type="button"
-                  className={styles.modeToggle}
-                  onClick={() => setSummarizePromptMode(summarizePromptMode === 'source' ? 'preview' : 'source')}
-                >
-                  {summarizePromptMode === 'source' ? '预览模式' : '源码模式'}
-                </button>
-              </div>
-              <p className={styles.promptDesc}>主体阶段结束时，基于日志提炼总结</p>
-              <div style={{ marginTop: '8px' }}>
-                <DescriptionEditorWithMode
-                  value={summarizePrompt || ''}
-                  onChange={setSummarizePrompt}
-                  mode={summarizePromptMode}
-                  onModeChange={setSummarizePromptMode}
-                  minHeight={150}
-                  textareaClassName="field__textarea"
-                  hideInlineToggle
-                />
-              </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
+              <button type="submit" className="btn btn--primary" disabled={saveLLM.isPending}>{saveLLM.isPending ? '保存中...' : '保存'}</button>
             </div>
+          </form>
+        )}
+      </section>
 
-            {/* 维护期总结提示词 */}
-            <div className={styles.promptField}>
-              <div className={styles.promptLabel}>
-                <span className={styles.promptName}>
-                  维护期总结提示词
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const ok = await confirm({
-                        level: 'moderate',
-                        title: '重置维护期总结提示词？',
-                        body: <p>将恢复为系统默认值，您的自定义内容将被覆盖。</p>,
-                        confirmLabel: '重置',
-                      })
-                      if (ok) setSummarizeMaintenancePrompt('')
-                    }}
-                    className={styles.resetBtn}
-                  >
-                    重置
-                  </button>
-                </span>
-                <button
-                  type="button"
-                  className={styles.modeToggle}
-                  onClick={() => setSummarizeMaintenancePromptMode(summarizeMaintenancePromptMode === 'source' ? 'preview' : 'source')}
-                >
-                  {summarizeMaintenancePromptMode === 'source' ? '预览模式' : '源码模式'}
-                </button>
-              </div>
-              <p className={styles.promptDesc}>维护阶段结束时的总结，侧重偶发问题和对外影响</p>
-              <div style={{ marginTop: '8px' }}>
-                <DescriptionEditorWithMode
-                  value={summarizeMaintenancePrompt || ''}
-                  onChange={setSummarizeMaintenancePrompt}
-                  mode={summarizeMaintenancePromptMode}
-                  onModeChange={setSummarizeMaintenancePromptMode}
-                  minHeight={150}
-                  textareaClassName="field__textarea"
-                  hideInlineToggle
-                />
-              </div>
-            </div>
-
-            {/* 维护建议提示词 */}
-            <div className={styles.promptField}>
-              <div className={styles.promptLabel}>
-                <span className={styles.promptName}>
-                  维护建议提示词
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const ok = await confirm({
-                        level: 'moderate',
-                        title: '重置维护建议提示词？',
-                        body: <p>将恢复为系统默认值，您的自定义内容将被覆盖。</p>,
-                        confirmLabel: '重置',
-                      })
-                      if (ok) setAskMaintenancePrompt('')
-                    }}
-                    className={styles.resetBtn}
-                  >
-                    重置
-                  </button>
-                </span>
-                <button
-                  type="button"
-                  className={styles.modeToggle}
-                  onClick={() => setAskMaintenancePromptMode(askMaintenancePromptMode === 'source' ? 'preview' : 'source')}
-                >
-                  {askMaintenancePromptMode === 'source' ? '预览模式' : '源码模式'}
-                </button>
-              </div>
-              <p className={styles.promptDesc}>判断任务是否应进入维护期或直接关闭</p>
-              <div style={{ marginTop: '8px' }}>
-                <DescriptionEditorWithMode
-                  value={askMaintenancePrompt || ''}
-                  onChange={setAskMaintenancePrompt}
-                  mode={askMaintenancePromptMode}
-                  onModeChange={setAskMaintenancePromptMode}
-                  minHeight={150}
-                  textareaClassName="field__textarea"
-                  hideInlineToggle
-                />
-              </div>
-            </div>
-
-            {/* 对话提示词 */}
+      {/* 卡片 3：对话与报表 Prompt */}
+      <section id="llm-dialog" className={styles.section}>
+        <h2 className={styles.sectionTitle}>对话与报表</h2>
+        <p className={styles.sectionHint}>对话提示词、工具说明、日报/周报模板，留空则使用默认值。</p>
+        {isLoading ? (
+          <p className={styles.sectionHint}>载入中...</p>
+        ) : (
+          <form onSubmit={handleSaveDialog}>
             <div className={styles.promptField}>
               <div className={styles.promptLabel}>
                 <span className={styles.promptName}>
                   对话提示词
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const ok = await confirm({
-                        level: 'moderate',
-                        title: '重置对话提示词？',
-                        body: <p>将恢复为系统默认值，您的自定义内容将被覆盖。</p>,
-                        confirmLabel: '重置',
-                      })
-                      if (ok) setChatPrompt('')
-                    }}
-                    className={styles.resetBtn}
-                  >
-                    重置
-                  </button>
+                  <button type="button" onClick={async () => { if (await confirm({ level: 'moderate', title: '重置对话提示词？', body: <p>将恢复为系统默认值。</p>, confirmLabel: '重置' })) setChatPrompt('') }} className={styles.resetBtn}>重置</button>
                 </span>
-                <button
-                  type="button"
-                  className={styles.modeToggle}
-                  onClick={() => setChatPromptMode(chatPromptMode === 'source' ? 'preview' : 'source')}
-                >
-                  {chatPromptMode === 'source' ? '预览模式' : '源码模式'}
-                </button>
+                <button type="button" className={styles.modeToggle} onClick={() => setChatPromptMode(chatPromptMode === 'source' ? 'preview' : 'source')}>{chatPromptMode === 'source' ? '预览模式' : '源码模式'}</button>
               </div>
               <p className={styles.promptDesc}>聊天窗口的系统提示，定义 AI 的角色和行为</p>
               <div style={{ marginTop: '8px' }}>
-                <DescriptionEditorWithMode
-                  value={chatPrompt || ''}
-                  onChange={setChatPrompt}
-                  mode={chatPromptMode}
-                  onModeChange={setChatPromptMode}
-                  minHeight={120}
-                  textareaClassName="field__textarea"
-                  hideInlineToggle
-                />
+                <DescriptionEditorWithMode value={chatPrompt || ''} onChange={setChatPrompt} mode={chatPromptMode} onModeChange={setChatPromptMode} minHeight={120} textareaClassName="field__textarea" hideInlineToggle autoGrow maxHeight={300} />
               </div>
             </div>
-
-            {/* 工具说明 */}
             <div className={styles.promptField}>
               <div className={styles.promptLabel}>
                 <span className={styles.promptName}>
                   工具说明
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const ok = await confirm({
-                        level: 'moderate',
-                        title: '重置工具说明？',
-                        body: <p>将恢复为系统默认值，您的自定义内容将被覆盖。</p>,
-                        confirmLabel: '重置',
-                      })
-                      if (ok) setToolsDesc('')
-                    }}
-                    className={styles.resetBtn}
-                  >
-                    重置
-                  </button>
+                  <button type="button" onClick={async () => { if (await confirm({ level: 'moderate', title: '重置工具说明？', body: <p>将恢复为系统默认值。</p>, confirmLabel: '重置' })) setToolsDesc('') }} className={styles.resetBtn}>重置</button>
                 </span>
-                <button
-                  type="button"
-                  className={styles.modeToggle}
-                  onClick={() => setToolsDescMode(toolsDescMode === 'source' ? 'preview' : 'source')}
-                >
-                  {toolsDescMode === 'source' ? '预览模式' : '源码模式'}
-                </button>
+                <button type="button" className={styles.modeToggle} onClick={() => setToolsDescMode(toolsDescMode === 'source' ? 'preview' : 'source')}>{toolsDescMode === 'source' ? '预览模式' : '源码模式'}</button>
               </div>
               <p className={styles.promptDesc}>告诉 LLM 有哪些工具可用及如何使用</p>
               <div style={{ marginTop: '8px' }}>
-                <DescriptionEditorWithMode
-                  value={toolsDesc || ''}
-                  onChange={setToolsDesc}
-                  mode={toolsDescMode}
-                  onModeChange={setToolsDescMode}
-                  minHeight={200}
-                  textareaClassName="field__textarea"
-                  hideInlineToggle
-                />
+                <DescriptionEditorWithMode value={toolsDesc || ''} onChange={setToolsDesc} mode={toolsDescMode} onModeChange={setToolsDescMode} minHeight={200} textareaClassName="field__textarea" hideInlineToggle autoGrow maxHeight={300} />
               </div>
             </div>
-
-            {/* 日报/周报模板 */}
             <div className={styles.promptField}>
               <div className={styles.promptLabel}>
                 <span className={styles.promptName}>
                   今日工作模板
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const ok = await confirm({
-                        level: 'moderate',
-                        title: '重置今日工作模板？',
-                        body: <p>将恢复为系统默认值，您的自定义内容将被覆盖。</p>,
-                        confirmLabel: '重置',
-                      })
-                      if (ok) setDailyReportTemplate('')
-                    }}
-                    className={styles.resetBtn}
-                  >
-                    重置
-                  </button>
+                  <button type="button" onClick={async () => { if (await confirm({ level: 'moderate', title: '重置今日工作模板？', body: <p>将恢复为系统默认值。</p>, confirmLabel: '重置' })) setDailyReportTemplate('') }} className={styles.resetBtn}>重置</button>
                 </span>
-                <button
-                  type="button"
-                  className={styles.modeToggle}
-                  onClick={() => setDailyReportTemplateMode(dailyReportTemplateMode === 'source' ? 'preview' : 'source')}
-                >
-                  {dailyReportTemplateMode === 'source' ? '预览模式' : '源码模式'}
-                </button>
+                <button type="button" className={styles.modeToggle} onClick={() => setDailyReportTemplateMode(dailyReportTemplateMode === 'source' ? 'preview' : 'source')}>{dailyReportTemplateMode === 'source' ? '预览模式' : '源码模式'}</button>
               </div>
               <p className={styles.promptDesc}>聊天说「导出今日工作」时使用</p>
               <div style={{ marginTop: '8px' }}>
-                <DescriptionEditorWithMode
-                  value={dailyReportTemplate || ''}
-                  onChange={setDailyReportTemplate}
-                  mode={dailyReportTemplateMode}
-                  onModeChange={setDailyReportTemplateMode}
-                  minHeight={180}
-                  textareaClassName="field__textarea"
-                  hideInlineToggle
-                />
+                <DescriptionEditorWithMode value={dailyReportTemplate || ''} onChange={setDailyReportTemplate} mode={dailyReportTemplateMode} onModeChange={setDailyReportTemplateMode} minHeight={180} textareaClassName="field__textarea" hideInlineToggle autoGrow maxHeight={300} />
               </div>
             </div>
-
             <div className={styles.promptField}>
               <div className={styles.promptLabel}>
                 <span className={styles.promptName}>
                   本周工作模板
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const ok = await confirm({
-                        level: 'moderate',
-                        title: '重置本周工作模板？',
-                        body: <p>将恢复为系统默认值，您的自定义内容将被覆盖。</p>,
-                        confirmLabel: '重置',
-                      })
-                      if (ok) setWeeklyReportTemplate('')
-                    }}
-                    className={styles.resetBtn}
-                  >
-                    重置
-                  </button>
+                  <button type="button" onClick={async () => { if (await confirm({ level: 'moderate', title: '重置本周工作模板？', body: <p>将恢复为系统默认值。</p>, confirmLabel: '重置' })) setWeeklyReportTemplate('') }} className={styles.resetBtn}>重置</button>
                 </span>
-                <button
-                  type="button"
-                  className={styles.modeToggle}
-                  onClick={() => setWeeklyReportTemplateMode(weeklyReportTemplateMode === 'source' ? 'preview' : 'source')}
-                >
-                  {weeklyReportTemplateMode === 'source' ? '预览模式' : '源码模式'}
-                </button>
+                <button type="button" className={styles.modeToggle} onClick={() => setWeeklyReportTemplateMode(weeklyReportTemplateMode === 'source' ? 'preview' : 'source')}>{weeklyReportTemplateMode === 'source' ? '预览模式' : '源码模式'}</button>
               </div>
               <p className={styles.promptDesc}>聊天说「导出本周工作」时使用</p>
               <div style={{ marginTop: '8px' }}>
-                <DescriptionEditorWithMode
-                  value={weeklyReportTemplate || ''}
-                  onChange={setWeeklyReportTemplate}
-                  mode={weeklyReportTemplateMode}
-                  onModeChange={setWeeklyReportTemplateMode}
-                  minHeight={180}
-                  textareaClassName="field__textarea"
-                  hideInlineToggle
-                />
+                <DescriptionEditorWithMode value={weeklyReportTemplate || ''} onChange={setWeeklyReportTemplate} mode={weeklyReportTemplateMode} onModeChange={setWeeklyReportTemplateMode} minHeight={180} textareaClassName="field__textarea" hideInlineToggle autoGrow maxHeight={300} />
               </div>
             </div>
-
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
-              <button type="submit" className="btn btn--primary" disabled={saveLLM.isPending}>
-                {saveLLM.isPending ? '保存中...' : '保存'}
-              </button>
+              <button type="submit" className="btn btn--primary" disabled={saveLLM.isPending}>{saveLLM.isPending ? '保存中...' : '保存'}</button>
+            </div>
+          </form>
+        )}
+      </section>
+
+      {/* 卡片 4：暂不可用 Prompt */}
+      <section id="llm-disabled" className={styles.section}>
+        <h2 className={styles.sectionTitle}>暂不可用</h2>
+        <p className={styles.sectionHint}>相关功能开发中，提示词可提前配置。</p>
+        {isLoading ? (
+          <p className={styles.sectionHint}>载入中...</p>
+        ) : (
+          <form onSubmit={handleSaveDisabled}>
+            <div className={styles.promptField}>
+              <div className={styles.promptLabel}>
+                <span className={styles.promptName}>
+                  总结提示词
+                  <button type="button" onClick={async () => { if (await confirm({ level: 'moderate', title: '重置总结提示词？', body: <p>将恢复为系统默认值。</p>, confirmLabel: '重置' })) setSummarizePrompt('') }} className={styles.resetBtn}>重置</button>
+                </span>
+                <button type="button" className={styles.modeToggle} onClick={() => setSummarizePromptMode(summarizePromptMode === 'source' ? 'preview' : 'source')}>{summarizePromptMode === 'source' ? '预览模式' : '源码模式'}</button>
+              </div>
+              <p className={styles.promptDesc}>主体阶段结束时，基于日志提炼总结</p>
+              <div style={{ marginTop: '8px' }}>
+                <DescriptionEditorWithMode value={summarizePrompt || ''} onChange={setSummarizePrompt} mode={summarizePromptMode} onModeChange={setSummarizePromptMode} minHeight={150} textareaClassName="field__textarea" hideInlineToggle autoGrow maxHeight={300} />
+              </div>
+            </div>
+            <div className={styles.promptField}>
+              <div className={styles.promptLabel}>
+                <span className={styles.promptName}>
+                  维护期总结
+                  <button type="button" onClick={async () => { if (await confirm({ level: 'moderate', title: '重置维护期总结提示词？', body: <p>将恢复为系统默认值。</p>, confirmLabel: '重置' })) setSummarizeMaintenancePrompt('') }} className={styles.resetBtn}>重置</button>
+                </span>
+                <button type="button" className={styles.modeToggle} onClick={() => setSummarizeMaintenancePromptMode(summarizeMaintenancePromptMode === 'source' ? 'preview' : 'source')}>{summarizeMaintenancePromptMode === 'source' ? '预览模式' : '源码模式'}</button>
+              </div>
+              <p className={styles.promptDesc}>维护阶段结束时的总结，侧重偶发问题和对外影响</p>
+              <div style={{ marginTop: '8px' }}>
+                <DescriptionEditorWithMode value={summarizeMaintenancePrompt || ''} onChange={setSummarizeMaintenancePrompt} mode={summarizeMaintenancePromptMode} onModeChange={setSummarizeMaintenancePromptMode} minHeight={150} textareaClassName="field__textarea" hideInlineToggle autoGrow maxHeight={300} />
+              </div>
+            </div>
+            <div className={styles.promptField}>
+              <div className={styles.promptLabel}>
+                <span className={styles.promptName}>
+                  维护建议
+                  <button type="button" onClick={async () => { if (await confirm({ level: 'moderate', title: '重置维护建议提示词？', body: <p>将恢复为系统默认值。</p>, confirmLabel: '重置' })) setAskMaintenancePrompt('') }} className={styles.resetBtn}>重置</button>
+                </span>
+                <button type="button" className={styles.modeToggle} onClick={() => setAskMaintenancePromptMode(askMaintenancePromptMode === 'source' ? 'preview' : 'source')}>{askMaintenancePromptMode === 'source' ? '预览模式' : '源码模式'}</button>
+              </div>
+              <p className={styles.promptDesc}>判断任务是否应进入维护期或直接关闭</p>
+              <div style={{ marginTop: '8px' }}>
+                <DescriptionEditorWithMode value={askMaintenancePrompt || ''} onChange={setAskMaintenancePrompt} mode={askMaintenancePromptMode} onModeChange={setAskMaintenancePromptMode} minHeight={150} textareaClassName="field__textarea" hideInlineToggle autoGrow maxHeight={300} />
+              </div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
+              <button type="submit" className="btn btn--primary" disabled={saveLLM.isPending}>{saveLLM.isPending ? '保存中...' : '保存'}</button>
             </div>
           </form>
         )}
