@@ -1,4 +1,4 @@
-import { useTaskCounts } from '@/api/tasks'
+import { useOverview } from '@/api/insights'
 import { useMotto } from '@/api/settings'
 import { useFilterContext } from '@/context/FilterContext'
 import { STATUS_LIST, NATURE_LIST } from '@/constants'
@@ -7,7 +7,7 @@ import { monthLabel } from '@/constants'
 import styles from './Sidebar.module.css'
 
 export function Sidebar() {
-  const { data: counts } = useTaskCounts()
+  const { data: counts } = useOverview()
   const { data: motto } = useMotto()
   const { filter, setStatus, setNature, setTag, setMonth } = useFilterContext()
 

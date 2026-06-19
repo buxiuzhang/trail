@@ -4,7 +4,8 @@ import { useTask, useUpdateTask, useChangeTaskStatus, useCancelTask, useTasks } 
 import { useInfiniteLogs, useCreateLog, useUpdateLog, useDeleteLog } from '@/api/logs'
 import { useTodos, useCreateTodo, useUpdateTodo, useCompleteTodo, useAbandonTodo, useDeleteTodo } from '@/api/todos'
 import { usePlaceholders, DEFAULT_PLACEHOLDERS } from '@/api/settings'
-import { usePolish, LLM_AVAILABLE } from '@/api/llm'
+import { LLM_AVAILABLE } from '@/api/llm'
+import { usePolishContent } from '@/hooks/usePolishContent'
 import { useModalContext } from '@/context/ModalContext'
 import { useToastContext } from '@/context/ToastContext'
 import { ALLOWED_TRANSITIONS } from '@/constants'
@@ -19,9 +20,6 @@ import { ModeToggleButton } from '@/components/shared/ModeToggleButton'
 import polishIcon from '@/icons/polish.svg'
 import type { LogOut, TodoOut } from '@/types'
 
-/** 添加/编辑待办弹窗内的表单子组件。
- *  "保存" → 提交后关闭弹窗；"保存并继续添加" → 提交后清空表单继续。
- *  initialTitle/initialDescription 用于编辑模式，填充初始值。 */
 function TodoAddForm({ onSubmit, onClose, initialTitle = '', initialDescription = '' }: {
   onSubmit: (data: { title: string; description?: string }) => Promise<void>
   onClose: () => void
@@ -31,36 +29,14 @@ function TodoAddForm({ onSubmit, onClose, initialTitle = '', initialDescription 
   const { data: placeholders } = usePlaceholders()
   const [title, setTitle] = useState(initialTitle)
   const [description, setDescription] = useState(initialDescription)
-  const [polishedFrom, setPolishedFrom] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [hoverClose, setHoverClose] = useState(false)
   const [hoverContinue, setHoverContinue] = useState(false)
   const [editorMode, setEditorMode] = useState<EditorMode>('preview')
 
-  const polishMutation = usePolish()
-  const { showToast } = useToastContext()
+  const polish = usePolishContent({ type: 'todo' })
 
   const interactive = !submitting && title.trim()
-
-  async function handlePolish() {
-    const raw = description.trim()
-    if (!raw) { showToast('先写点内容再润色'); return }
-    if (polishedFrom !== null) {
-      setDescription(polishedFrom)
-      setPolishedFrom(null)
-      return
-    }
-    try {
-      const result = await polishMutation.mutateAsync({ content: raw, type: 'todo' })
-      setPolishedFrom(raw)
-      setDescription(result.polished)
-    } catch (err: any) {
-      const hint = err.status === 503
-        ? '（未配置 LLM）'
-        : err.status === 502 ? '（调用失败）' : ''
-      showToast('润色失败：' + err.message + hint)
-    }
-  }
 
   async function handleSubmit(andContinue: boolean) {
     if (!title.trim() || submitting) return
@@ -70,7 +46,7 @@ function TodoAddForm({ onSubmit, onClose, initialTitle = '', initialDescription 
       if (andContinue) {
         setTitle('')
         setDescription('')
-        setPolishedFrom(null)
+        polish.reset()
         const input = document.getElementById('todo-add-form')?.querySelector('input')
         input?.focus()
       } else {
@@ -110,9 +86,9 @@ function TodoAddForm({ onSubmit, onClose, initialTitle = '', initialDescription 
           <ModeToggleButton mode={editorMode} onModeChange={setEditorMode} style={{ marginLeft: 'auto' }} />
           <button
             type="button"
-            onClick={handlePolish}
-            disabled={!LLM_AVAILABLE || polishMutation.isPending}
-            title={LLM_AVAILABLE ? (polishedFrom !== null ? '撤销润色' : 'AI 润色') : 'LLM 暂未接入'}
+            onClick={() => polish.handlePolish(description, setDescription)}
+            disabled={!LLM_AVAILABLE || polish.isPending}
+            title={LLM_AVAILABLE ? (polish.isPolished ? '撤销润色' : 'AI 润色') : 'LLM 暂未接入'}
             style={{
               background: 'none',
               border: 'none',
@@ -129,7 +105,7 @@ function TodoAddForm({ onSubmit, onClose, initialTitle = '', initialDescription 
               style={{
                 width: 16,
                 height: 16,
-                opacity: polishedFrom !== null ? 0.85 : 0.4,
+                opacity: polish.isPolished ? 0.85 : 0.4,
               }}
             />
           </button>

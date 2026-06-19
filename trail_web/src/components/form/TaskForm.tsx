@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import type { TaskOut, ContactIn, ContactOut } from '@/types'
 import { TODAY } from '@/constants'
 import { useCreateTask, useUpdateTask } from '@/api/tasks'
-import { usePolish, LLM_AVAILABLE } from '@/api/llm'
+import { LLM_AVAILABLE } from '@/api/llm'
+import { usePolishContent } from '@/hooks/usePolishContent'
 import { usePlaceholders, DEFAULT_PLACEHOLDERS } from '@/api/settings'
 import { useToastContext } from '@/context/ToastContext'
 import { FormField } from './FormField'
@@ -51,11 +52,11 @@ export function TaskForm({ mode, task }: TaskFormProps) {
   const { showToast } = useToastContext()
   const createTask = useCreateTask()
   const updateTask = useUpdateTask(task?.id || 0)
-  const polishMutation = usePolish()
   const { data: placeholders } = usePlaceholders()
 
   const isEdit = mode === 'edit'
   const taskId = task?.id
+  const polishDesc = usePolishContent({ type: 'task_desc', task_id: taskId })
 
   // 表单状态
   const [title, setTitle] = useState(task?.title || '')
@@ -63,7 +64,6 @@ export function TaskForm({ mode, task }: TaskFormProps) {
   const [startDate, setStartDate] = useState(task?.start_date || TODAY)
   const [processingDate, setProcessingDate] = useState(task?.processing_date || '')
   const [description, setDescription] = useState(task?.description || '')
-  const [polishedDescFrom, setPolishedDescFrom] = useState<string | null>(null) // 润色撤销用
   const [endDate, setEndDate] = useState(task?.end_date || '')
   const [tagsStr, setTagsStr] = useState((task?.tags || []).join(', '))
   const [contacts, setContacts] = useState<ContactIn[]>(
@@ -87,26 +87,6 @@ export function TaskForm({ mode, task }: TaskFormProps) {
 
   function addContact() {
     setContacts(prev => [...prev, emptyContact()])
-  }
-
-  async function handlePolishDesc() {
-    const raw = description.trim()
-    if (!raw) { showToast('先写点内容再润色'); return }
-    if (polishedDescFrom !== null) {
-      setDescription(polishedDescFrom)
-      setPolishedDescFrom(null)
-      return
-    }
-    try {
-      const result = await polishMutation.mutateAsync({ content: raw, task_id: taskId, type: 'task_desc' })
-      setPolishedDescFrom(raw)
-      setDescription(result.polished)
-    } catch (err: any) {
-      const hint = err.status === 503
-        ? '（未配置 LLM）'
-        : err.status === 502 ? '（LLM 调用失败）' : ''
-      showToast('润色失败：' + err.message + hint)
-    }
   }
 
   // 提交
@@ -242,15 +222,15 @@ export function TaskForm({ mode, task }: TaskFormProps) {
               <ModeToggleButton mode={editorMode} onModeChange={setEditorMode} />
               <button
                 type="button"
-                onClick={handlePolishDesc}
-                disabled={!LLM_AVAILABLE || polishMutation.isPending}
-                title={LLM_AVAILABLE ? (polishedDescFrom !== null ? '撤销润色' : 'AI 润色描述') : 'LLM 暂未接入新后端'}
+                onClick={() => polishDesc.handlePolish(description, setDescription)}
+                disabled={!LLM_AVAILABLE || polishDesc.isPending}
+                title={LLM_AVAILABLE ? (polishDesc.isPolished ? '撤销润色' : 'AI 润色描述') : 'LLM 暂未接入新后端'}
                 className={styles.polishBtn}
               >
                 <img
                   src={polishIcon}
                   alt=""
-                  className={`${styles.polishIcon} ${polishedDescFrom !== null ? styles.polishIconActive : ''}`}
+                  className={`${styles.polishIcon} ${polishDesc.isPolished ? styles.polishIconActive : ''}`}
                 />
               </button>
             </div>

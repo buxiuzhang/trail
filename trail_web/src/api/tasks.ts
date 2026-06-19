@@ -5,29 +5,13 @@ import type { PagedResponse, TaskOut, TaskCreate, TaskUpdate, StatusChange } fro
 // ── 查询 ──
 
 /**
- * 拉全量任务。已废弃——Sidebar 统计改用 useTaskCounts。
+ * 拉全量任务（已废弃，Sidebar 统计改用 useOverview）。
  * @deprecated
  */
 export function useTasks() {
   return useQuery({
     queryKey: ['tasks'],
     queryFn: () => api.get<PagedResponse<TaskOut>>('/api/tasks').then(r => r.items),
-    staleTime: 60_000,
-  })
-}
-
-/** Sidebar 分组计数，调 /api/insights/overview，后端统计，不拉全量任务数据。 */
-export function useTaskCounts() {
-  return useQuery({
-    queryKey: ['task-counts'],
-    queryFn: () => api.get<{
-      total_tasks: number
-      by_status: Record<string, number>
-      by_nature: Record<string, number>
-      by_tag: Record<string, number>
-      by_month: Record<string, number>
-      total_logs: number
-    }>('/api/insights/overview'),
     staleTime: 60_000,
   })
 }
@@ -88,7 +72,6 @@ export function useCreateTask() {
     mutationFn: (data: TaskCreate) => api.post<TaskOut>('/api/tasks', data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['tasks'] })
-      qc.invalidateQueries({ queryKey: ['task-counts'] })
       qc.invalidateQueries({ queryKey: ['overview'] })
     },
   })
@@ -100,7 +83,7 @@ export function useUpdateTask(id: number) {
     mutationFn: (data: TaskUpdate) => api.put<TaskOut>(`/api/tasks/${id}`, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['tasks'] })
-      qc.invalidateQueries({ queryKey: ['task-counts'] })
+      qc.invalidateQueries({ queryKey: ['overview'] })
       qc.invalidateQueries({ queryKey: ['tasks', id] })
     },
   })
@@ -112,7 +95,7 @@ export function useChangeTaskStatus(id: number) {
     mutationFn: (data: StatusChange) => api.post<TaskOut>(`/api/tasks/${id}/status`, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['tasks'] })
-      qc.invalidateQueries({ queryKey: ['task-counts'] })
+      qc.invalidateQueries({ queryKey: ['overview'] })
       qc.invalidateQueries({ queryKey: ['tasks', id] })
       qc.invalidateQueries({ queryKey: ['logs', id] })
     },
@@ -125,7 +108,7 @@ export function useCancelTask(id: number) {
     mutationFn: () => api.post<TaskOut>(`/api/tasks/${id}/cancel`, {}),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['tasks'] })
-      qc.invalidateQueries({ queryKey: ['task-counts'] })
+      qc.invalidateQueries({ queryKey: ['overview'] })
       qc.invalidateQueries({ queryKey: ['tasks', id] })
     },
   })
@@ -137,7 +120,7 @@ export function usePinTask(id: number) {
     mutationFn: () => api.post<TaskOut>(`/api/tasks/${id}/pin`, {}),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['tasks'] })
-      qc.invalidateQueries({ queryKey: ['task-counts'] })
+      qc.invalidateQueries({ queryKey: ['overview'] })
     },
   })
 }
@@ -148,7 +131,7 @@ export function useUnpinTask(id: number) {
     mutationFn: () => api.post<TaskOut>(`/api/tasks/${id}/unpin`, {}),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['tasks'] })
-      qc.invalidateQueries({ queryKey: ['task-counts'] })
+      qc.invalidateQueries({ queryKey: ['overview'] })
     },
   })
 }
@@ -159,7 +142,6 @@ export function useDeleteTask(id: number) {
     mutationFn: () => api.del(`/api/tasks/${id}`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['tasks'] })
-      qc.invalidateQueries({ queryKey: ['task-counts'] })
       qc.invalidateQueries({ queryKey: ['overview'] })
     },
   })

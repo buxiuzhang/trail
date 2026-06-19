@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
 import type { LogOut, TaskOut, TodoOut } from '@/types'
 import { TODAY } from '@/constants'
-import { usePolish, useDraftLog, LLM_AVAILABLE } from '@/api/llm'
+import { useDraftLog, LLM_AVAILABLE } from '@/api/llm'
+import { usePolishContent } from '@/hooks/usePolishContent'
 import { usePlaceholders, DEFAULT_PLACEHOLDERS } from '@/api/settings'
 import { useToastContext } from '@/context/ToastContext'
 import { useModalContext } from '@/context/ModalContext'
@@ -34,14 +35,13 @@ export function LogCompose({ task, todos, tasks = [], editing, onSave, onCancel 
   const [content, setContent] = useState(editing?.content || '')
   const [selectedTodoIds, setSelectedTodoIds] = useState<number[]>(editing?.todo_ids || [])
   const [selectedTaskIds, setSelectedTaskIds] = useState<number[]>(editing?.task_ids || [])
-  const [polishedFrom, setPolishedFrom] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [mode, setMode] = useState<'preview' | 'source'>('preview')
   const [draftOpen, setDraftOpen] = useState(false)
   const [draftInput, setDraftInput] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const draftInputRef = useRef<HTMLTextAreaElement>(null)
-  const polishMutation = usePolish()
+  const polishLog = usePolishContent({ task_id: task.id })
   const draftMutation = useDraftLog(task.id)
   const { showToast } = useToastContext()
   const { openModal, closeModal } = useModalContext()
@@ -100,14 +100,13 @@ export function LogCompose({ task, todos, tasks = [], editing, onSave, onCancel 
   async function doSave(contentToSave: string) {
     setSubmitting(true)
     try {
-      // 从内容中提取 @ 提及的待办 ID 和任务 ID，与手动选择的合并去重
       const mentionTodoIds = extractTodoMentionIds(contentToSave)
       const mentionTaskIds = extractTaskRefIds(contentToSave)
       const allTodoIds = [...new Set([...mentionTodoIds, ...selectedTodoIds])]
       const allTaskIds = [...new Set([...mentionTaskIds, ...selectedTaskIds])]
       await onSave({ log_date: logDate, content: contentToSave, phase, hours, todo_ids: allTodoIds, task_ids: allTaskIds })
       setContent('')
-      setPolishedFrom(null)
+      polishLog.reset()
       setSelectedTodoIds([])
       setSelectedTaskIds([])
       setDraftInput('')
@@ -117,26 +116,6 @@ export function LogCompose({ task, todos, tasks = [], editing, onSave, onCancel 
       // error toasted by parent
     } finally {
       setSubmitting(false)
-    }
-  }
-
-  async function handlePolish() {
-    const raw = content.trim()
-    if (!raw) { showToast('先写点内容再润色'); return }
-    if (polishedFrom !== null) {
-      setContent(polishedFrom)
-      setPolishedFrom(null)
-      return
-    }
-    try {
-      const result = await polishMutation.mutateAsync({ content: raw, task_id: task.id })
-      setPolishedFrom(raw)
-      setContent(result.polished)
-    } catch (err: any) {
-      const hint = err.status === 503
-        ? '（未配置 LLM）'
-        : err.status === 502 ? '（调用失败）' : ''
-      showToast('润色失败：' + err.message + hint)
     }
   }
 
@@ -316,14 +295,14 @@ export function LogCompose({ task, todos, tasks = [], editing, onSave, onCancel 
           <button
             type="button"
             className={styles.btnPolish}
-            onClick={handlePolish}
-            disabled={!LLM_AVAILABLE || polishMutation.isPending}
-            data-tooltip={LLM_AVAILABLE ? (polishedFrom !== null ? '撤销润色' : '润色') : 'LLM 暂未接入'}
+            onClick={() => polishLog.handlePolish(content, setContent)}
+            disabled={!LLM_AVAILABLE || polishLog.isPending}
+            data-tooltip={LLM_AVAILABLE ? (polishLog.isPolished ? '撤销润色' : '润色') : 'LLM 暂未接入'}
           >
             <img
               src={polishIcon}
               alt=""
-              className={`${styles.polishIcon} ${polishedFrom !== null ? styles.polishIconActive : ''}`}
+              className={`${styles.polishIcon} ${polishLog.isPolished ? styles.polishIconActive : ''}`}
             />
           </button>
           <button type="submit" className={styles.btnSave} disabled={submitting || !content.trim()}>

@@ -26,6 +26,10 @@ import java.util.Map;
 @ControllerAdvice
 public class GlobalExceptionHandler {
 
+    private static ResponseEntity<Map<String, Object>> of(HttpStatus status, String msg) {
+        return ResponseEntity.status(status).body(Map.of("detail", msg));
+    }
+
     /** M8：数据目录未配置 → 503 + code:NEEDS_DATA_DIR（前端路由拦截依赖） */
     @ExceptionHandler(DataDirNotConfiguredException.class)
     public ResponseEntity<Map<String, Object>> dataDir(DataDirNotConfiguredException e) {
@@ -37,41 +41,39 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(NotFoundException.class)
     public ResponseEntity<Map<String, Object>> notFound(NotFoundException e) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("detail", e.getMessage()));
+        return of(HttpStatus.NOT_FOUND, e.getMessage());
     }
 
     @ExceptionHandler(DuplicateException.class)
     public ResponseEntity<Map<String, Object>> duplicate(DuplicateException e) {
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("detail", e.getMessage()));
+        return of(HttpStatus.CONFLICT, e.getMessage());
     }
 
     @ExceptionHandler(InvalidTransitionException.class)
     public ResponseEntity<Map<String, Object>> invalidTransition(InvalidTransitionException e) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("detail", e.getMessage()));
+        return of(HttpStatus.BAD_REQUEST, e.getMessage());
     }
 
     @ExceptionHandler(StoreError.class)
     public ResponseEntity<Map<String, Object>> store(StoreError e) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("detail", e.getMessage()));
+        return of(HttpStatus.BAD_REQUEST, e.getMessage());
     }
 
     /** LLM 未配置 → 503 */
     @ExceptionHandler(LlmNotConfiguredException.class)
     public ResponseEntity<Map<String, Object>> llmNotConfigured(LlmNotConfiguredException e) {
-        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
-                .body(Map.of("detail", e.getMessage()));
+        return of(HttpStatus.SERVICE_UNAVAILABLE, e.getMessage());
     }
 
     /** LLM API 调用失败 → 502 */
     @ExceptionHandler(LlmApiException.class)
     public ResponseEntity<Map<String, Object>> llmApi(LlmApiException e) {
-        return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
-                .body(Map.of("detail", e.getMessage()));
+        return of(HttpStatus.BAD_GATEWAY, e.getMessage());
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, Object>> illegalArgument(IllegalArgumentException e) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("detail", e.getMessage()));
+        return of(HttpStatus.BAD_REQUEST, e.getMessage());
     }
 
     /** SQLite 锁错误（busy / locked）→ 503 */
@@ -79,17 +81,14 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, Object>> sql(java.sql.SQLException e) {
         String msg = e.getMessage() == null ? "" : e.getMessage();
         if (msg.contains("database is locked") || msg.contains("SQLITE_BUSY")) {
-            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
-                    .body(Map.of("detail", "数据库被其他进程占用（持写锁）。请断开连接后重试。"));
+            return of(HttpStatus.SERVICE_UNAVAILABLE, "数据库被其他进程占用（持写锁）。请断开连接后重试。");
         }
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("detail", "内部错误：SQLException: " + msg));
+        return of(HttpStatus.INTERNAL_SERVER_ERROR, "内部错误：SQLException: " + msg);
     }
 
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<Map<String, Object>> illegalState(IllegalStateException e) {
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("detail", e.getMessage()));
+        return of(HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage());
     }
 
     /**

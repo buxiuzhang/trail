@@ -1,13 +1,9 @@
 package com.trail.web.dto;
 
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
-import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Map;
+
+import static com.trail.web.dto.RowAccessors.*;
 
 /** Map<String,Object>（store 行） + List<ContactDto>（contacts 行） → TaskResponse。 */
 public final class TaskMapper {
@@ -34,11 +30,11 @@ public final class TaskMapper {
                 asInstant(row.get("created_at")),
                 asInstant(row.get("updated_at")),
                 asLocalDate(row.get("last_log_date")),
-                asInt(row.get("todo_active_count")),
-                asInt(row.get("todo_completed_count")),
-                asInt(row.get("todo_abandoned_count")),
-                asInt(row.get("log_count")),
-                asInt(row.get("log_main_count")),
+                asIntOrZero(row.get("todo_active_count")),
+                asIntOrZero(row.get("todo_completed_count")),
+                asIntOrZero(row.get("todo_abandoned_count")),
+                asIntOrZero(row.get("log_count")),
+                asIntOrZero(row.get("log_main_count")),
                 asDouble(row.get("total_hours")),
                 contacts == null ? List.of() : contacts
         );
@@ -58,42 +54,6 @@ public final class TaskMapper {
         );
     }
 
-    private static Long asLong(Object o) { return o == null ? null : ((Number) o).longValue(); }
-    private static int asInt(Object o) { return o == null ? 0 : ((Number) o).intValue(); }
-    private static Double asDouble(Object o) { return o == null ? 0.0 : ((Number) o).doubleValue(); }
-    private static String asString(Object o) { return o == null ? null : o.toString(); }
-    private static LocalDate asLocalDate(Object o) {
-        if (o == null) return null;
-        if (o instanceof java.sql.Date d) return d.toLocalDate();
-        if (o instanceof LocalDate ld) return ld;
-        String s = o.toString();
-        try { return LocalDate.parse(s); }
-        catch (DateTimeParseException ignored) {}
-        try { return LocalDate.parse(s.length() >= 10 ? s.substring(0, 10) : s); }
-        catch (DateTimeParseException ignored) {}
-        return null;
-    }
-    private static Instant asInstant(Object o) {
-        if (o == null) return null;
-        if (o instanceof java.sql.Timestamp t) return t.toInstant();
-        if (o instanceof Instant i) return i;
-        if (o instanceof OffsetDateTime odt) return odt.toInstant();
-        String s = o.toString();
-        // 多种形态（与 JdbcTypes.parseOffsetDateTime 对齐）：
-        //   1) ISO_OFFSET_DATE_TIME（带 T + ±HH:MM）
-        //   2) LocalDateTime（带 T 无时区）→ 视作 UTC
-        //   3) 空格分隔无时区（CURRENT_TIMESTAMP 默认）→ 视作 UTC
-        //   4) UTC 'Z' 后缀
-        try { return OffsetDateTime.parse(s).toInstant(); }
-        catch (DateTimeParseException ignored) {}
-        // 关键：先替换空格为 T，再走 LocalDateTime（不需要 offset）
-        String t = s.indexOf(' ') >= 0 ? s.replace(' ', 'T') : s;
-        try { return LocalDateTime.parse(t).toInstant(ZoneOffset.UTC); }
-        catch (DateTimeParseException ignored) {}
-        try { return Instant.parse(t); }
-        catch (DateTimeParseException ignored) {}
-        return null;
-    }
     private static List<String> asStringList(Object o) {
         if (o == null) return List.of();
         if (o instanceof List<?> l) return l.stream().map(String::valueOf).toList();

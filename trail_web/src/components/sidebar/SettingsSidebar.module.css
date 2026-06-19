@@ -1,7 +1,9 @@
 /* SettingsSidebar · 设置导航侧边栏样式 */
 
 .sidebar {
-  position: relative;
+  position: sticky;
+  top: 24px;
+  align-self: start;
   padding-top: 24px;
   padding-left: 4px;
 }

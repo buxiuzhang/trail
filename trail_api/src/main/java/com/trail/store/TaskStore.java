@@ -162,6 +162,16 @@ public class TaskStore {
         }
     }
 
+    /**
+     * 封版判断：已作废 或 已完成（非维护期）的任务不再接受新日志和待办。
+     * 与前端 constants/status.ts#isSealed 规则保持一致。
+     */
+    public static boolean isSealed(Map<String, Object> task) {
+        String status = (String) task.get("status");
+        String nature = (String) task.get("nature");
+        return "已作废".equals(status) || ("已完成".equals(status) && !"维护".equals(nature));
+    }
+
     /** 批量获取任务标题，一次 IN 查询，返回 id → title。 */
     public Map<Long, String> getTaskTitles(List<Long> ids) {
         if (ids == null || ids.isEmpty()) return java.util.Collections.emptyMap();

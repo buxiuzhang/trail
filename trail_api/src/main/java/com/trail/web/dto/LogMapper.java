@@ -1,14 +1,10 @@
 package com.trail.web.dto;
 
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
-import java.time.format.DateTimeParseException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+
+import static com.trail.web.dto.RowAccessors.*;
 
 /** work_logs 行 → LogResponse。 */
 public final class LogMapper {
@@ -40,43 +36,5 @@ public final class LogMapper {
                 todoIds != null ? todoIds : Collections.emptyList(),
                 taskIds != null ? taskIds : Collections.emptyList()
         );
-    }
-
-    private static Long asLong(Object o) { return o == null ? null : ((Number) o).longValue(); }
-    private static Integer asInt(Object o) { return o == null ? null : ((Number) o).intValue(); }
-    private static Double asDouble(Object o) { return o == null ? null : ((Number) o).doubleValue(); }
-    private static Boolean asBool(Object o) {
-        if (o == null) return Boolean.FALSE;
-        // SQLite 用 INTEGER 存 bool（0/1），Xerial 返回 Integer
-        if (o instanceof Number n) return n.intValue() != 0;
-        if (o instanceof Boolean b) return b;
-        return "1".equals(o.toString()) || "true".equalsIgnoreCase(o.toString());
-    }
-    private static String asString(Object o) { return o == null ? null : o.toString(); }
-    private static LocalDate asLocalDate(Object o) {
-        if (o == null) return null;
-        if (o instanceof java.sql.Date d) return d.toLocalDate();
-        if (o instanceof LocalDate ld) return ld;
-        String s = o.toString();
-        try { return LocalDate.parse(s); }
-        catch (DateTimeParseException ignored) {}
-        try { return LocalDate.parse(s.length() >= 10 ? s.substring(0, 10) : s); }
-        catch (DateTimeParseException ignored) {}
-        return null;
-    }
-    private static Instant asInstant(Object o) {
-        if (o == null) return null;
-        if (o instanceof java.sql.Timestamp t) return t.toInstant();
-        if (o instanceof Instant i) return i;
-        if (o instanceof OffsetDateTime odt) return odt.toInstant();
-        String s = o.toString();
-        try { return OffsetDateTime.parse(s).toInstant(); }
-        catch (DateTimeParseException ignored) {}
-        String t = s.indexOf(' ') >= 0 ? s.replace(' ', 'T') : s;
-        try { return LocalDateTime.parse(t).toInstant(ZoneOffset.UTC); }
-        catch (DateTimeParseException ignored) {}
-        try { return Instant.parse(t); }
-        catch (DateTimeParseException ignored) {}
-        return null;
     }
 }

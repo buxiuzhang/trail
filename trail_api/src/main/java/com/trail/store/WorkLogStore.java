@@ -136,11 +136,13 @@ public class WorkLogStore {
         List<Map<String, Object>> taskRows = db.query(
             "SELECT status, nature FROM tasks WHERE id = ?", taskId);
         if (taskRows.isEmpty()) throw new NotFoundException("任务不存在：" + taskId);
-        String taskStatus = (String) taskRows.get(0).get("status");
-        String taskNature = (String) taskRows.get(0).get("nature");
-        if ("已作废".equals(taskStatus)) throw new StoreError("已作废的任务不能添加日志");
-        if ("已完成".equals(taskStatus) && !"维护".equals(taskNature))
-            throw new StoreError("已完成的任务不能添加日志（维护期除外）");
+        Map<String, Object> taskRow = taskRows.get(0);
+        if (TaskStore.isSealed(taskRow)) {
+            String taskStatus = (String) taskRow.get("status");
+            throw new StoreError("已作废".equals(taskStatus)
+                ? "已作废的任务不能添加日志"
+                : "已完成的任务不能添加日志（维护期除外）");
+        }
 
         // ordinal = COALESCE(MAX(ordinal), -1) + 1
         List<Map<String, Object>> ordRows = db.query(
