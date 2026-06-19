@@ -12,6 +12,7 @@ export function useTasks() {
   return useQuery({
     queryKey: ['tasks'],
     queryFn: () => api.get<PagedResponse<TaskOut>>('/api/tasks').then(r => r.items),
+    staleTime: 60_000,
   })
 }
 
@@ -27,6 +28,7 @@ export function useTaskCounts() {
       by_month: Record<string, number>
       total_logs: number
     }>('/api/insights/overview'),
+    staleTime: 60_000,
   })
 }
 
@@ -35,6 +37,7 @@ export function useTask(id: number) {
     queryKey: ['tasks', id],
     queryFn: () => api.get<TaskOut>(`/api/tasks/${id}`),
     enabled: !isNaN(id) && id > 0,
+    staleTime: 30_000,
   })
 }
 
@@ -73,6 +76,7 @@ export function useInfiniteTasks(params: TaskListParams = {}) {
       if (lastPage.items.length < TASK_PAGE_SIZE) return undefined
       return allPages.reduce((sum, p) => sum + p.items.length, 0)
     },
+    staleTime: 30_000,
   })
 }
 

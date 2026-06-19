@@ -162,6 +162,20 @@ public class TaskStore {
         }
     }
 
+    /** 批量获取任务标题，一次 IN 查询，返回 id → title。 */
+    public Map<Long, String> getTaskTitles(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) return java.util.Collections.emptyMap();
+        String placeholders = ids.stream().map(id -> "?").collect(java.util.stream.Collectors.joining(","));
+        List<Map<String, Object>> rows = db.query(
+            "SELECT id, title FROM tasks WHERE id IN (" + placeholders + ")",
+            ids.toArray());
+        Map<Long, String> result = new java.util.LinkedHashMap<>();
+        for (Map<String, Object> row : rows) {
+            result.put(((Number) row.get("id")).longValue(), (String) row.get("title"));
+        }
+        return result;
+    }
+
     public Map<String, Object> getTask(long taskId) {
         List<Map<String, Object>> rows = db.query("""
             SELECT t.*, sub.last_log_date,

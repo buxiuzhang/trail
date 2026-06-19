@@ -1,5 +1,6 @@
 package com.trail.web.controller;
 
+import com.trail.store.LogTodoRefStore;
 import com.trail.store.TaskStore;
 import com.trail.store.WorkLogStore;
 import com.trail.web.dto.LogCreateRequest;
@@ -15,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/tasks/{taskId}/logs")
@@ -23,10 +25,12 @@ public class WorkLogController {
 
     private final WorkLogStore logs;
     private final TaskStore tasks;
+    private final LogTodoRefStore logTodoRefs;
 
-    public WorkLogController(WorkLogStore logs, TaskStore tasks) {
+    public WorkLogController(WorkLogStore logs, TaskStore tasks, LogTodoRefStore logTodoRefs) {
         this.logs = logs;
         this.tasks = tasks;
+        this.logTodoRefs = logTodoRefs;
     }
 
     @Operation(summary = "查询任务的工作日志", description = "获取指定任务的工作日志，支持分页。默认 limit=5；不传 limit 时返回全量。")
@@ -41,15 +45,24 @@ public class WorkLogController {
             @Parameter(description = "每页条数，不传返回全量")
             @RequestParam(required = false) Integer limit,
             @Parameter(description = "偏移量")
-            @RequestParam(defaultValue = "0") int offset) {
+            @RequestParam(defaultValue = "0") int offset,
+            @Parameter(description = "排序方向：desc（最新在前）或 asc（最早在前）")
+            @RequestParam(defaultValue = "desc") String sort) {
         int effectiveLimit = (limit == null) ? Integer.MAX_VALUE : limit;
         long total = logs.countLogs(taskId, phase, includeDeleted);
-        List<LogResponse> items = logs.listLogs(taskId, phase, includeDeleted, null, effectiveLimit, offset)
-                .stream()
+        List<Map<String, Object>> rows = logs.listLogs(taskId, phase, includeDeleted, null, effectiveLimit, offset, sort);
+
+        List<Long> logIds = rows.stream()
+                .map(r -> ((Number) r.get("id")).longValue())
+                .toList();
+        Map<Long, List<Long>> todoIdsByLogId = logTodoRefs.getTodoIdsForLogs(logIds);
+
+        List<LogResponse> items = rows.stream()
                 .map(row -> {
                     long logId = ((Number) row.get("id")).longValue();
-                    List<Long> todoIds = logs.getTodoIdsForLog(logId);
-                    List<Long> taskIds = logs.getTaskIdsForLog(logId);
+                    List<Long> todoIds = todoIdsByLogId.getOrDefault(logId, List.of());
+                    List<Long> taskIds = logs.parseTaskIds(
+                            row.getOrDefault("task_ids", "[]").toString());
                     return LogMapper.toResponse(row, todoIds, taskIds);
                 })
                 .toList();
@@ -71,8 +84,8 @@ public class WorkLogController {
             tasks.changeStatus(taskId, "进行中", null, false);
         }
         long logId = ((Number) created.get("id")).longValue();
-        List<Long> todoIds = logs.getTodoIdsForLog(logId);
-        List<Long> taskIds = logs.getTaskIdsForLog(logId);
+        List<Long> todoIds = logTodoRefs.getTodoIdsForLogs(List.of(logId)).getOrDefault(logId, List.of());
+        List<Long> taskIds = logs.parseTaskIds(created.getOrDefault("task_ids", "[]").toString());
         return ResponseEntity.status(HttpStatus.CREATED).body(LogMapper.toResponse(created, todoIds, taskIds));
     }
 
@@ -86,8 +99,8 @@ public class WorkLogController {
             @Parameter(description = "要修改的字段，包含 content（内容）、log_date（日期）、phase（阶段）、hours（工时）、todoIds（关联待办 ID 列表）、taskIds（关联任务 ID 列表）")
             @RequestBody LogUpdateRequest req) {
         var updated = logs.updateLog(logId, taskId, req.content(), req.logDate(), req.phase(), req.hours(), req.todoIds(), req.taskIds());
-        List<Long> todoIds = logs.getTodoIdsForLog(logId);
-        List<Long> taskIds = logs.getTaskIdsForLog(logId);
+        List<Long> todoIds = logTodoRefs.getTodoIdsForLogs(List.of(logId)).getOrDefault(logId, List.of());
+        List<Long> taskIds = logs.parseTaskIds(updated.getOrDefault("task_ids", "[]").toString());
         return LogMapper.toResponse(updated, todoIds, taskIds);
     }
 

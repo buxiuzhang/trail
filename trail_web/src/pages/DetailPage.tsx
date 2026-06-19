@@ -212,7 +212,8 @@ export function DetailPage() {
   const { showToast } = useToastContext()
 
   const { data: task, isLoading, error } = useTask(taskId)
-  const { data: logsData, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteLogs(taskId)
+  const [logSortOrder, setLogSortOrder] = useState<'asc' | 'desc'>('desc')
+  const { data: logsData, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteLogs(taskId, logSortOrder)
   const { data: todos = [] } = useTodos(taskId)
   const { data: allTasks = [] } = useTasks()
   const [metaCollapsed, setMetaCollapsed] = useState(false)
@@ -588,6 +589,8 @@ export function DetailPage() {
           fetchNextPage={fetchNextPage}
           hasNextPage={hasNextPage}
           isFetchingNextPage={isFetchingNextPage}
+          sortOrder={logSortOrder}
+          onSortChange={setLogSortOrder}
         />
       </div>
     </article>

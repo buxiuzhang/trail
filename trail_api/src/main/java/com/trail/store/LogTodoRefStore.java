@@ -108,6 +108,28 @@ public class LogTodoRefStore {
     }
 
     /**
+     * 批量获取多条日志关联的待办 ID 列表，避免 N+1。
+     * 返回 Map<logId, List<todoId>>
+     */
+    public Map<Long, List<Long>> getTodoIdsForLogs(List<Long> logIds) {
+        if (logIds == null || logIds.isEmpty()) return java.util.Collections.emptyMap();
+
+        String placeholders = logIds.stream().map(id -> "?").collect(java.util.stream.Collectors.joining(","));
+        List<Map<String, Object>> rows = db.query(
+            "SELECT log_id, todo_id FROM log_todo_refs" +
+            " WHERE log_id IN (" + placeholders + ") ORDER BY log_id, id",
+            logIds.toArray());
+
+        Map<Long, List<Long>> result = new java.util.LinkedHashMap<>();
+        for (Map<String, Object> row : rows) {
+            long logId = ((Number) row.get("log_id")).longValue();
+            long todoId = ((Number) row.get("todo_id")).longValue();
+            result.computeIfAbsent(logId, k -> new ArrayList<>()).add(todoId);
+        }
+        return result;
+    }
+
+    /**
      * 获取日志关联的待办详情（含标题、状态等）。
      * 用于日志展示时显示关联待办。
      */

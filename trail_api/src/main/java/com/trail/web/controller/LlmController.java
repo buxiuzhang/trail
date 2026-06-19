@@ -3,7 +3,6 @@ package com.trail.web.controller;
 import com.trail.service.ChatWithToolsService;
 import com.trail.service.LlmService;
 import com.trail.store.WorkLogStore;
-import com.trail.store.exception.NotFoundException;
 import com.trail.web.dto.*;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -43,12 +42,7 @@ public class LlmController {
     @Operation(summary = "润色已落档日志", description = "润色指定日志的内容")
     @PostMapping("/tasks/{taskId}/logs/{logId}/polish")
     public LlmPolishResponse polishLogged(@PathVariable Long taskId, @PathVariable Long logId) {
-        List<Map<String, Object>> logs = workLogStore.listLogs(taskId, null, false, null, null);
-        Map<String, Object> log = logs.stream()
-                .filter(l -> l.get("id") != null && ((Number) l.get("id")).longValue() == logId)
-                .findFirst()
-                .orElseThrow(() -> new NotFoundException("日志不存在：" + logId));
-
+        Map<String, Object> log = workLogStore.getLog(logId);
         String content = (String) log.get("content");
         String polished = llmService.polish(content, taskId);
         return new LlmPolishResponse(polished, false);

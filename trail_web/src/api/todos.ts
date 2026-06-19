@@ -7,6 +7,7 @@ export function useTodos(taskId: number) {
     queryKey: ['todos', taskId],
     queryFn: () => api.get<TodoOut[]>(`/api/tasks/${taskId}/todos`),
     enabled: !isNaN(taskId) && taskId > 0,
+    staleTime: 30_000,
   })
 }
 
@@ -81,5 +82,6 @@ export function useLogsForTodo(taskId: number, todoId: number, enabled: boolean)
     queryKey: ['todo-logs', taskId, todoId],
     queryFn: () => api.get<TodoLogItem[]>(`/api/tasks/${taskId}/todos/${todoId}/logs`),
     enabled,
+    staleTime: 30_000,
   })
 }

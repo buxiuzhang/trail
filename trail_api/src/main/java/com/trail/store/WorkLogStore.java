@@ -38,11 +38,16 @@ public class WorkLogStore {
 
     public List<Map<String, Object>> listLogs(long taskId, String phase, boolean includeDeleted,
                                               Integer sinceDays, Integer limit) {
-        return listLogs(taskId, phase, includeDeleted, sinceDays, limit, null);
+        return listLogs(taskId, phase, includeDeleted, sinceDays, limit, null, "desc");
     }
 
     public List<Map<String, Object>> listLogs(long taskId, String phase, boolean includeDeleted,
                                               Integer sinceDays, Integer limit, Integer offset) {
+        return listLogs(taskId, phase, includeDeleted, sinceDays, limit, offset, "desc");
+    }
+
+    public List<Map<String, Object>> listLogs(long taskId, String phase, boolean includeDeleted,
+                                              Integer sinceDays, Integer limit, Integer offset, String sort) {
         StringBuilder where = new StringBuilder("task_id = ?");
         List<Object> params = new ArrayList<>();
         params.add(taskId);
@@ -58,9 +63,10 @@ public class WorkLogStore {
             where.append(" AND log_date >= ?");
             params.add(cutoff);
         }
+        String dir = "asc".equalsIgnoreCase(sort) ? "ASC" : "DESC";
         StringBuilder sql = new StringBuilder("SELECT * FROM work_logs WHERE ")
                 .append(where)
-                .append(" ORDER BY log_date DESC, ordinal DESC");
+                .append(" ORDER BY log_date " + dir + ", ordinal " + dir);
         if (limit != null) {
             sql.append(" LIMIT ?");
             params.add(limit);
@@ -343,12 +349,19 @@ public class WorkLogStore {
             .collect(Collectors.toList());
         Map<Long, List<Map<String, Object>>> todosByLogId = logTodoRefStore.getTodosForLogs(logIds);
 
+        // 批量查所有日志引用的任务标题，避免 N+1
+        Set<Long> allTaskIds = new java.util.LinkedHashSet<>();
+        for (Map<String, Object> log : logs) {
+            allTaskIds.addAll(parseTaskIds(log.getOrDefault("task_ids", "[]").toString()));
+        }
+        Map<Long, String> taskTitleMap = taskStore.getTaskTitles(new ArrayList<>(allTaskIds));
+
         List<Map<String, Object>> result = new ArrayList<>();
         for (Map<String, Object> log : logs) {
             long logId = ((Number) log.get("id")).longValue();
             Map<String, Object> enriched = new LinkedHashMap<>(log);
 
-            // 关联待办（从 log_todo_refs 查）
+            // 关联待办
             List<Map<String, Object>> todos = todosByLogId.getOrDefault(logId, List.of());
             if (!todos.isEmpty()) {
                 enriched.put("related_todos", todos.stream()
@@ -359,19 +372,17 @@ public class WorkLogStore {
                     .collect(Collectors.toList()));
             }
 
-            // 关联任务（从 task_ids JSON 字段查）
+            // 关联任务
+            List<Long> taskIds = parseTaskIds(log.getOrDefault("task_ids", "[]").toString());
             Map<Long, String> taskIdToTitle = new LinkedHashMap<>();
-            List<Long> taskIds = parseTaskIds(
-                log.getOrDefault("task_ids", "[]").toString());
             if (!taskIds.isEmpty()) {
                 List<String> taskTitles = new ArrayList<>();
                 for (Long tid : taskIds) {
-                    try {
-                        Map<String, Object> task = taskStore.getTask(tid);
-                        String title = (String) task.get("title");
+                    String title = taskTitleMap.get(tid);
+                    if (title != null) {
                         taskIdToTitle.put(tid, title);
                         taskTitles.add(title);
-                    } catch (Exception ignored) {}
+                    }
                 }
                 if (!taskTitles.isEmpty()) {
                     enriched.put("related_tasks", taskTitles);
@@ -382,13 +393,11 @@ public class WorkLogStore {
             Object contentObj = enriched.get("content");
             if (contentObj != null) {
                 String content = contentObj.toString();
-                // 替换 @todo:id
                 for (Map<String, Object> todo : todos) {
                     long tid = ((Number) todo.get("id")).longValue();
                     String title = (String) todo.get("title");
                     content = content.replace("@todo:" + tid, "@todo「" + title + "」");
                 }
-                // 替换 @task:id
                 for (Map.Entry<Long, String> entry : taskIdToTitle.entrySet()) {
                     content = content.replace("@task:" + entry.getKey(), "@task「" + entry.getValue() + "」");
                 }

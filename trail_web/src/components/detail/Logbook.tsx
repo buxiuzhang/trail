@@ -5,8 +5,6 @@ import { LogEntry } from './LogEntry'
 import { useInfiniteScroll } from '@/hooks/useInfiniteScroll'
 import styles from './Logbook.module.css'
 
-type SortOrder = 'asc' | 'desc'
-
 interface LogbookProps {
   task: TaskOut
   logs: LogOut[]
@@ -20,21 +18,16 @@ interface LogbookProps {
   fetchNextPage: () => void
   hasNextPage: boolean
   isFetchingNextPage: boolean
+  sortOrder: 'asc' | 'desc'
+  onSortChange: (order: 'asc' | 'desc') => void
 }
 
-export function Logbook({ task, logs, todos, tasks = [], onSaveNew, onSaveEdit, onDelete, onAddLogFocus, revealLogId, fetchNextPage, hasNextPage, isFetchingNextPage }: LogbookProps) {
+export function Logbook({ task, logs, todos, tasks = [], onSaveNew, onSaveEdit, onDelete, onAddLogFocus, revealLogId, fetchNextPage, hasNextPage, isFetchingNextPage, sortOrder, onSortChange }: LogbookProps) {
   const [editingLogId, setEditingLogId] = useState<number | null>(null)
-  const [sortOrder, setSortOrder] = useState<SortOrder>('desc')
   const prevRevealId = useRef<number | undefined>(undefined)
   const sentinelRef = useInfiniteScroll(fetchNextPage, hasNextPage, isFetchingNextPage)
 
-  // 按日期+序号排序（后端已 desc，asc 时前端反转）
-  const key = (l: LogOut) => l.log_date + String(l.ordinal).padStart(4, '0')
-  const sorted = sortOrder === 'desc'
-    ? logs
-    : [...logs].sort((a, b) => key(a).localeCompare(key(b)))
-
-  // reveal：目标已在当前 logs 中则直接 scroll + 高亮
+  // reveal：scroll + 高亮目标日志
   useEffect(() => {
     if (!revealLogId || revealLogId === prevRevealId.current || logs.length === 0) return
     prevRevealId.current = revealLogId
@@ -54,13 +47,12 @@ export function Logbook({ task, logs, todos, tasks = [], onSaveNew, onSaveEdit, 
     if (el) {
       requestAnimationFrame(doReveal)
     } else {
-      // 目标还没加载：连续翻页直到出现或无更多
       const tryLoad = () => {
         if (document.getElementById(`log-${revealLogId}`)) {
           doReveal()
           return
         }
-        if (hasNextPageRef.current && !isFetchingNextPageRef.current) {
+        if (hasNextPage && !isFetchingNextPage) {
           fetchNextPage()
           setTimeout(tryLoad, 300)
         }
@@ -100,7 +92,7 @@ export function Logbook({ task, logs, todos, tasks = [], onSaveNew, onSaveEdit, 
         <button
           type="button"
           className={`${styles.sortBtn} ${sortOrder === 'desc' ? styles.sortActive : ''}`}
-          onClick={() => setSortOrder('desc')}
+          onClick={() => onSortChange('desc')}
         >
           倒序
         </button>
@@ -108,21 +100,21 @@ export function Logbook({ task, logs, todos, tasks = [], onSaveNew, onSaveEdit, 
         <button
           type="button"
           className={`${styles.sortBtn} ${sortOrder === 'asc' ? styles.sortActive : ''}`}
-          onClick={() => setSortOrder('asc')}
+          onClick={() => onSortChange('asc')}
         >
           正序
         </button>
       </div>
 
       <div className={styles.entries}>
-        {sorted.length === 0 && !hasNextPage ? (
+        {logs.length === 0 && !hasNextPage ? (
           <div className={styles.emptyLog}>
             <span className={styles.emptyGlyph}>∅</span>
             尚无记录。写下第一笔吧。
           </div>
         ) : (
           <>
-            {sorted.map(l => (
+            {logs.map(l => (
               <LogEntry
                 key={l.id}
                 task={task}
