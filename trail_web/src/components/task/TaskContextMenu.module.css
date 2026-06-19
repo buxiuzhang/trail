@@ -1,0 +1,33 @@
+.menu {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+  background: var(--card);
+  border: 0.5px solid var(--rule);
+  box-shadow: var(--shadow-xl);
+  min-width: 148px;
+  z-index: 9999;
+  font-family: var(--body);
+  font-size: 13px;
+}
+
+.item {
+  padding: 7px 16px;
+  cursor: pointer;
+  color: var(--ink-faded);
+  white-space: nowrap;
+  transition: background 0.1s, color 0.1s;
+}
+.item:hover {
+  background: var(--card-deep);
+  color: var(--ink);
+}
+
+.danger { color: var(--red, #c0392b); }
+.danger:hover { background: rgba(192, 57, 43, 0.07); color: var(--red, #c0392b); }
+
+.sep {
+  height: 0.5px;
+  background: var(--rule);
+  margin: 4px 0;
+}

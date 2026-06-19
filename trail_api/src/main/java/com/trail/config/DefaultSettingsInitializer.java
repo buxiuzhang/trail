@@ -67,7 +67,6 @@ public class DefaultSettingsInitializer {
         putIfPresent(defaults, "summarize_maintenance_prompt", d.summarizeMaintenancePrompt());
         putIfPresent(defaults, "ask_maintenance_prompt", d.askMaintenancePrompt());
         putIfPresent(defaults, "chat_system_prompt", d.chatSystemPrompt());
-        putIfPresent(defaults, "tools_desc", d.toolsDesc());
         putIfPresent(defaults, "daily_report_template", d.dailyReportTemplate());
         putIfPresent(defaults, "weekly_report_template", d.weeklyReportTemplate());
 

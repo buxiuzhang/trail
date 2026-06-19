@@ -388,6 +388,62 @@ public class TaskStore {
     }
 
     // ============================================================
+    // 特别关注
+    // ============================================================
+
+    public Map<String, Object> watch(long taskId) {
+        int affected = db.update(
+            "UPDATE tasks SET watched_at = COALESCE(watched_at, CURRENT_TIMESTAMP)"
+          + " WHERE id = ? RETURNING id", taskId);
+        if (affected == 0) throw new NotFoundException("任务不存在：" + taskId);
+        return getTask(taskId);
+    }
+
+    public Map<String, Object> unwatch(long taskId) {
+        int affected = db.update(
+            "UPDATE tasks SET watched_at = NULL WHERE id = ? RETURNING id", taskId);
+        if (affected == 0) throw new NotFoundException("任务不存在：" + taskId);
+        return getTask(taskId);
+    }
+
+    /** 返回所有已关注任务（watched_at IS NOT NULL），按 watched_at DESC 排序。 */
+    public List<Map<String, Object>> listWatched() {
+        return db.query("""
+            SELECT t.*, sub.last_log_date,
+              COALESCE(todo_sub.todo_active_count, 0) AS todo_active_count,
+              COALESCE(todo_sub.todo_completed_count, 0) AS todo_completed_count,
+              COALESCE(todo_sub.todo_abandoned_count, 0) AS todo_abandoned_count,
+              COALESCE(log_sub.log_count, 0) AS log_count,
+              COALESCE(log_sub.log_main_count, 0) AS log_main_count,
+              COALESCE(log_sub.total_hours, 0.0) AS total_hours
+            FROM tasks t
+            LEFT JOIN (
+                SELECT task_id, MAX(log_date) AS last_log_date
+                FROM work_logs WHERE is_deleted = 0
+                GROUP BY task_id
+            ) sub ON sub.task_id = t.id
+            LEFT JOIN (
+                SELECT task_id,
+                  SUM(CASE WHEN is_completed = 0 AND is_abandoned = 0 THEN 1 ELSE 0 END) AS todo_active_count,
+                  SUM(CASE WHEN is_completed = 1 THEN 1 ELSE 0 END) AS todo_completed_count,
+                  SUM(CASE WHEN is_abandoned = 1 THEN 1 ELSE 0 END) AS todo_abandoned_count
+                FROM todos
+                GROUP BY task_id
+            ) todo_sub ON todo_sub.task_id = t.id
+            LEFT JOIN (
+                SELECT task_id,
+                  SUM(CASE WHEN is_deleted = 0 THEN 1 ELSE 0 END) AS log_count,
+                  SUM(CASE WHEN is_deleted = 0 AND phase = 'main' THEN 1 ELSE 0 END) AS log_main_count,
+                  SUM(CASE WHEN is_deleted = 0 THEN hours ELSE 0 END) AS total_hours
+                FROM work_logs
+                GROUP BY task_id
+            ) log_sub ON log_sub.task_id = t.id
+            WHERE t.watched_at IS NOT NULL
+            ORDER BY t.watched_at DESC
+            """);
+    }
+
+    // ============================================================
     // 硬删
     // ============================================================
 

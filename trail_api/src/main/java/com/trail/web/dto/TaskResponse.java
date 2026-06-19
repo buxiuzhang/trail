@@ -21,6 +21,7 @@ public record TaskResponse(
         String originalTitle,
         String source,
         Instant pinnedAt,
+        Instant watchedAt,
         Instant createdAt,
         Instant updatedAt,
         LocalDate lastLogDate,

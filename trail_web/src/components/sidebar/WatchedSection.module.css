@@ -1,0 +1,41 @@
+.item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 5px 4px 5px 14px;
+  font-family: var(--body);
+  font-size: 13.5px;
+  color: var(--ink-faded);
+  cursor: pointer;
+  position: relative;
+  transition: color 150ms ease;
+}
+.item::before {
+  content: "⭐";
+  position: absolute;
+  left: 0;
+  top: 5px;
+  font-size: 9px;
+  line-height: 1;
+}
+.item:hover { color: var(--ink); }
+
+.name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.idle {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink-ghost);
+  white-space: nowrap;
+  font-feature-settings: "tnum";
+  flex-shrink: 0;
+}
+.hot { color: var(--green); }
+.warn { color: #e07b39; }

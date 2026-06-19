@@ -4,15 +4,13 @@ import com.trail.crypto.RsaKeyService;
 import com.trail.service.LlmService;
 import com.trail.store.LLMSettingsStore;
 import com.trail.web.dto.LlmSettingsDto;
+import com.trail.web.ws.WatchAlertScheduler;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
-/**
- * LLM 配置 API
- */
 @RestController
 @RequestMapping("/api/settings/llm")
 @Tag(name = "LLM 配置", description = "大模型 API Key、模型、Prompt 模板等配置")
@@ -21,11 +19,14 @@ public class LlmSettingsController {
     private final LLMSettingsStore store;
     private final LlmService llmService;
     private final RsaKeyService rsaKeyService;
+    private final WatchAlertScheduler watchAlertScheduler;
 
-    public LlmSettingsController(LLMSettingsStore store, LlmService llmService, RsaKeyService rsaKeyService) {
+    public LlmSettingsController(LLMSettingsStore store, LlmService llmService,
+                                 RsaKeyService rsaKeyService, WatchAlertScheduler watchAlertScheduler) {
         this.store = store;
         this.llmService = llmService;
         this.rsaKeyService = rsaKeyService;
+        this.watchAlertScheduler = watchAlertScheduler;
     }
 
     @Operation(summary = "获取 LLM 配置", description = "获取 API Key（遮蔽）、模型、Prompt 模板等配置")
@@ -49,11 +50,14 @@ public class LlmSettingsController {
                 all.getOrDefault("summarize_maintenance_prompt", ""),
                 all.getOrDefault("ask_maintenance_prompt", ""),
                 all.getOrDefault("draft_log_system_prompt", ""),
-                all.getOrDefault("tools_desc", ""),
                 all.getOrDefault("daily_report_template", ""),
                 all.getOrDefault("weekly_report_template", ""),
                 all.getOrDefault("speech_duration", "10"),
-                all.getOrDefault("max_tool_iterations", "30")
+                all.getOrDefault("max_tool_iterations", "30"),
+                all.getOrDefault("watch_idle_hot_days", "3"),
+                all.getOrDefault("watch_idle_warn_days", "14"),
+                all.getOrDefault("watch_snooze_minutes", "30"),
+                all.getOrDefault("watch_cron", "0 9,14 * * 1-5")
         );
     }
 
@@ -85,15 +89,19 @@ public class LlmSettingsController {
         saveIfPresent(data, "summarize_maintenance_prompt");
         saveIfPresent(data, "ask_maintenance_prompt");
         saveIfPresent(data, "draft_log_system_prompt");
-        saveIfPresent(data, "tools_desc");
 
         saveIfPresent(data, "daily_report_template");
         saveIfPresent(data, "weekly_report_template");
 
         saveIfPresent(data, "speech_duration");
         saveIfPresent(data, "max_tool_iterations");
+        saveIfPresent(data, "watch_idle_hot_days");
+        saveIfPresent(data, "watch_idle_warn_days");
+        saveIfPresent(data, "watch_snooze_minutes");
+        saveIfPresent(data, "watch_cron");
 
         llmService.refreshPrompts();
+        watchAlertScheduler.reschedule();
         return Map.of("ok", true);
     }
 

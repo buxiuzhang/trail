@@ -136,6 +136,36 @@ export function useUnpinTask(id: number) {
   })
 }
 
+export function useWatchTask(id: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => api.post<TaskOut>(`/api/tasks/${id}/watch`, {}),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['tasks'] })
+      qc.invalidateQueries({ queryKey: ['watched-tasks'] })
+    },
+  })
+}
+
+export function useUnwatchTask(id: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => api.post<TaskOut>(`/api/tasks/${id}/unwatch`, {}),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['tasks'] })
+      qc.invalidateQueries({ queryKey: ['watched-tasks'] })
+    },
+  })
+}
+
+export function useWatchedTasks() {
+  return useQuery({
+    queryKey: ['watched-tasks'],
+    queryFn: () => api.get<TaskOut[]>('/api/tasks/watched'),
+    staleTime: 30_000,
+  })
+}
+
 export function useDeleteTask(id: number) {
   const qc = useQueryClient()
   return useMutation({

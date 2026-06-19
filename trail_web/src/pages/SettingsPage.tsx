@@ -4,12 +4,14 @@ import {
   useMotto, useSaveMotto,
   useDataDir, useSaveDataDir,
   usePlaceholders, useSavePlaceholders, DEFAULT_PLACEHOLDERS,
+  DEFAULT_WATCH_SETTINGS,
 } from '@/api/settings'
 import { rsaDecrypt } from '@/api/crypto'
 import { useToastContext } from '@/context/ToastContext'
 import { useSettingsContext } from '@/App'
 import { Crumbs } from '@/components/shared/Crumbs'
 import { DescriptionEditorWithMode, type EditorMode } from '@/components/shared/DescriptionEditorWithMode'
+import { CronEditor } from '@/components/shared/CronEditor'
 import { useConfirm } from '@/utils/confirm'
 import styles from './SettingsPage.module.css'
 
@@ -21,7 +23,7 @@ export function SettingsPage() {
 
   // 按需加载：只有切换到对应 section 才请求数据
   const { data: settings, isLoading } = useLLMSettings({
-    enabled: activeSection === 'llm',
+    enabled: activeSection === 'llm' || activeSection === 'interface',
   })
   const saveLLM = useSaveLLMSettings()
 
@@ -59,7 +61,7 @@ export function SettingsPage() {
   const [summarizePrompt, setSummarizePrompt] = useState('')
   const [summarizeMaintenancePrompt, setSummarizeMaintenancePrompt] = useState('')
   const [askMaintenancePrompt, setAskMaintenancePrompt] = useState('')
-  const [toolsDesc, setToolsDesc] = useState('')
+  // 日报/周报模板
 
   // Prompt 模板编辑器模式（默认源码模式）
   const [chatPromptMode, setChatPromptMode] = useState<EditorMode>('preview')
@@ -70,7 +72,6 @@ export function SettingsPage() {
   const [summarizePromptMode, setSummarizePromptMode] = useState<EditorMode>('preview')
   const [summarizeMaintenancePromptMode, setSummarizeMaintenancePromptMode] = useState<EditorMode>('preview')
   const [askMaintenancePromptMode, setAskMaintenancePromptMode] = useState<EditorMode>('preview')
-  const [toolsDescMode, setToolsDescMode] = useState<EditorMode>('preview')
 
   // Prompt 折叠分组状态
   const [groupRecord, setGroupRecord] = useState(true)
@@ -90,6 +91,11 @@ export function SettingsPage() {
 
   // 工具调用最大迭代次数
   const [maxToolIterations, setMaxToolIterations] = useState('30')
+
+  // 特别关注阈值
+  const [watchIdleHotDays, setWatchIdleHotDays] = useState(String(DEFAULT_WATCH_SETTINGS.watch_idle_hot_days))
+  const [watchIdleWarnDays, setWatchIdleWarnDays] = useState(String(DEFAULT_WATCH_SETTINGS.watch_idle_warn_days))
+  const [watchCron, setWatchCron] = useState(DEFAULT_WATCH_SETTINGS.watch_cron)
 
   // 其他设置
   const [mottoDraft, setMottoDraft] = useState('')
@@ -123,7 +129,6 @@ export function SettingsPage() {
       setSummarizePrompt(settings.summarize_system_prompt || '')
       setSummarizeMaintenancePrompt(settings.summarize_maintenance_prompt || '')
       setAskMaintenancePrompt(settings.ask_maintenance_prompt || '')
-      setToolsDesc(settings.tools_desc || '')
       // 日报/周报模板
       setDailyReportTemplate(settings.daily_report_template || '')
       setWeeklyReportTemplate(settings.weekly_report_template || '')
@@ -131,6 +136,10 @@ export function SettingsPage() {
       setSpeechDuration(settings.speech_duration || '10')
       // 工具调用最大迭代次数
       setMaxToolIterations(settings.max_tool_iterations || '30')
+      // 特别关注阈值
+      setWatchIdleHotDays(settings.watch_idle_hot_days || String(DEFAULT_WATCH_SETTINGS.watch_idle_hot_days))
+      setWatchIdleWarnDays(settings.watch_idle_warn_days || String(DEFAULT_WATCH_SETTINGS.watch_idle_warn_days))
+      setWatchCron(settings.watch_cron || DEFAULT_WATCH_SETTINGS.watch_cron)
     }
   }, [settings])
 
@@ -201,7 +210,6 @@ export function SettingsPage() {
     try {
       await saveLLM.mutateAsync({
         chat_system_prompt: chatPrompt.trim(),
-        tools_desc: toolsDesc.trim(),
         daily_report_template: dailyReportTemplate.trim(),
         weekly_report_template: weeklyReportTemplate.trim(),
       })
@@ -218,6 +226,20 @@ export function SettingsPage() {
         summarize_system_prompt: summarizePrompt.trim(),
         summarize_maintenance_prompt: summarizeMaintenancePrompt.trim(),
         ask_maintenance_prompt: askMaintenancePrompt.trim(),
+      })
+      showToast('已保存')
+    } catch (err: any) {
+      showToast('保存失败：' + err.message)
+    }
+  }
+
+  async function handleSaveWatch(e: React.SyntheticEvent) {
+    e.preventDefault()
+    try {
+      await saveLLM.mutateAsync({
+        watch_idle_hot_days: watchIdleHotDays,
+        watch_idle_warn_days: watchIdleWarnDays,
+        watch_cron: watchCron.trim(),
       })
       showToast('已保存')
     } catch (err: any) {
@@ -589,7 +611,7 @@ export function SettingsPage() {
       {/* 卡片 3：对话与报表 Prompt */}
       <section id="llm-dialog" className={styles.section}>
         <h2 className={styles.sectionTitle}>对话与报表</h2>
-        <p className={styles.sectionHint}>对话提示词、工具说明、日报/周报模板，留空则使用默认值。</p>
+        <p className={styles.sectionHint}>对话提示词、日报/周报模板，留空则使用默认值。</p>
         {isLoading ? (
           <p className={styles.sectionHint}>载入中...</p>
         ) : (
@@ -605,19 +627,6 @@ export function SettingsPage() {
               <p className={styles.promptDesc}>聊天窗口的系统提示，定义 AI 的角色和行为</p>
               <div style={{ marginTop: '8px' }}>
                 <DescriptionEditorWithMode value={chatPrompt || ''} onChange={setChatPrompt} mode={chatPromptMode} onModeChange={setChatPromptMode} minHeight={120} textareaClassName="field__textarea" hideInlineToggle autoGrow maxHeight={300} />
-              </div>
-            </div>
-            <div className={styles.promptField}>
-              <div className={styles.promptLabel}>
-                <span className={styles.promptName}>
-                  工具说明
-                  <button type="button" onClick={async () => { if (await confirm({ level: 'moderate', title: '重置工具说明？', body: <p>将恢复为系统默认值。</p>, confirmLabel: '重置' })) setToolsDesc('') }} className={styles.resetBtn}>重置</button>
-                </span>
-                <button type="button" className={styles.modeToggle} onClick={() => setToolsDescMode(toolsDescMode === 'source' ? 'preview' : 'source')}>{toolsDescMode === 'source' ? '预览模式' : '源码模式'}</button>
-              </div>
-              <p className={styles.promptDesc}>告诉 LLM 有哪些工具可用及如何使用</p>
-              <div style={{ marginTop: '8px' }}>
-                <DescriptionEditorWithMode value={toolsDesc || ''} onChange={setToolsDesc} mode={toolsDescMode} onModeChange={setToolsDescMode} minHeight={200} textareaClassName="field__textarea" hideInlineToggle autoGrow maxHeight={300} />
               </div>
             </div>
             <div className={styles.promptField}>
@@ -711,6 +720,7 @@ export function SettingsPage() {
 
       {/* 界面偏好 */}
       {activeSection === 'interface' && (
+        <>
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>界面偏好</h2>
           <p className={styles.sectionHint}>自定义界面风格和行为。</p>
@@ -800,6 +810,74 @@ export function SettingsPage() {
           </button>
         </div>
       </section>
+
+      {/* 特别关注 */}
+      <section id="interface-watch" className={styles.section}>
+          <h2 className={styles.sectionTitle}>特别关注</h2>
+          <p className={styles.sectionHint}>侧边栏「特别关注」区块用颜色区分任务活跃程度，根据最近一条日志距今天数判断。</p>
+          {isLoading ? (
+            <p className={styles.sectionHint}>载入中...</p>
+          ) : (
+            <form onSubmit={handleSaveWatch}>
+              <div className="field">
+                <div className="field__label">
+                  <span>活跃天数</span>
+                  <span className="field__hint" style={{ color: 'var(--green)' }}>绿色 · {watchIdleHotDays} 天内</span>
+                </div>
+                <input
+                  type="range"
+                  min="1"
+                  max="7"
+                  value={watchIdleHotDays}
+                  onChange={e => setWatchIdleHotDays(e.target.value)}
+                  className={styles.slider}
+                />
+                <p className={styles.fieldHint}>最近一条日志在此天数内，闲置标签显示为绿色（近期活跃）。</p>
+              </div>
+              <div className="field">
+                <div className="field__label">
+                  <span>预警天数</span>
+                  <span className="field__hint" style={{ color: '#e07b39' }}>橙色 · {watchIdleWarnDays} 天以上</span>
+                </div>
+                <input
+                  type="range"
+                  min="8"
+                  max="30"
+                  value={watchIdleWarnDays}
+                  onChange={e => setWatchIdleWarnDays(e.target.value)}
+                  className={styles.slider}
+                />
+                <p className={styles.fieldHint}>最近一条日志超过此天数，闲置标签显示为橙色（需要关注）。</p>
+              </div>
+              <div className="field">
+                <div className="field__label">
+                  <span>推送计划</span>
+                </div>
+                <CronEditor value={watchCron} onChange={setWatchCron} />
+                <p className={styles.fieldHint}>
+                  设置特别关注预警的推送时间。支持 cron 表达式（分 时 日 月 周），保存后立即生效。
+                </p>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16, gap: 8 }}>
+                <button
+                  type="button"
+                  className="btn btn--ghost"
+                  onClick={() => {
+                    setWatchIdleHotDays(String(DEFAULT_WATCH_SETTINGS.watch_idle_hot_days))
+                    setWatchIdleWarnDays(String(DEFAULT_WATCH_SETTINGS.watch_idle_warn_days))
+                    setWatchCron(DEFAULT_WATCH_SETTINGS.watch_cron)
+                  }}
+                >
+                  恢复默认
+                </button>
+                <button type="submit" className="btn btn--primary" disabled={saveLLM.isPending}>
+                  {saveLLM.isPending ? '保存中...' : '保存'}
+                </button>
+              </div>
+            </form>
+          )}
+        </section>
+      </>
       )}
 
       {/* 占位提示语 */}
@@ -946,3 +1024,5 @@ export function SettingsPage() {
     </article>
   )
 }
+
+// ── SettingsPage 结束 ────────────────────────────────────────

@@ -23,12 +23,16 @@ public record LlmSettingsDto(
         String summarizeMaintenancePrompt,
         String askMaintenancePrompt,
         String draftLogSystemPrompt,
-        String toolsDesc,
         // 日报/周报模板
         String dailyReportTemplate,
         String weeklyReportTemplate,
         // 语音输入时长（秒）
         String speechDuration,
         // 工具调用最大迭代次数
-        String maxToolIterations
+        String maxToolIterations,
+        // 特别关注
+        String watchIdleHotDays,
+        String watchIdleWarnDays,
+        String watchSnoozeMinutes,
+        String watchCron
 ) {}

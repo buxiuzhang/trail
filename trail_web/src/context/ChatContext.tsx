@@ -11,6 +11,7 @@ interface ChatContextValue {
   isOpen: boolean
   messages: Message[]
   isLoading: boolean
+  alertCount: number
   openChat: () => void
   closeChat: () => void
   addMessage: (role: 'user' | 'assistant', content: string) => void
@@ -18,6 +19,9 @@ interface ChatContextValue {
   updateLastMessage: (content: string) => void
   clearMessages: () => void
   setIsLoading: (v: boolean) => void
+  /** 推入一条预警消息（assistant 角色），并增加未读角标。 */
+  pushAlert: (content: string) => void
+  clearAlerts: () => void
 }
 
 const ChatContext = createContext<ChatContextValue | null>(null)
@@ -28,10 +32,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false)
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [alertCount, setAlertCount] = useState(0)
 
   const openChat = useCallback(() => {
     setIsOpen(true)
-    // 首次打开时插入问候语
     setMessages(prev => {
       if (prev.length === 0) {
         return [
@@ -76,18 +80,35 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setMessages([])
   }, [])
 
+  const pushAlert = useCallback((content: string) => {
+    setMessages(prev => {
+      const base = prev.length === 0
+        ? [{ id: crypto.randomUUID(), role: 'assistant' as const, content: GREETING, timestamp: Date.now() }]
+        : prev
+      return [...base, { id: crypto.randomUUID(), role: 'assistant' as const, content, timestamp: Date.now() }]
+    })
+    setAlertCount(n => n + 1)
+  }, [])
+
+  const clearAlerts = useCallback(() => {
+    setAlertCount(0)
+  }, [])
+
   return (
     <ChatContext.Provider
       value={{
         isOpen,
         messages,
         isLoading,
+        alertCount,
         openChat,
         closeChat,
         addMessage,
         updateLastMessage,
         clearMessages,
         setIsLoading,
+        pushAlert,
+        clearAlerts,
       }}
     >
       {children}

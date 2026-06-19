@@ -27,6 +27,7 @@ public final class TaskMapper {
                 asString(row.get("original_title")),
                 asString(row.get("source")),
                 asInstant(row.get("pinned_at")),
+                asInstant(row.get("watched_at")),
                 asInstant(row.get("created_at")),
                 asInstant(row.get("updated_at")),
                 asLocalDate(row.get("last_log_date")),

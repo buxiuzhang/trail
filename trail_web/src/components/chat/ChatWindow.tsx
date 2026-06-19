@@ -4,6 +4,7 @@ import { useChat } from '@/api/chat'
 import { useToastContext } from '@/context/ToastContext'
 import { useLLMSettings } from '@/api/settings'
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition'
+import { ignoreAlert } from '@/hooks/useWatchAlerts'
 import { MessageContent } from './MessageContent'
 import CopyIcon from './copy.svg'
 import CopiedIcon from './copied.svg'
@@ -29,6 +30,8 @@ export function ChatWindow() {
     addMessage,
     updateLastMessage,
     setIsLoading,
+    clearAlerts,
+    clearMessages,
   } = useChatContext()
   const { send, abort, isPending } = useChat()
   const { showToast } = useToastContext()
@@ -36,10 +39,25 @@ export function ChatWindow() {
   const bodyRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // 获取 LLM 设置（包含语音时长、模型名称）——只在窗口打开时才请求
   const { data: llmSettings } = useLLMSettings({ enabled: isOpen })
   const speechDuration = parseInt(llmSettings?.speech_duration || '10', 10)
   const modelName = llmSettings?.model || ''
+
+  const handleAction = useCallback((action: string) => {
+    const parts = action.split(':')
+    const type = parts[0]
+    const id = parseInt(parts[1])
+    if (isNaN(id)) return
+    if (type === 'ignore') {
+      ignoreAlert(id)
+      showToast('今日不再提醒')
+    }
+  }, [showToast])
+
+  // 打开时清空未读角标
+  useEffect(() => {
+    if (isOpen) clearAlerts()
+  }, [isOpen, clearAlerts])
 
   // 语音识别 - 使用回调方式实时更新输入框
   const {
@@ -67,6 +85,17 @@ export function ChatWindow() {
   // 迭代次数
   const [iterationInfo, setIterationInfo] = useState<{ current: number; max: number } | null>(null)
 
+  // 自动滚到底部
+  const scrollToBottom = useCallback(() => {
+    if (bodyRef.current) {
+      bodyRef.current.scrollTop = bodyRef.current.scrollHeight
+    }
+  }, [])
+
+  useEffect(() => {
+    scrollToBottom()
+  }, [messages, scrollToBottom])
+
   // 启动打字机（如未启动）；取一个字符追加到 DOM。
   const pump = useCallback(() => {
     const q = queueRef.current
@@ -80,7 +109,8 @@ export function ChatWindow() {
     const ch = q.shift()!
     const el = liveRef.current
     if (el) el.textContent = (el.textContent ?? '') + ch
-  }, [])
+    scrollToBottom()
+  }, [scrollToBottom])
 
   // 启动打字机 interval（幂等：已有就不重复启动）
   const ensureTimer = useCallback(() => {
@@ -122,13 +152,6 @@ export function ChatWindow() {
     stopTimer()
     if (liveRef.current) updateLastMessage(liveRef.current.textContent ?? '')
   }, [stopTimer, updateLastMessage])
-
-  // 自动滚到底部
-  useEffect(() => {
-    if (bodyRef.current) {
-      bodyRef.current.scrollTop = bodyRef.current.scrollHeight
-    }
-  }, [messages])
 
   // 打开时聚焦输入框
   useEffect(() => {
@@ -181,6 +204,8 @@ export function ChatWindow() {
       stopTimer()
     }
   }, [abort, stopTimer])
+
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null)
 
   if (!isOpen) return null
 
@@ -283,7 +308,12 @@ export function ChatWindow() {
       </div>
 
       {/* 消息列表 */}
-      <div className={styles.body} ref={bodyRef}>
+      <div
+        className={styles.body}
+        ref={bodyRef}
+        onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY }) }}
+        onClick={() => setCtxMenu(null)}
+      >
         {messages.map((msg, i) => {
           const isLast = i === messages.length - 1
           return (
@@ -294,6 +324,7 @@ export function ChatWindow() {
               liveRef={isLast && isStreaming ? liveRef : undefined}
               isStreaming={isLast && isStreaming}
               showTyping={isLast && showTyping && !toolStatus}
+              onAction={handleAction}
             />
           )
         })}
@@ -313,6 +344,22 @@ export function ChatWindow() {
           </div>
         )}
       </div>
+
+      {/* 右键菜单 */}
+      {ctxMenu && (
+        <ul
+          className={styles.ctxMenu}
+          style={{ left: ctxMenu.x, top: ctxMenu.y }}
+          onMouseLeave={() => setCtxMenu(null)}
+        >
+          <li
+            className={styles.ctxItem}
+            onMouseDown={(e) => { e.preventDefault(); clearMessages(); setCtxMenu(null) }}
+          >
+            清空聊天记录
+          </li>
+        </ul>
+      )}
 
       {/* 输入区 */}
       <form className={styles.inputRow} onSubmit={handleSend}>
@@ -390,12 +437,14 @@ function ChatMessageRow({
   liveRef,
   isStreaming,
   showTyping,
+  onAction,
 }: {
   message: Message
   modelName?: string
   liveRef?: React.RefObject<HTMLDivElement | null>
   isStreaming?: boolean
   showTyping?: boolean
+  onAction?: (action: string) => void
 }) {
   const isUser = message.role === 'user'
   const [copied, setCopied] = useState(false)
@@ -422,7 +471,7 @@ function ChatMessageRow({
           <div className={styles.msgContent} ref={liveRef} />
         ) : (
           // 完成：使用 MessageContent 组件解析链接
-          <MessageContent content={message.content} />
+          <MessageContent content={message.content} onAction={onAction} />
         )}
         {/* 等待中：右下角显示 typing dots */}
         {showTyping && (

@@ -160,6 +160,22 @@
 .pinBtn:hover { opacity: 0.9; transform: scale(1.15); }
 .pinOn { opacity: 1; }
 
+/* ⭐ 关注角标 —— 右上角 */
+.watchBadge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  font-size: 14px;
+  line-height: 1;
+  z-index: 10;
+  pointer-events: none;
+  opacity: 0.85;
+}
+
+.isWatched {
+  border-right: 3px solid #f5a623;
+}
+
 /* 中列：主体 */
 .body {
   min-width: 0;

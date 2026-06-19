@@ -433,12 +433,9 @@ public class ChatWithToolsService {
 
             """.formatted(today, weekday, yesterday);
 
-        // 从配置读取 tools_desc 和 chat_system_prompt
+        // 从配置读取 chat_system_prompt（已含工具说明）
         Map<String, String> settings = settingsStore.getAll();
-        String toolsDesc = settings.getOrDefault("tools_desc", "");
-        String chatSystemPrompt = settings.getOrDefault("chat_system_prompt", "");
-
-        String systemPrompt = chatSystemPrompt.replace("{tools_desc}", toolsDesc);
+        String systemPrompt = settings.getOrDefault("chat_system_prompt", "");
 
         return nowBlock + systemPrompt;
     }

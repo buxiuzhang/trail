@@ -3,6 +3,7 @@ import { useMotto } from '@/api/settings'
 import { useFilterContext } from '@/context/FilterContext'
 import { STATUS_LIST, NATURE_LIST } from '@/constants'
 import { FilterSection } from './FilterSection'
+import { WatchedSection } from './WatchedSection'
 import { monthLabel } from '@/constants'
 import styles from './Sidebar.module.css'
 
@@ -47,6 +48,7 @@ export function Sidebar() {
 
   return (
     <aside className={styles.sidebar} aria-label="查找助手">
+      <WatchedSection />
       <FilterSection
         title="按状态"
         items={statusItems}

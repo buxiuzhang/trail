@@ -407,11 +407,8 @@ public class ApiToolExecutor {
         }
 
         String url = "/api/reports/daily?date=" + date;
-        String filename = "日报_" + date + ".md";
         return Map.of(
-            "url", url,
-            "filename", filename,
-            "message", "日报已准备好，[点击下载](" + url + ")"
+            "message", "日报已生成，下载链接：[日报_" + date + ".md](" + url + ")"
         );
     }
 
@@ -447,11 +444,8 @@ public class ApiToolExecutor {
         }
 
         String url = String.format("/api/reports/weekly?start=%s&end=%s", start, end);
-        String filename = String.format("周报_%s_%s.md", start, end);
         return Map.of(
-            "url", url,
-            "filename", filename,
-            "message", "周报已准备好，[点击下载](" + url + ")"
+            "message", "周报已生成，下载链接：[周报_" + start + "_" + end + ".md](" + url + ")"
         );
     }
 

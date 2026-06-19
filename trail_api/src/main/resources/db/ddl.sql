@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     original_title      TEXT,
     source              TEXT    NOT NULL DEFAULT '任务需求.md',
     pinned_at           TEXT,                           -- TIMESTAMP → TEXT
+    watched_at          TEXT,                           -- 特别关注标记时间
     created_at          TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

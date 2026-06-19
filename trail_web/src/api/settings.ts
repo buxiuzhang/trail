@@ -19,8 +19,11 @@ export interface LLMSettings {
   summarize_maintenance_prompt: string
   ask_maintenance_prompt: string
   draft_log_system_prompt: string
-  // 工具说明
-  tools_desc: string
+  // 特别关注阈值
+  watch_idle_hot_days: string
+  watch_idle_warn_days: string
+  watch_snooze_minutes: string
+  watch_cron: string             // cron 表达式，默认工作日 9 点和 14 点
   // 日报/周报模板
   daily_report_template: string
   weekly_report_template: string
@@ -66,6 +69,23 @@ export function useSaveLLMSettings() {
       )
     },
   })
+}
+
+export const DEFAULT_WATCH_SETTINGS = {
+  watch_idle_hot_days: 3,
+  watch_idle_warn_days: 14,
+  watch_snooze_minutes: 30,
+  watch_cron: '0 9,14 * * 1-5',
+}
+
+/** 特别关注阈值：从 LLM 设置中取，返回数字；未配置时回退到默认值。 */
+export function useWatchSettings() {
+  const { data } = useLLMSettings()
+  return {
+    hotDays: parseInt(data?.watch_idle_hot_days || '') || DEFAULT_WATCH_SETTINGS.watch_idle_hot_days,
+    warnDays: parseInt(data?.watch_idle_warn_days || '') || DEFAULT_WATCH_SETTINGS.watch_idle_warn_days,
+    snoozeMinutes: parseInt(data?.watch_snooze_minutes || '') || DEFAULT_WATCH_SETTINGS.watch_snooze_minutes,
+  }
 }
 
 /** 卷首语（侧栏底部"凡录入者..."那两行） */

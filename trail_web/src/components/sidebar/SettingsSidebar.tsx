@@ -25,14 +25,17 @@ const LLM_SUB = [
   { id: 'llm-disabled', label: '暂不可用' },
 ]
 
+const INTERFACE_SUB = [
+  { id: 'interface-watch', label: '特别关注' },
+]
+
 export function SettingsSidebar({ activeSection, onSectionChange }: SettingsSidebarProps) {
   const [activeSubId, setActiveSubId] = useState<string | null>(null)
 
-  function handleSubClick(id: string) {
+  function handleSubClick(id: string, section: string) {
     setActiveSubId(id)
-    if (activeSection !== 'llm') {
-      onSectionChange('llm')
-      // 等 DOM 渲染后再滚动
+    if (activeSection !== section) {
+      onSectionChange(section)
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -59,16 +62,32 @@ export function SettingsSidebar({ activeSection, onSectionChange }: SettingsSide
               >
                 <span>{item.label}</span>
               </div>
+              {item.key === 'interface' && activeSection === 'interface' && (
+                <ul className={styles.subList} role="list">
+                  {INTERFACE_SUB.map(sub => (
+                    <li
+                      key={sub.id}
+                      className={`${styles.subItem} ${activeSubId === sub.id ? styles.subItemActive : ''}`}
+                      onClick={() => handleSubClick(sub.id, 'interface')}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleSubClick(sub.id, 'interface') }}
+                    >
+                      <span>{sub.label}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
               {item.key === 'llm' && activeSection === 'llm' && (
                 <ul className={styles.subList} role="list">
                   {LLM_SUB.map(sub => (
                     <li
                       key={sub.id}
                       className={`${styles.subItem} ${activeSubId === sub.id ? styles.subItemActive : ''}`}
-                      onClick={() => handleSubClick(sub.id)}
+                      onClick={() => handleSubClick(sub.id, 'llm')}
                       role="button"
                       tabIndex={0}
-                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleSubClick(sub.id) }}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleSubClick(sub.id, 'llm') }}
                     >
                       <span>{sub.label}</span>
                     </li>

@@ -1,0 +1,178 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-top: 8px;
+  border: 0.5px solid var(--rule);
+}
+
+/* ── tab 栏 ── */
+.tabs {
+  display: flex;
+  border-bottom: 0.5px solid var(--rule);
+}
+
+.tab {
+  flex: 1;
+  padding: 7px 0;
+  background: none;
+  border: none;
+  border-right: 0.5px solid var(--rule);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  letter-spacing: 0.06em;
+  color: var(--ink-ghost);
+  cursor: pointer;
+  transition: background 150ms, color 150ms;
+}
+.tab:last-child { border-right: none; }
+.tab:hover { background: var(--card-deep); color: var(--ink-faded); }
+.tabActive {
+  background: var(--card-deep);
+  color: var(--ink);
+  font-weight: 500;
+}
+
+/* ── 面板 ── */
+.panel {
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 100px;
+}
+
+/* ── 模式单选行 ── */
+.modes {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.modeBtn {
+  padding: 3px 12px;
+  font-family: var(--body);
+  font-size: 12px;
+  border: 0.5px solid var(--rule);
+  background: transparent;
+  color: var(--ink-faded);
+  cursor: pointer;
+  border-radius: 2px;
+  transition: background 150ms, color 150ms;
+}
+.modeBtn:hover { background: var(--card-deep); color: var(--ink); }
+.modeBtnActive {
+  background: var(--card-deep);
+  color: var(--ink);
+  font-weight: 500;
+  border-color: var(--ink-ghost);
+}
+
+/* ── 输入控件区 ── */
+.control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-family: var(--body);
+  font-size: 13px;
+  color: var(--ink-faded);
+}
+
+.numInput {
+  width: 56px;
+  padding: 4px 8px;
+  font-family: var(--mono);
+  font-size: 13px;
+  border: 0.5px solid var(--rule);
+  background: var(--card);
+  color: var(--ink);
+  text-align: center;
+  outline: none;
+}
+.numInput:focus { border-color: var(--ink-faded); }
+
+/* 指定：chip 网格 */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.chip {
+  min-width: 28px;
+  padding: 3px 6px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  border: 0.5px solid var(--rule);
+  background: transparent;
+  color: var(--ink-faded);
+  cursor: pointer;
+  border-radius: 2px;
+  text-align: center;
+  transition: background 150ms, color 150ms;
+}
+.chip:hover { background: var(--card-deep); color: var(--ink); }
+.chipActive {
+  background: var(--card-deep);
+  color: var(--ink);
+  border-color: var(--ink-ghost);
+  font-weight: 500;
+}
+
+/* ── 底部预览 ── */
+.footer {
+  border-top: 0.5px solid var(--rule);
+  padding: 10px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.exprRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.expr {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--card-deep);
+  padding: 3px 10px;
+  border-radius: 2px;
+  letter-spacing: 0.05em;
+  flex: 1;
+}
+
+.desc {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--green);
+  letter-spacing: 0.03em;
+}
+.descError { color: var(--red, #c0392b); }
+
+.nextLabel {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--ink-ghost);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.nextTimes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.nextTime {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-faded);
+  background: var(--card-deep);
+  padding: 2px 8px;
+  border-radius: 2px;
+}

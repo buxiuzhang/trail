@@ -1,10 +1,12 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { TaskOut } from '@/types'
-import { usePinTask, useUnpinTask } from '@/api/tasks'
+import { usePinTask, useUnpinTask, useWatchTask, useUnwatchTask } from '@/api/tasks'
 import { useToastContext } from '@/context/ToastContext'
 import { ContentViewer } from '@/components/shared/ContentViewer'
 import { Stamp } from './Stamp'
 import { NatureBadge } from './NatureBadge'
+import { TaskContextMenu } from './TaskContextMenu'
 import styles from './TaskCard.module.css'
 
 interface TaskCardProps {
@@ -90,9 +92,19 @@ export function TaskCard({ task, logCount = 0, logMainCount = 0 }: TaskCardProps
   const navigate = useNavigate()
   const pinTask = usePinTask(task.id)
   const unpinTask = useUnpinTask(task.id)
+  const watchTask = useWatchTask(task.id)
+  const unwatchTask = useUnwatchTask(task.id)
   const { showToast } = useToastContext()
   const catalog = catalogOf(task)
   const pinned = !!task.pinned_at
+  const watched = !!task.watched_at
+
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
+
+  function handleContextMenu(e: React.MouseEvent) {
+    e.preventDefault()
+    setMenu({ x: e.clientX, y: e.clientY })
+  }
 
   // 待办三态计数：来自 task 字段（后端 SQL 聚合），不再 N+1 拉 /todos
   const todoActive = task.todo_active_count
@@ -101,7 +113,6 @@ export function TaskCard({ task, logCount = 0, logMainCount = 0 }: TaskCardProps
 
   async function handlePin(e: React.MouseEvent) {
     e.stopPropagation()
-    // 卡片改双击进入后，pin 区域被双击会触发两次 click；用 e.detail 过滤掉第二次，避免快速切两次
     if (e.detail >= 2) return
     try {
       if (pinned) {
@@ -110,6 +121,20 @@ export function TaskCard({ task, logCount = 0, logMainCount = 0 }: TaskCardProps
       } else {
         await pinTask.mutateAsync(undefined as any)
         showToast('已置顶')
+      }
+    } catch (err: any) {
+      showToast('操作失败：' + err.message)
+    }
+  }
+
+  async function handleWatch() {
+    try {
+      if (watched) {
+        await unwatchTask.mutateAsync(undefined as any)
+        showToast('已取消关注')
+      } else {
+        await watchTask.mutateAsync(undefined as any)
+        showToast('已添加到特别关注')
       }
     } catch (err: any) {
       showToast('操作失败：' + err.message)
@@ -134,91 +159,109 @@ export function TaskCard({ task, logCount = 0, logMainCount = 0 }: TaskCardProps
   const hoursLabel = formatHours(task.total_hours)
 
   return (
-    <div className={styles.cardWrap}>
-      <span
-        className={`${styles.pinBtn} ${pinned ? styles.pinOn : ''}`}
-        role="button"
-        tabIndex={0}
-        onClick={handlePin}
-        onDoubleClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); handlePin(e as any) } }}
-        title={pinned ? '取消置顶' : '置顶到列表首位'}
-      >
-        📌
-      </span>
-      <div
-        className={`${styles.card} ${pinned ? styles.isPinned : ''}`}
-        role="button"
-        tabIndex={0}
-        onDoubleClick={() => navigate(`/task/${task.id}`)}
-        onKeyDown={(e) => {
-          // 键盘可达：Enter / Space 走详情
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault()
-            navigate(`/task/${task.id}`)
-          }
-        }}
-        title="双击进入详情"
-      >
-        {/* 左列：编目号 */}
-        <div className={styles.cat}>
-          <span className={styles.catNo}>
-            CAT. № <strong>{catalog.display}</strong>
-          </span>
-          <span className={styles.catLabel}>
-            {task.nature} · {NATURE_EN[task.nature] || task.nature}
-          </span>
-          <div className={styles.hoursBlock}>
-            <span className={styles.hoursTitle}>任务总工时</span>
-            <span className={styles.hoursValue}>{hoursLabel}</span>
+    <>
+      <div className={styles.cardWrap} onContextMenu={handleContextMenu}>
+        <span
+          className={`${styles.pinBtn} ${pinned ? styles.pinOn : ''}`}
+          role="button"
+          tabIndex={0}
+          onClick={handlePin}
+          onDoubleClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); handlePin(e as any) } }}
+          title={pinned ? '取消置顶' : '置顶到列表首位'}
+        >
+          📌
+        </span>
+        {watched && (
+          <span className={styles.watchBadge} title="特别关注">⭐</span>
+        )}
+        <div
+          className={`${styles.card} ${pinned ? styles.isPinned : ''} ${watched ? styles.isWatched : ''}`}
+          role="button"
+          tabIndex={0}
+          onDoubleClick={() => navigate(`/task/${task.id}`)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              navigate(`/task/${task.id}`)
+            }
+          }}
+          title="双击进入详情，右键菜单"
+        >
+          {/* 左列：编目号 */}
+          <div className={styles.cat}>
+            <span className={styles.catNo}>
+              CAT. № <strong>{catalog.display}</strong>
+            </span>
+            <span className={styles.catLabel}>
+              {task.nature} · {NATURE_EN[task.nature] || task.nature}
+            </span>
+            <div className={styles.hoursBlock}>
+              <span className={styles.hoursTitle}>任务总工时</span>
+              <span className={styles.hoursValue}>{hoursLabel}</span>
+            </div>
+            <div className={styles.todoBlock}>
+              <span className={styles.todoTitle}>待办事项</span>
+              <ul className={styles.todoList}>
+                <li>- 待办 {todoActive}</li>
+                <li>- 已完成 {todoCompleted}</li>
+                <li>- 已废弃 {todoAbandoned}</li>
+              </ul>
+            </div>
           </div>
-          <div className={styles.todoBlock}>
-            <span className={styles.todoTitle}>待办事项</span>
-            <ul className={styles.todoList}>
-              <li>- 待办 {todoActive}</li>
-              <li>- 已完成 {todoCompleted}</li>
-              <li>- 已废弃 {todoAbandoned}</li>
-            </ul>
-          </div>
-        </div>
 
-      {/* 中列：主体 */}
-      <div className={styles.body}>
-        <div className={styles.topline}>
-          <Stamp status={task.status} />
-          <NatureBadge nature={task.nature} />
-        </div>
-        <h3 className={styles.title}>{task.title}</h3>
-        {task.description && (
-          <ContentViewer
-            text={task.description}
-            maxHeight={124}
-            previewClassName={styles.desc}
-          />
-        )}
-        {task.tags.length > 0 && (
-          <div className={styles.tags}>
-            {task.tags.map(t => <span key={t} className="tag">{t}</span>)}
+          {/* 中列：主体 */}
+          <div className={styles.body}>
+            <div className={styles.topline}>
+              <Stamp status={task.status} />
+              <NatureBadge nature={task.nature} />
+            </div>
+            <h3 className={styles.title}>{task.title}</h3>
+            {task.description && (
+              <ContentViewer
+                text={task.description}
+                maxHeight={124}
+                previewClassName={styles.desc}
+              />
+            )}
+            {task.tags.length > 0 && (
+              <div className={styles.tags}>
+                {task.tags.map(t => <span key={t} className="tag">{t}</span>)}
+              </div>
+            )}
           </div>
-        )}
+
+          {/* 右列：旁注 */}
+          <dl className={styles.margin}>
+            <dt>对接</dt>
+            <dd>{contactLabel}</dd>
+            <div className={styles.marginSep} />
+            <dt>开始</dt>
+            <dd>{fmtDatePretty(task.start_date)}</dd>
+            <dt>最近记录</dt>
+            <dd>{fmtDatePretty(task.last_log_date || task.processing_date) || '—'}</dd>
+            <div className={styles.marginSep} />
+            <dt>日志</dt>
+            <dd>{logSummary}</dd>
+            <dt>闲置</dt>
+            <dd>{idleLabel}</dd>
+          </dl>
+        </div>
       </div>
-
-      {/* 右列：旁注 */}
-      <dl className={styles.margin}>
-        <dt>对接</dt>
-        <dd>{contactLabel}</dd>
-        <div className={styles.marginSep} />
-        <dt>开始</dt>
-        <dd>{fmtDatePretty(task.start_date)}</dd>
-        <dt>最近记录</dt>
-        <dd>{fmtDatePretty(task.last_log_date || task.processing_date) || '—'}</dd>
-        <div className={styles.marginSep} />
-        <dt>日志</dt>
-        <dd>{logSummary}</dd>
-        <dt>闲置</dt>
-        <dd>{idleLabel}</dd>
-      </dl>
-    </div>
-  </div>
+      {menu && (
+        <TaskContextMenu
+          x={menu.x}
+          y={menu.y}
+          watched={watched}
+          pinned={pinned}
+          onWatch={handleWatch}
+          onUnwatch={handleWatch}
+          onPin={() => handlePin({ stopPropagation: () => {}, detail: 1 } as any)}
+          onUnpin={() => handlePin({ stopPropagation: () => {}, detail: 1 } as any)}
+          onOpen={() => navigate(`/task/${task.id}`)}
+          onClose={() => setMenu(null)}
+        />
+      )}
+    </>
   )
 }

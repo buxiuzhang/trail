@@ -17,6 +17,7 @@ import { DetailPage } from './pages/DetailPage'
 import { FormPage } from './pages/FormPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { SettingsPage } from './pages/SettingsPage'
+import { useWatchAlerts } from './hooks/useWatchAlerts'
 import { createContext, useContext, useState, type ReactNode } from 'react'
 
 // 设置页面分类状态上下文
@@ -32,10 +33,15 @@ export function useSettingsContext() {
   return ctx
 }
 
+/** 始终挂载，确保 WebSocket 长连接不依赖 ChatWindow 是否打开。 */
+function WatchAlertsMount() {
+  useWatchAlerts()
+  return null
+}
+
 // 布局组件：根据路由决定显示哪个侧边栏
 function AppLayout({ children }: { children: ReactNode }) {
   const location = useLocation()
-  // HashRouter 下 location.pathname 不含 #，直接是路径
   const isSettingsPage = location.pathname === '/settings'
   const [activeSection, setActiveSection] = useState('interface')
 
@@ -62,6 +68,7 @@ export default function App() {
             <ChatProvider>
               <DataDirGate>
                 <div className="grain" aria-hidden="true" />
+                <WatchAlertsMount />
                 <Masthead />
                 <AppLayout>
                   <main className="main">

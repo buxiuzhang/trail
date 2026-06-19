@@ -92,6 +92,20 @@ public class TaskController {
         return ResponseEntity.status(HttpStatus.CREATED).body(withContacts(created));
     }
 
+    @Operation(summary = "获取特别关注列表")
+    @GetMapping("/watched")
+    public List<TaskResponse> listWatched() {
+        List<Map<String, Object>> rows = tasks.listWatched();
+        List<Long> ids = rows.stream().map(r -> ((Number) r.get("id")).longValue()).toList();
+        Map<Long, List<Map<String, Object>>> contactsByTask = contacts.listContactsBulk(ids);
+        return rows.stream().map(r -> {
+            long id = ((Number) r.get("id")).longValue();
+            List<ContactDto> cs = contactsByTask.getOrDefault(id, List.of()).stream()
+                    .map(TaskMapper::contactToDto).toList();
+            return TaskMapper.toResponse(r, cs);
+        }).toList();
+    }
+
     @Operation(summary = "获取任务详情", description = "根据任务 ID 获取任务的完整信息，包括标题、状态、性质、日期、摘要、标签、对接人等。")
     @GetMapping("/{id}")
     public TaskResponse get(
@@ -192,6 +206,18 @@ public class TaskController {
             @Parameter(description = "任务 ID")
             @PathVariable long id) {
         return withContacts(tasks.unpin(id));
+    }
+
+    @Operation(summary = "特别关注任务")
+    @PostMapping("/{id}/watch")
+    public TaskResponse watch(@PathVariable long id) {
+        return withContacts(tasks.watch(id));
+    }
+
+    @Operation(summary = "取消特别关注")
+    @PostMapping("/{id}/unwatch")
+    public TaskResponse unwatch(@PathVariable long id) {
+        return withContacts(tasks.unwatch(id));
     }
 
     // ============================================================

@@ -61,6 +61,7 @@ export interface TaskOut {
   original_title: string | null;
   source: string;
   pinned_at: string | null;
+  watched_at: string | null;
   created_at: string | null;
   updated_at: string | null;
   last_log_date: string | null;  // 派生：未软删日志 max(log_date)

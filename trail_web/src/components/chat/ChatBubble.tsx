@@ -15,7 +15,7 @@ function ChatIcon() {
 }
 
 export function ChatBubble() {
-  const { isOpen, openChat } = useChatContext()
+  const { isOpen, openChat, alertCount } = useChatContext()
 
   if (isOpen) return null
 
@@ -27,6 +27,11 @@ export function ChatBubble() {
       title="工作对话"
     >
       <ChatIcon />
+      {alertCount > 0 && (
+        <span className={styles.badge} aria-label={`${alertCount} 条预警`}>
+          {alertCount > 9 ? '9+' : alertCount}
+        </span>
+      )}
     </button>
   )
 }

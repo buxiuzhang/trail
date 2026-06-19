@@ -204,6 +204,13 @@ public class SqliteDb {
                     log.info("M11 迁移: work_logs.hours 列已添加");
                 }
             }
+            // M13: tasks 表补 watched_at 列
+            if (tableExists("tasks") && !columnExists("tasks", "watched_at")) {
+                try (Statement s = c.createStatement()) {
+                    s.execute("ALTER TABLE tasks ADD COLUMN watched_at TEXT");
+                    log.info("M13 迁移: tasks.watched_at 列已添加");
+                }
+            }
             log.info("ensureSchema 完成");
         } catch (Exception e) {
             throw new RuntimeException("ensureSchema 失败: " + e.getMessage(), e);

@@ -1,86 +1,77 @@
+import { useNavigate } from 'react-router-dom'
+import ReactMarkdown from 'react-markdown'
 import styles from './ChatWindow.module.css'
 
-/** 解析后的文本片段 */
-type TextPart =
-  | { type: 'text'; text: string }
-  | { type: 'link'; text: string; url: string }
-
-/**
- * 将 Markdown 链接语法 `[text](url)` 转为可点击的 <a> 标签
- * 仅支持链接语法，不渲染其他 Markdown 元素
- */
-export function MessageContent({ content }: { content: string }) {
-  const parts = parseLinks(content)
+export function MessageContent({
+  content,
+  onAction,
+}: {
+  content: string
+  onAction?: (action: string) => void
+}) {
+  const navigate = useNavigate()
 
   return (
     <div className={styles.msgContent}>
-      {parts.map((part, i) => {
-        if (part.type === 'text') {
-          return <span key={i}>{part.text}</span>
-        }
-        // 链接
-        const isExternal = part.url.startsWith('http://') || part.url.startsWith('https://')
-        const isApiLink = part.url.startsWith('/api/')
+      <ReactMarkdown
+        components={{
+          // 标题降级为加粗段落（避免聊天窗口出现大标题）
+          h1: ({ children }) => <p><strong>{children}</strong></p>,
+          h2: ({ children }) => <p><strong>{children}</strong></p>,
+          h3: ({ children }) => <p><strong>{children}</strong></p>,
+          h4: ({ children }) => <p><strong>{children}</strong></p>,
+          h5: ({ children }) => <p><strong>{children}</strong></p>,
+          h6: ({ children }) => <p><strong>{children}</strong></p>,
+          // 链接路由分发
+          a: ({ href, children }) => {
+            if (!href) return <span>{children}</span>
 
-        // 安全校验：只允许内部 /api/ 链接和外部 https/http 链接
-        if (!isExternal && !isApiLink) {
-          return <span key={i}>{part.text}</span>
-        }
+            if (href.startsWith('action:')) {
+              return (
+                <button className={styles.actionLink} onClick={() => onAction?.(href.slice(7))}>
+                  {children}
+                </button>
+              )
+            }
 
-        return (
-          <a
-            key={i}
-            href={part.url}
-            className={styles.link}
-            target={isExternal ? '_blank' : undefined}
-            rel={isExternal ? 'noopener noreferrer' : undefined}
-          >
-            {part.text}
-          </a>
-        )
-      })}
+            if (href.startsWith('/task/')) {
+              return (
+                <button className={styles.actionLink} onClick={() => navigate(href)}>
+                  {children}
+                </button>
+              )
+            }
+
+            const normalized = href.startsWith('api/') ? '/' + href : href
+            if (normalized.startsWith('/api/')) {
+              return (
+                <a href={normalized} className={styles.link} target="_blank" rel="noopener noreferrer" download>
+                  {children}
+                </a>
+              )
+            }
+
+            return (
+              <a href={href} className={styles.link} target="_blank" rel="noopener noreferrer">
+                {children}
+              </a>
+            )
+          },
+          p:     ({ children }) => <p style={{ margin: '3px 0' }}>{children}</p>,
+          ul:    ({ children }) => <ul style={{ paddingLeft: 18, margin: '3px 0' }}>{children}</ul>,
+          ol:    ({ children }) => <ol style={{ paddingLeft: 18, margin: '3px 0' }}>{children}</ol>,
+          li:    ({ children }) => <li style={{ margin: '2px 0' }}>{children}</li>,
+          code:  ({ children, className }) =>
+            className
+              ? <pre style={{ background: 'var(--card-deep)', padding: '6px 10px', borderRadius: 2, overflowX: 'auto', fontSize: 12, margin: '4px 0' }}><code>{children}</code></pre>
+              : <code style={{ background: 'var(--card-deep)', padding: '1px 5px', borderRadius: 2, fontSize: '0.9em' }}>{children}</code>,
+          table: ({ children }) => <table style={{ borderCollapse: 'collapse', fontSize: 13, margin: '4px 0', width: '100%' }}>{children}</table>,
+          th:    ({ children }) => <th style={{ border: '0.5px solid var(--rule)', padding: '4px 8px', textAlign: 'left', background: 'var(--card-deep)' }}>{children}</th>,
+          td:    ({ children }) => <td style={{ border: '0.5px solid var(--rule)', padding: '4px 8px' }}>{children}</td>,
+        }}
+      >
+        {content}
+      </ReactMarkdown>
     </div>
   )
-}
-
-/**
- * 解析文本中的 Markdown 链接
- * 匹配模式：[显示文本](URL)
- */
-function parseLinks(text: string): TextPart[] {
-  // 正则：\[([^\]]+)\]\(([^)]+)\)
-  // 匹配 [文本](URL)，文本不能含 ]，URL 不能含 )
-  const LINK_REGEX = /\[([^\]]+)\]\(([^)]+)\)/g
-
-  const parts: TextPart[] = []
-  let lastIndex = 0
-  let match: RegExpExecArray | null
-
-  while ((match = LINK_REGEX.exec(text)) !== null) {
-    // 链接前的普通文本
-    if (match.index > lastIndex) {
-      parts.push({ type: 'text', text: text.slice(lastIndex, match.index) })
-    }
-
-    // 链接
-    parts.push({
-      type: 'link',
-      text: match[1],
-      url: match[2],
-    })
-
-    lastIndex = match.index + match[0].length
-  }
-
-  // 剩余的普通文本
-  if (lastIndex < text.length) {
-    parts.push({ type: 'text', text: text.slice(lastIndex) })
-  }
-
-  // 如果没有链接，返回原文本
-  if (parts.length === 0) {
-    return [{ type: 'text', text }]
-  }
-
-  return parts
 }
