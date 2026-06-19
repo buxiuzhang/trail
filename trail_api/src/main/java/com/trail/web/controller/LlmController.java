@@ -48,6 +48,17 @@ public class LlmController {
         return new LlmPolishResponse(polished, false);
     }
 
+    @Operation(summary = "生成日志草稿", description = "根据粗糙描述和任务上下文生成工作日志草稿")
+    @PostMapping("/tasks/{taskId}/logs/draft")
+    public LlmPolishResponse draftLog(
+            @PathVariable Long taskId,
+            @RequestBody java.util.Map<String, String> body) {
+        String hint = body.getOrDefault("hint", "");
+        if (hint.isBlank()) throw new IllegalArgumentException("hint 不能为空");
+        String draft = llmService.draftLog(taskId, hint);
+        return new LlmPolishResponse(draft, false);
+    }
+
     @Operation(summary = "主体阶段总结", description = "总结任务主体阶段的工作内容")
     @PostMapping("/tasks/{taskId}/summarize")
     public LlmSummarizeResponse summarizeMain(@PathVariable Long taskId) {

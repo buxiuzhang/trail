@@ -38,3 +38,10 @@ export function useAskMaintenance(taskId: number) {
     mutationFn: () => api.post<AskMaintenanceOut>(`/api/tasks/${taskId}/ask-maintenance`, {}),
   })
 }
+
+export function useDraftLog(taskId: number) {
+  return useMutation({
+    mutationFn: (hint: string) =>
+      api.post<PolishOut>(`/api/tasks/${taskId}/logs/draft`, { hint }),
+  })
+}

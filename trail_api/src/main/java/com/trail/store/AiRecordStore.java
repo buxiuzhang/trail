@@ -10,7 +10,7 @@ import java.util.Set;
 @Component
 public class AiRecordStore {
 
-    public static final Set<String> OPS = Set.of("polish", "summarize", "ask_maintenance", "chat", "chat_tool_use");
+    public static final Set<String> OPS = Set.of("polish", "summarize", "ask_maintenance", "chat", "chat_tool_use", "draft_log");
 
     private final SqliteDb db;
 

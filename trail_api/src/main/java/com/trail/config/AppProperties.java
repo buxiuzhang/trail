@@ -54,6 +54,7 @@ public record AppProperties(
             String placeholderTodoNote,
             String polishSystemPrompt,
             String polishTodoSystemPrompt,
+            String draftLogSystemPrompt,
             String summarizeSystemPrompt,
             String summarizeMaintenancePrompt,
             String askMaintenancePrompt,

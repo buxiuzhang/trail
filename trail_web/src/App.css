@@ -757,3 +757,29 @@ body::before {
 .log-highlight {
   animation: logHighlightPulse 1.6s ease forwards;
 }
+
+/* 通用 tooltip：给任意元素加 data-tooltip="文字" 即可 */
+[data-tooltip] {
+  position: relative;
+}
+[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  color: var(--paper);
+  background: var(--ink-soft);
+  padding: 3px 8px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 120ms ease;
+  z-index: 100;
+}
+[data-tooltip]:hover::after {
+  opacity: 1;
+}
