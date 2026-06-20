@@ -42,6 +42,8 @@ public class StartupChecks {
             LogSetup.configureFileAppender(dataDir.currentDataDir().resolve("logs"));
             keys.ensureInitialized();
             importer.migrateIfPresent();
+            db.compressAiRecords();   // M16: 存量 ai_records 压缩迁移（已压缩则跳过）
+            db.pruneAiRecords(30);    // 清理 30 天前的 ai_records
             log.info("启动就绪：dataDir={}", dataDir.currentDataDir());
         } else {
             log.warn("未配置数据目录。HTTP 已起，/api/*（health + data-dir 探测除外）返 503 NEEDS_DATA_DIR。");

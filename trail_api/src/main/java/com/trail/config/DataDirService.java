@@ -76,7 +76,18 @@ public class DataDirService {
                 log.warn("user config 读取失败: {}", e.getMessage());
             }
         }
-        log.warn("未配置数据目录（env / user config 都无）。所有 /api/*（health + data-dir 探测除外）将返 503 NEEDS_DATA_DIR");
+        // 首次启动：自动初始化默认数据目录，写入 user config
+        Path defaultDir = PathUtils.defaultDataDir();
+        log.info("首次启动，自动初始化默认数据目录: {}", defaultDir);
+        try {
+            Files.createDirectories(defaultDir);
+            writeUserConfig(defaultDir);
+            log.info("已生成默认配置文件: {}", userConfigPath);
+        } catch (IOException e) {
+            log.warn("自动初始化默认数据目录失败: {}，请手动配置", e.getMessage());
+            return;
+        }
+        applyDataDir(defaultDir, false);
     }
 
     /** 检查是否已配置；未配置抛 DataDirNotConfiguredException（给 GlobalExceptionHandler 转 503） */

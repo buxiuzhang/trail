@@ -1,5 +1,6 @@
 server:
   port: 8765
+  address: 127.0.0.1
   error:
     include-message: always
 
@@ -74,6 +75,18 @@ trail:
     auth-type: "bearer"
     # speech-duration: 语音输入最大时长（秒），用于前端录音限制
     speech-duration: "10"
+    # 待办事项超期预警
+    todo-idle-warn-days: "7"
+    todo-cron: "0 9,14 * * 1-5"
+    # 推送消息模板（支持占位符）
+    watch-alert-template: |
+      **${task_title}** 特别关注预警：
+
+      该任务已 **${idle_days} 天**未记录日志，请关注进展。
+    todo-alert-template: |
+      **${task_title}** 待办事项超期提醒：
+
+      你有一条关于 **${todo_title}** 的待办超期提醒：该待办已创建 **${idle_days} 天**，尚未完成，请关注进展。
 
     # 座右铭：显示在应用主页，可自定义
     motto: |

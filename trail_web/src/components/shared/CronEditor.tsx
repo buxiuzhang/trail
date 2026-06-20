@@ -172,21 +172,32 @@ export function CronEditor({ value, onChange }: { value: string; onChange: (v: s
 
   // 当外部 value 变化时（如 settings 异步加载完）同步内部 states
   const prevValue = useRef('')
+  const prevExpr = useRef('')
   useEffect(() => {
     if (value === prevValue.current) return
     prevValue.current = value
     const p = parseStates(value)
-    if (p) setStates(p)
+    if (p) {
+      setStates(p)
+      prevExpr.current = buildExpr(p)
+    }
   }, [value])
 
   // 同步到父组件
   const update = (key: string, patch: Partial<FieldState>) => {
     setStates(prev => {
       const next = { ...prev, [key]: { ...prev[key], ...patch } }
-      onChange(buildExpr(next))
       return next
     })
   }
+
+  // expr 变化时同步到父组件（在 effect 里调用，避免在 render/setState 期间触发父组件更新）
+  useEffect(() => {
+    if (expr === prevExpr.current) return
+    prevExpr.current = expr
+    prevValue.current = expr  // 标记为"已知"，防止父组件回传时触发重新解析
+    onChange(expr)
+  }, [expr, onChange])
 
   const field = FIELDS.find(f => f.key === activeTab)!
   const state = states[activeTab]
@@ -195,7 +206,7 @@ export function CronEditor({ value, onChange }: { value: string; onChange: (v: s
     { key: 'every',    label: '每' },
     { key: 'specific', label: '指定' },
     { key: 'range',    label: '范围' },
-    { key: 'step',     label: '步进' },
+    { key: 'step',     label: '步长' },
   ]
 
   function toggleSpecific(v: number) {

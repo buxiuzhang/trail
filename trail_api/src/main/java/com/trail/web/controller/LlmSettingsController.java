@@ -11,6 +11,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
+import com.trail.web.ws.TodoAlertScheduler;
+
 @RestController
 @RequestMapping("/api/settings/llm")
 @Tag(name = "LLM 配置", description = "大模型 API Key、模型、Prompt 模板等配置")
@@ -20,13 +22,16 @@ public class LlmSettingsController {
     private final LlmService llmService;
     private final RsaKeyService rsaKeyService;
     private final WatchAlertScheduler watchAlertScheduler;
+    private final TodoAlertScheduler todoAlertScheduler;
 
     public LlmSettingsController(LLMSettingsStore store, LlmService llmService,
-                                 RsaKeyService rsaKeyService, WatchAlertScheduler watchAlertScheduler) {
+                                 RsaKeyService rsaKeyService, WatchAlertScheduler watchAlertScheduler,
+                                 TodoAlertScheduler todoAlertScheduler) {
         this.store = store;
         this.llmService = llmService;
         this.rsaKeyService = rsaKeyService;
         this.watchAlertScheduler = watchAlertScheduler;
+        this.todoAlertScheduler = todoAlertScheduler;
     }
 
     @Operation(summary = "获取 LLM 配置", description = "获取 API Key（遮蔽）、模型、Prompt 模板等配置")
@@ -57,7 +62,11 @@ public class LlmSettingsController {
                 all.getOrDefault("watch_idle_hot_days", "3"),
                 all.getOrDefault("watch_idle_warn_days", "14"),
                 all.getOrDefault("watch_snooze_minutes", "30"),
-                all.getOrDefault("watch_cron", "0 9,14 * * 1-5")
+                all.getOrDefault("watch_cron", "0 9,14 * * 1-5"),
+                all.getOrDefault("todo_idle_warn_days", "7"),
+                all.getOrDefault("todo_cron", "0 9,14 * * 1-5"),
+                all.getOrDefault("watch_alert_template", ""),
+                all.getOrDefault("todo_alert_template", "")
         );
     }
 
@@ -99,9 +108,14 @@ public class LlmSettingsController {
         saveIfPresent(data, "watch_idle_warn_days");
         saveIfPresent(data, "watch_snooze_minutes");
         saveIfPresent(data, "watch_cron");
+        saveIfPresent(data, "todo_idle_warn_days");
+        saveIfPresent(data, "todo_cron");
+        saveIfPresent(data, "watch_alert_template");
+        saveIfPresent(data, "todo_alert_template");
 
         llmService.refreshPrompts();
         watchAlertScheduler.reschedule();
+        todoAlertScheduler.reschedule();
         return Map.of("ok", true);
     }
 

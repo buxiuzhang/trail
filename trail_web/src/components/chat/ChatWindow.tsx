@@ -96,6 +96,13 @@ export function ChatWindow() {
     scrollToBottom()
   }, [messages, scrollToBottom])
 
+  useEffect(() => {
+    if (isOpen) {
+      const id = setTimeout(scrollToBottom, 50)
+      return () => clearTimeout(id)
+    }
+  }, [isOpen, scrollToBottom])
+
   // 启动打字机（如未启动）；取一个字符追加到 DOM。
   const pump = useCallback(() => {
     const q = queueRef.current

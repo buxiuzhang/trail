@@ -29,7 +29,7 @@ export function ChatBubble() {
       <ChatIcon />
       {alertCount > 0 && (
         <span className={styles.badge} aria-label={`${alertCount} 条预警`}>
-          {alertCount > 9 ? '9+' : alertCount}
+          {alertCount > 99 ? '99+' : alertCount}
         </span>
       )}
     </button>

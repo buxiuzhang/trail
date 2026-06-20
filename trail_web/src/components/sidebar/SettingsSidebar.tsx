@@ -26,7 +26,8 @@ const LLM_SUB = [
 ]
 
 const INTERFACE_SUB = [
-  { id: 'interface-watch', label: '特别关注' },
+  { id: 'interface-watch', label: '特别关注推送配置' },
+  { id: 'interface-todo-alert', label: '待办事项推送配置' },
 ]
 
 export function SettingsSidebar({ activeSection, onSectionChange }: SettingsSidebarProps) {

@@ -40,3 +40,4 @@ CLAUDE.md
 e2e/
 playwright.config.ts
 test-results/
+build.zip

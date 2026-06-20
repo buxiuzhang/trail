@@ -24,6 +24,12 @@ export interface LLMSettings {
   watch_idle_warn_days: string
   watch_snooze_minutes: string
   watch_cron: string             // cron 表达式，默认工作日 9 点和 14 点
+  // 待办事项超期预警
+  todo_idle_warn_days: string
+  todo_cron: string
+  // 推送消息模板
+  watch_alert_template: string
+  todo_alert_template: string
   // 日报/周报模板
   daily_report_template: string
   weekly_report_template: string
@@ -76,6 +82,13 @@ export const DEFAULT_WATCH_SETTINGS = {
   watch_idle_warn_days: 14,
   watch_snooze_minutes: 30,
   watch_cron: '0 9,14 * * 1-5',
+  watch_alert_template: '**${task_title}** 特别关注预警：\n\n该任务已 **${idle_days} 天**未记录日志，请关注进展。',
+}
+
+export const DEFAULT_TODO_SETTINGS = {
+  todo_idle_warn_days: 7,
+  todo_cron: '0 9,14 * * 1-5',
+  todo_alert_template: '**${task_title}** 待办事项超期提醒：\n\n你有一条关于 **${todo_title}** 的待办超期提醒：该待办已创建 **${idle_days} 天**，尚未完成，请关注进展。',
 }
 
 /** 特别关注阈值：从 LLM 设置中取，返回数字；未配置时回退到默认值。 */

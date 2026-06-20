@@ -1,12 +1,13 @@
 import { useEffect } from 'react'
 import { useChatContext } from '@/context/ChatContext'
 
-interface WatchAlertPayload {
-  type: 'watch_alert'
+interface AlertPayload {
+  type: 'watch_alert' | 'todo_alert'
   taskId: number
   title: string
   idleDays: number
   taskPath: string
+  message: string
 }
 
 const STORAGE_KEY = 'trail_watch_alerts'
@@ -17,7 +18,7 @@ function loadState(): { ignored: Record<number, string> } {
 }
 
 function saveState(s: { ignored: Record<number, string> }) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(s))
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)) } catch { /* storage blocked */ }
 }
 
 function todayStr() {
@@ -25,43 +26,39 @@ function todayStr() {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
 }
 
-function isSuppressed(taskId: number): boolean {
+function isSuppressed(id: number): boolean {
   const state = loadState()
-  return state.ignored?.[taskId] === todayStr()
-}
-
-function buildAlertMessage(p: WatchAlertPayload): string {
-  return `**${p.title}** 特别关注预警：\n\n该任务已 **${p.idleDays} 天**未记录日志，请关注进展。\n\n[查看任务详情](${p.taskPath})　　[今日忽略](action:ignore:${p.taskId})`
+  return state.ignored?.[id] === todayStr()
 }
 
 // ── 模块级单例：脱离 React 生命周期 ──
 type AlertCallback = (content: string) => void
 let es: EventSource | null = null
 let callback: AlertCallback | null = null
-const recentAlerts = new Map<number, number>() // taskId → last shown timestamp
+const recentAlerts = new Map<number, number>()
 const DEDUP_MS = 10_000
+
+function handleEvent(event: MessageEvent) {
+  let payload: AlertPayload
+  try { payload = JSON.parse(event.data) } catch { return }
+  if (isSuppressed(payload.taskId)) return
+
+  const now = Date.now()
+  const last = recentAlerts.get(payload.taskId) ?? 0
+  if (now - last < DEDUP_MS) return
+  recentAlerts.set(payload.taskId, now)
+
+  callback?.(payload.message)
+}
 
 function startSse() {
   if (es && es.readyState !== EventSource.CLOSED) return
   es = new EventSource('/api/watch-alerts/stream')
-
-  es.addEventListener('watch_alert', (event: MessageEvent) => {
-    let payload: WatchAlertPayload
-    try { payload = JSON.parse(event.data) } catch { return }
-    if (isSuppressed(payload.taskId)) return
-
-    const now = Date.now()
-    const last = recentAlerts.get(payload.taskId) ?? 0
-    if (now - last < DEDUP_MS) return
-    recentAlerts.set(payload.taskId, now)
-
-    callback?.(buildAlertMessage(payload))
-  })
-
+  es.addEventListener('watch_alert', handleEvent)
+  es.addEventListener('todo_alert', handleEvent)
   es.onerror = () => {
     es?.close()
     es = null
-    // 浏览器会自动重连 EventSource，这里 30s 后手动重建避免频繁重试
     setTimeout(startSse, 30_000)
   }
 }
@@ -69,7 +66,6 @@ function startSse() {
 
 export function useWatchAlerts() {
   const { pushAlert } = useChatContext()
-
   useEffect(() => {
     callback = pushAlert
     startSse()

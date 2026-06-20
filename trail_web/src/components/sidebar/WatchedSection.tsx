@@ -14,6 +14,15 @@ export function WatchedSection() {
 
   if (tasks.length === 0) return null
 
+  const getIdle = (task: import('@/types').TaskOut) => {
+    const lastDate = task.last_log_date || task.processing_date || task.start_date
+    if (!lastDate) return -1
+    const [y, m, d] = lastDate.split('-').map(Number)
+    return Math.floor((Date.now() - new Date(y, m - 1, d).getTime()) / 86400000)
+  }
+
+  const sorted = [...tasks].sort((a, b) => getIdle(b) - getIdle(a))
+
   return (
     <section className={filterStyles.block}>
       <h2 className={filterStyles.title}>
@@ -33,7 +42,7 @@ export function WatchedSection() {
         className={`${filterStyles.list} ${expanded ? '' : filterStyles.listCollapsed}`}
         role="list"
       >
-        {tasks.map(task => (
+        {sorted.map(task => (
           <li
             key={task.id}
             className={styles.item}

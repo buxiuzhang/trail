@@ -52,6 +52,10 @@ public class DefaultSettingsInitializer {
         putIfPresent(defaults, "min_tokens", d.minTokens());
         putIfPresent(defaults, "auth_type", d.authType());
         putIfPresent(defaults, "speech_duration", d.speechDuration());
+        putIfPresent(defaults, "todo_idle_warn_days", d.todoIdleWarnDays());
+        putIfPresent(defaults, "todo_cron", d.todoCron());
+        putIfPresent(defaults, "watch_alert_template", d.watchAlertTemplate());
+        putIfPresent(defaults, "todo_alert_template", d.todoAlertTemplate());
         // 座右铭
         putIfPresent(defaults, "motto", d.motto());
         // Placeholder 占位符

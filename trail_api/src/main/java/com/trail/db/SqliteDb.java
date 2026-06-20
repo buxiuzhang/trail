@@ -67,6 +67,10 @@ public class SqliteDb {
                     log.warn("PRAGMA journal_mode=WAL 失败，退化: {}", ex.getMessage());
                 }
                 s.execute("PRAGMA synchronous=NORMAL");
+                s.execute("PRAGMA cache_size=-64000");
+                s.execute("PRAGMA temp_store=MEMORY");
+                s.execute("PRAGMA mmap_size=268435456");
+                s.execute("PRAGMA auto_vacuum=INCREMENTAL");
             }
             log.info("SQLite 打开: {}", dbFile);
         } catch (SQLException | java.io.IOException e) {
@@ -183,11 +187,17 @@ public class SqliteDb {
         Connection c = requireConn();
         try {
             String ddl = readClasspath("db/ddl.sql");
-            try (Statement s = c.createStatement()) {
-                for (String stmt : splitSql(ddl)) {
-                    String t = stmt.trim();
-                    if (t.isEmpty()) continue;
+            for (String stmt : splitSql(ddl)) {
+                String t = stmt.trim();
+                if (t.isEmpty()) continue;
+                try (Statement s = c.createStatement()) {
                     s.execute(t);
+                } catch (SQLException ex) {
+                    // CREATE VIRTUAL TABLE IF NOT EXISTS 在表已存在时 sqlite-jdbc 有时抛此异常，可忽略
+                    if (!ex.getMessage().contains("already exists") &&
+                        !ex.getMessage().contains("finalized")) {
+                        throw ex;
+                    }
                 }
             }
             // M10+: 已有 attachments 表补 display_size 列(IF NOT EXISTS 不支持 ALTER,这里容错)
@@ -211,15 +221,113 @@ public class SqliteDb {
                     log.info("M13 迁移: tasks.watched_at 列已添加");
                 }
             }
+            // M15: FTS5 tokenizer 升级 unicode61 → trigram（支持中文子串搜索）
+            if (tableExists("fts_tasks")) {
+                boolean isTrigram = false;
+                try (Statement s = c.createStatement();
+                     ResultSet rs = s.executeQuery(
+                         "SELECT sql FROM sqlite_master WHERE type='table' AND name='fts_tasks'")) {
+                    if (rs.next()) {
+                        String sql = rs.getString(1);
+                        isTrigram = sql != null && sql.contains("trigram");
+                    }
+                }
+                if (!isTrigram) {
+                    try (Statement s = c.createStatement()) {
+                        s.execute("DROP TRIGGER IF EXISTS fts_tasks_ai");
+                        s.execute("DROP TRIGGER IF EXISTS fts_tasks_ad");
+                        s.execute("DROP TRIGGER IF EXISTS fts_tasks_au");
+                        s.execute("DROP TRIGGER IF EXISTS fts_logs_ai");
+                        s.execute("DROP TRIGGER IF EXISTS fts_logs_ad");
+                        s.execute("DROP TRIGGER IF EXISTS fts_logs_au");
+                        s.execute("DROP TABLE IF EXISTS fts_tasks");
+                        s.execute("DROP TABLE IF EXISTS fts_logs");
+                        s.execute("CREATE VIRTUAL TABLE fts_tasks USING fts5(title, description, content='tasks', content_rowid='id', tokenize='trigram')");
+                        s.execute("CREATE VIRTUAL TABLE fts_logs USING fts5(content, polished_content, content='work_logs', content_rowid='id', tokenize='trigram')");
+                        s.execute("INSERT INTO fts_tasks(rowid, title, description) SELECT id, title, description FROM tasks");
+                        s.execute("INSERT INTO fts_logs(rowid, content, polished_content) SELECT id, content, polished_content FROM work_logs WHERE is_deleted = 0");
+                    }
+                    log.info("M15 迁移: FTS5 tokenizer 升级为 trigram，索引已重建");
+                }
+            }
+            // FTS5 同步触发器（含 BEGIN...END，不走 splitSql 以免被 ; 切断）
+            try (Statement s = c.createStatement()) {
+                s.execute("CREATE TRIGGER IF NOT EXISTS fts_tasks_ai AFTER INSERT ON tasks BEGIN INSERT INTO fts_tasks(rowid, title, description) VALUES (new.id, new.title, new.description); END");
+                s.execute("CREATE TRIGGER IF NOT EXISTS fts_tasks_ad AFTER DELETE ON tasks BEGIN INSERT INTO fts_tasks(fts_tasks, rowid, title, description) VALUES ('delete', old.id, old.title, old.description); END");
+                s.execute("CREATE TRIGGER IF NOT EXISTS fts_tasks_au AFTER UPDATE ON tasks BEGIN INSERT INTO fts_tasks(fts_tasks, rowid, title, description) VALUES ('delete', old.id, old.title, old.description); INSERT INTO fts_tasks(rowid, title, description) VALUES (new.id, new.title, new.description); END");
+                s.execute("CREATE TRIGGER IF NOT EXISTS fts_logs_ai AFTER INSERT ON work_logs BEGIN INSERT INTO fts_logs(rowid, content, polished_content) VALUES (new.id, new.content, new.polished_content); END");
+                s.execute("CREATE TRIGGER IF NOT EXISTS fts_logs_ad AFTER DELETE ON work_logs BEGIN INSERT INTO fts_logs(fts_logs, rowid, content, polished_content) VALUES ('delete', old.id, old.content, old.polished_content); END");
+                s.execute("CREATE TRIGGER IF NOT EXISTS fts_logs_au AFTER UPDATE ON work_logs BEGIN INSERT INTO fts_logs(fts_logs, rowid, content, polished_content) VALUES ('delete', old.id, old.content, old.polished_content); INSERT INTO fts_logs(rowid, content, polished_content) VALUES (new.id, new.content, new.polished_content); END");
+            }
+            // M14: FTS5 全文索引回填（虚拟表首次创建后，历史数据一次性导入）
+            if (tableExists("fts_tasks")) {
+                List<Map<String, Object>> ftsCount = query("SELECT COUNT(*) AS n FROM fts_tasks");
+                List<Map<String, Object>> taskCount = query("SELECT COUNT(*) AS n FROM tasks");
+                long ftsRows  = ftsCount.isEmpty()  ? 0 : ((Number) ftsCount.get(0).get("n")).longValue();
+                long taskRows = taskCount.isEmpty() ? 0 : ((Number) taskCount.get(0).get("n")).longValue();
+                if (ftsRows == 0 && taskRows > 0) {
+                    try (Statement s = c.createStatement()) {
+                        s.execute("INSERT INTO fts_tasks(rowid, title, description) SELECT id, title, description FROM tasks");
+                        s.execute("INSERT INTO fts_logs(rowid, content, polished_content) SELECT id, content, polished_content FROM work_logs WHERE is_deleted = 0");
+                    }
+                    log.info("M14 迁移: FTS5 索引回填完成（tasks={}, 触发 work_logs 同步）", taskRows);
+                }
+            }
             log.info("ensureSchema 完成");
         } catch (Exception e) {
             throw new RuntimeException("ensureSchema 失败: " + e.getMessage(), e);
         }
     }
 
-    // ============================================================
-    // 元数据查询（SQLite 用 sqlite_master / pragma table_info）
-    // ============================================================
+    /**
+     * M16: ai_records 存量 TEXT 数据压缩迁移。
+     * typeof(prompt) = 'text' 表示未压缩，逐行读出 → GZIP 压缩 → 写回。
+     */
+    public void compressAiRecords() {
+        List<Map<String, Object>> rows = query(
+            "SELECT id, prompt, response FROM ai_records WHERE typeof(prompt) = 'text' OR typeof(response) = 'text'");
+        if (rows.isEmpty()) return;
+        writeLock.lock();
+        try {
+            conn.setAutoCommit(false);
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "UPDATE ai_records SET prompt = ?, response = ? WHERE id = ?")) {
+                for (Map<String, Object> row : rows) {
+                    Object rawPrompt   = row.get("prompt");
+                    Object rawResponse = row.get("response");
+                    byte[] p = rawPrompt   instanceof String s ? com.trail.store.AiRecordStore.compress(s) : (byte[]) rawPrompt;
+                    byte[] r = rawResponse instanceof String s ? com.trail.store.AiRecordStore.compress(s) : (byte[]) rawResponse;
+                    ps.setBytes(1, p);
+                    ps.setBytes(2, r);
+                    ps.setLong(3, ((Number) row.get("id")).longValue());
+                    ps.addBatch();
+                }
+                ps.executeBatch();
+                conn.commit();
+            } catch (Exception e) {
+                conn.rollback();
+                throw e;
+            } finally {
+                conn.setAutoCommit(true);
+            }
+            log.info("M16 迁移: ai_records 存量数据压缩完成，共 {} 条", rows.size());
+        } catch (Exception e) {
+            throw new RuntimeException("M16 压缩迁移失败: " + e.getMessage(), e);
+        } finally {
+            writeLock.unlock();
+        }
+    }
+
+    /** 删除 retentionDays 天前的 ai_records。 */
+    public int pruneAiRecords(int retentionDays) {
+        int deleted = update(
+            "DELETE FROM ai_records WHERE created_at < datetime('now', ? || ' days')",
+            "-" + retentionDays);
+        if (deleted > 0) log.info("pruneAiRecords: 已清理 {} 条超过 {} 天的 ai_records", deleted, retentionDays);
+        return deleted;
+    }
+
+
 
     public boolean tableExists(String table) {
         List<Map<String, Object>> rows = query(

@@ -14,6 +14,7 @@ export function MessageContent({
   return (
     <div className={styles.msgContent}>
       <ReactMarkdown
+        urlTransform={(url) => url}
         components={{
           // 标题降级为加粗段落（避免聊天窗口出现大标题）
           h1: ({ children }) => <p><strong>{children}</strong></p>,

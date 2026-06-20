@@ -25,19 +25,20 @@ interface PublicKeyResponse {
  * 获取公钥（优先从 localStorage 缓存，有效期 24 小时）
  */
 export async function getPublicKey(): Promise<string> {
-  const cached = localStorage.getItem(PUBLIC_KEY_CACHE_KEY)
-
-  if (cached) {
-    try {
-      const data: PublicKeyCache = JSON.parse(cached)
-      if (Date.now() < data.expiresAt) {
-        return data.publicKey
+  try {
+    const cached = localStorage.getItem(PUBLIC_KEY_CACHE_KEY)
+    if (cached) {
+      try {
+        const data: PublicKeyCache = JSON.parse(cached)
+        if (Date.now() < data.expiresAt) {
+          return data.publicKey
+        }
+        localStorage.removeItem(PUBLIC_KEY_CACHE_KEY)
+      } catch {
+        localStorage.removeItem(PUBLIC_KEY_CACHE_KEY)
       }
-      localStorage.removeItem(PUBLIC_KEY_CACHE_KEY)
-    } catch {
-      localStorage.removeItem(PUBLIC_KEY_CACHE_KEY)
     }
-  }
+  } catch { /* storage blocked — skip cache */ }
 
   const response = await fetch('/api/crypto/public-key')
   if (!response.ok) {
@@ -45,10 +46,12 @@ export async function getPublicKey(): Promise<string> {
   }
   const { publicKey, expiresAt }: PublicKeyResponse = await response.json()
 
-  localStorage.setItem(PUBLIC_KEY_CACHE_KEY, JSON.stringify({
-    publicKey,
-    expiresAt: new Date(expiresAt).getTime()
-  }))
+  try {
+    localStorage.setItem(PUBLIC_KEY_CACHE_KEY, JSON.stringify({
+      publicKey,
+      expiresAt: new Date(expiresAt).getTime()
+    }))
+  } catch { /* storage blocked — operate without cache */ }
 
   return publicKey
 }
@@ -268,5 +271,5 @@ function removePKCS1v15Padding(bytes: Uint8Array): string {
  * 清除公钥缓存
  */
 export function clearPublicKeyCache(): void {
-  localStorage.removeItem(PUBLIC_KEY_CACHE_KEY)
+  try { localStorage.removeItem(PUBLIC_KEY_CACHE_KEY) } catch { /* storage blocked */ }
 }

@@ -127,6 +127,30 @@ CREATE TABLE IF NOT EXISTS log_todo_refs (
 CREATE INDEX IF NOT EXISTS idx_log_todo_refs_log  ON log_todo_refs(log_id);
 CREATE INDEX IF NOT EXISTS idx_log_todo_refs_todo ON log_todo_refs(todo_id);
 
+-- 列表页最常用过滤+排序组合（status/nature 过滤 + start_date 排序）
+CREATE INDEX IF NOT EXISTS idx_tasks_status_nature_date ON tasks(status, nature, start_date DESC);
+
+-- FTS5 全文索引（content= 模式：不重复存储，主表是权威数据源）
+CREATE VIRTUAL TABLE IF NOT EXISTS fts_tasks USING fts5(
+    title,
+    description,
+    content='tasks',
+    content_rowid='id',
+    tokenize='trigram'
+);
+
+CREATE VIRTUAL TABLE IF NOT EXISTS fts_logs USING fts5(
+    content,
+    polished_content,
+    content='work_logs',
+    content_rowid='id',
+    tokenize='trigram'
+);
+
+-- 注意：fts_tasks / fts_logs 的 6 个同步触发器（INSERT/UPDATE/DELETE）
+-- 在 SqliteDb.ensureSchema() 中以 Statement.execute() 直接创建，
+-- 原因：触发器体含多条 SQL（BEGIN...END），ddl.sql 的分号分割逻辑会截断，无法在此定义。
+
 -- 3) 1 个视图
 --    DuckDB 版用 CURRENT_DATE - log_date → SQLite 用 julianday('now') - julianday(log_date)
 CREATE VIEW IF NOT EXISTS v_stale_tasks AS

@@ -5,6 +5,7 @@ import {
   useDataDir, useSaveDataDir,
   usePlaceholders, useSavePlaceholders, DEFAULT_PLACEHOLDERS,
   DEFAULT_WATCH_SETTINGS,
+  DEFAULT_TODO_SETTINGS,
 } from '@/api/settings'
 import { rsaDecrypt } from '@/api/crypto'
 import { useToastContext } from '@/context/ToastContext'
@@ -85,6 +86,8 @@ export function SettingsPage() {
   // 日报/周报模板编辑器模式
   const [dailyReportTemplateMode, setDailyReportTemplateMode] = useState<EditorMode>('preview')
   const [weeklyReportTemplateMode, setWeeklyReportTemplateMode] = useState<EditorMode>('preview')
+  const [watchAlertTemplateMode, setWatchAlertTemplateMode] = useState<EditorMode>('preview')
+  const [todoAlertTemplateMode, setTodoAlertTemplateMode] = useState<EditorMode>('preview')
 
   // 语音输入时长
   const [speechDuration, setSpeechDuration] = useState('10')
@@ -96,6 +99,12 @@ export function SettingsPage() {
   const [watchIdleHotDays, setWatchIdleHotDays] = useState(String(DEFAULT_WATCH_SETTINGS.watch_idle_hot_days))
   const [watchIdleWarnDays, setWatchIdleWarnDays] = useState(String(DEFAULT_WATCH_SETTINGS.watch_idle_warn_days))
   const [watchCron, setWatchCron] = useState(DEFAULT_WATCH_SETTINGS.watch_cron)
+
+  // 待办事项超期预警
+  const [todoIdleWarnDays, setTodoIdleWarnDays] = useState(String(DEFAULT_TODO_SETTINGS.todo_idle_warn_days))
+  const [todoCron, setTodoCron] = useState(DEFAULT_TODO_SETTINGS.todo_cron)
+  const [watchAlertTemplate, setWatchAlertTemplate] = useState(DEFAULT_WATCH_SETTINGS.watch_alert_template)
+  const [todoAlertTemplate, setTodoAlertTemplate] = useState(DEFAULT_TODO_SETTINGS.todo_alert_template)
 
   // 其他设置
   const [mottoDraft, setMottoDraft] = useState('')
@@ -140,6 +149,11 @@ export function SettingsPage() {
       setWatchIdleHotDays(settings.watch_idle_hot_days || String(DEFAULT_WATCH_SETTINGS.watch_idle_hot_days))
       setWatchIdleWarnDays(settings.watch_idle_warn_days || String(DEFAULT_WATCH_SETTINGS.watch_idle_warn_days))
       setWatchCron(settings.watch_cron || DEFAULT_WATCH_SETTINGS.watch_cron)
+      // 待办事项超期预警
+      setTodoIdleWarnDays(settings.todo_idle_warn_days || String(DEFAULT_TODO_SETTINGS.todo_idle_warn_days))
+      setTodoCron(settings.todo_cron || DEFAULT_TODO_SETTINGS.todo_cron)
+      setWatchAlertTemplate(settings.watch_alert_template || DEFAULT_WATCH_SETTINGS.watch_alert_template)
+      setTodoAlertTemplate(settings.todo_alert_template || DEFAULT_TODO_SETTINGS.todo_alert_template)
     }
   }, [settings])
 
@@ -240,6 +254,21 @@ export function SettingsPage() {
         watch_idle_hot_days: watchIdleHotDays,
         watch_idle_warn_days: watchIdleWarnDays,
         watch_cron: watchCron.trim(),
+        watch_alert_template: watchAlertTemplate,
+      })
+      showToast('已保存')
+    } catch (err: any) {
+      showToast('保存失败：' + err.message)
+    }
+  }
+
+  async function handleSaveTodo(e: React.SyntheticEvent) {
+    e.preventDefault()
+    try {
+      await saveLLM.mutateAsync({
+        todo_idle_warn_days: todoIdleWarnDays,
+        todo_cron: todoCron.trim(),
+        todo_alert_template: todoAlertTemplate,
       })
       showToast('已保存')
     } catch (err: any) {
@@ -811,9 +840,9 @@ export function SettingsPage() {
         </div>
       </section>
 
-      {/* 特别关注 */}
+      {/* 特别关注推送配置 */}
       <section id="interface-watch" className={styles.section}>
-          <h2 className={styles.sectionTitle}>特别关注</h2>
+          <h2 className={styles.sectionTitle}>特别关注推送配置</h2>
           <p className={styles.sectionHint}>侧边栏「特别关注」区块用颜色区分任务活跃程度，根据最近一条日志距今天数判断。</p>
           {isLoading ? (
             <p className={styles.sectionHint}>载入中...</p>
@@ -858,6 +887,25 @@ export function SettingsPage() {
                   设置特别关注预警的推送时间。支持 cron 表达式（分 时 日 月 周），保存后立即生效。
                 </p>
               </div>
+              <div className="field">
+                <div className="field__label">
+                  <span>消息模板</span>
+                </div>
+                <DescriptionEditorWithMode
+                  value={watchAlertTemplate}
+                  onChange={setWatchAlertTemplate}
+                  mode={watchAlertTemplateMode}
+                  onModeChange={setWatchAlertTemplateMode}
+                  minHeight={120}
+                  textareaClassName="field__textarea"
+                  autoGrow
+                  maxHeight={300}
+                />
+                <p className={styles.fieldHint}>
+                  支持占位符：<code>{'${task_title}'}</code> 任务标题、<code>{'${idle_days}'}</code> 闲置天数<br/>
+                  系统会自动在消息末尾追加「查看任务」和「今日忽略」链接。
+                </p>
+              </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16, gap: 8 }}>
                 <button
                   type="button"
@@ -866,6 +914,7 @@ export function SettingsPage() {
                     setWatchIdleHotDays(String(DEFAULT_WATCH_SETTINGS.watch_idle_hot_days))
                     setWatchIdleWarnDays(String(DEFAULT_WATCH_SETTINGS.watch_idle_warn_days))
                     setWatchCron(DEFAULT_WATCH_SETTINGS.watch_cron)
+                    setWatchAlertTemplate(DEFAULT_WATCH_SETTINGS.watch_alert_template)
                   }}
                 >
                   恢复默认
@@ -877,6 +926,77 @@ export function SettingsPage() {
             </form>
           )}
         </section>
+
+      {/* 待办事项推送配置 */}
+      <section id="interface-todo-alert" className={styles.section}>
+        <h2 className={styles.sectionTitle}>待办事项推送配置</h2>
+        <p className={styles.sectionHint}>未完成、未废弃的待办事项超过指定天数未处理时，通过消息推送提醒。</p>
+        {isLoading ? (
+          <p className={styles.sectionHint}>载入中...</p>
+        ) : (
+          <form onSubmit={handleSaveTodo}>
+            <div className="field">
+              <div className="field__label">
+                <span>超期天数</span>
+                <span className="field__hint" style={{ color: '#e07b39' }}>橙色 · {todoIdleWarnDays} 天以上</span>
+              </div>
+              <input
+                type="range"
+                min="1"
+                max="30"
+                value={todoIdleWarnDays}
+                onChange={e => setTodoIdleWarnDays(e.target.value)}
+                className={styles.slider}
+              />
+              <p className={styles.fieldHint}>待办事项创建后超过此天数未完成，触发推送提醒。</p>
+            </div>
+            <div className="field">
+              <div className="field__label">
+                <span>推送计划</span>
+              </div>
+              <CronEditor value={todoCron} onChange={setTodoCron} />
+              <p className={styles.fieldHint}>
+                设置待办事项超期预警的推送时间。支持 cron 表达式（分 时 日 月 周），保存后立即生效。
+              </p>
+            </div>
+            <div className="field">
+              <div className="field__label">
+                <span>消息模板</span>
+              </div>
+              <DescriptionEditorWithMode
+                value={todoAlertTemplate}
+                onChange={setTodoAlertTemplate}
+                mode={todoAlertTemplateMode}
+                onModeChange={setTodoAlertTemplateMode}
+                minHeight={120}
+                textareaClassName="field__textarea"
+                autoGrow
+                maxHeight={300}
+              />
+              <p className={styles.fieldHint}>
+                  支持占位符：<code>{'${task_title}'}</code> 任务标题、<code>{'${todo_title}'}</code> 待办标题、<code>{'${idle_days}'}</code> 超期天数<br/>
+                  系统会自动在消息末尾追加「查看任务」和「今日忽略」链接。
+                </p>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16, gap: 8 }}>
+              <button
+                type="button"
+                className="btn btn--ghost"
+                onClick={() => {
+                  setTodoIdleWarnDays(String(DEFAULT_TODO_SETTINGS.todo_idle_warn_days))
+                  setTodoCron(DEFAULT_TODO_SETTINGS.todo_cron)
+                  setTodoAlertTemplate(DEFAULT_TODO_SETTINGS.todo_alert_template)
+                }}
+              >
+                恢复默认
+              </button>
+              <button type="submit" className="btn btn--primary" disabled={saveLLM.isPending}>
+                {saveLLM.isPending ? '保存中...' : '保存'}
+              </button>
+            </div>
+          </form>
+        )}
+      </section>
       </>
       )}
 

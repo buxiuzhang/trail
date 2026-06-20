@@ -34,5 +34,11 @@ public record LlmSettingsDto(
         String watchIdleHotDays,
         String watchIdleWarnDays,
         String watchSnoozeMinutes,
-        String watchCron
+        String watchCron,
+        // 待办事项超期预警
+        String todoIdleWarnDays,
+        String todoCron,
+        // 推送消息模板
+        String watchAlertTemplate,
+        String todoAlertTemplate
 ) {}
