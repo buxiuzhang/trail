@@ -106,19 +106,19 @@ export function FileManagerSection() {
   }, [expandedRefs])
 
   const handleDelete = useCallback(async (item: AttachmentListItem) => {
-    if (item.ref_count > 0) {
+    if (item.active_ref_count > 0) {
       const refs = await fetch(`/api/attachments/${item.id}/references`).then(r => r.json())
       openModal({
-        eyebrow: '删除确认',
+        eyebrow: '无法删除',
         title: '此文件正在被引用',
         titleMode: 'zh',
         body: (
           <div>
             <p style={{ marginBottom: 12, color: 'var(--ink-soft)', fontSize: 14 }}>
-              该文件被 <strong>{item.ref_count}</strong> 处引用，删除后这些位置图片将失效：
+              该文件被 <strong>{item.active_ref_count}</strong> 处有效引用，请先在对应的任务日志或描述中删除该附件引用，再回来删除此文件。
             </p>
             <ul style={{ paddingLeft: 16, fontSize: 13, color: 'var(--ink-faded)', lineHeight: 1.8 }}>
-              {refs.map((r: any, i: number) => (
+              {refs.filter((r: any) => !r.deleted).map((r: any, i: number) => (
                 <li key={i}>
                   [{r.sourceType === 'task' ? '任务' : r.sourceType === 'log' ? '日志' : '待办'}]
                   {' '}{r.title || ''}{r.logDate ? ` · ${r.logDate}` : ''}
@@ -128,15 +128,7 @@ export function FileManagerSection() {
           </div>
         ),
         buttons: [
-          { label: '取消', className: 'btn btn--ghost', action: () => {} },
-          {
-            label: '强制删除', className: 'btn btn--danger',
-            action: async () => {
-              await fetch(`/api/attachments/${item.id}`, { method: 'DELETE' })
-              showToast('已删除')
-              qc.invalidateQueries({ queryKey: ['attachments', 'list'] })
-            },
-          },
+          { label: '知道了', className: 'btn btn--primary', action: () => {} },
         ],
       })
       return

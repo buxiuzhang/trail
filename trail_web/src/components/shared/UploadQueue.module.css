@@ -1,0 +1,106 @@
+.panel {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 1100;
+  background: var(--card);
+  border: 0.5px solid var(--rule);
+  box-shadow: var(--shadow-lg);
+  min-width: 260px;
+  max-width: 320px;
+}
+
+.header {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-ghost);
+  padding: 6px 12px;
+  border-bottom: 0.5px solid var(--rule-soft);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 0.5px solid var(--rule-soft);
+}
+.row:last-child { border-bottom: none; }
+
+.icon {
+  font-family: var(--mono);
+  font-size: 12px;
+  width: 14px;
+  text-align: center;
+  flex-shrink: 0;
+  color: var(--ink-faded);
+}
+
+.info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.name {
+  font-family: var(--body);
+  font-size: 13px;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.barWrap {
+  height: 3px;
+  background: var(--rule-soft);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.bar {
+  height: 100%;
+  background: var(--ink-faded);
+  border-radius: 2px;
+  transition: width 120ms ease;
+}
+
+.percent {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink-ghost);
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+
+.done {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink-ghost);
+  letter-spacing: 0.04em;
+}
+
+.error {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: #c55;
+  letter-spacing: 0.04em;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.retry {
+  background: none;
+  border: 0.5px solid #c55;
+  color: #c55;
+  font-family: var(--mono);
+  font-size: 9px;
+  padding: 1px 5px;
+  cursor: pointer;
+  letter-spacing: 0.06em;
+}

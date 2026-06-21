@@ -52,19 +52,26 @@ public class AttachmentController {
         return AttachmentResponse.from(store.save(file));
     }
 
-    @Operation(summary = "下载附件", description = "获取附件二进制内容，用于图片显示")
+    @Operation(summary = "下载附件", description = "图片内联显示，其他文件触发下载")
     @GetMapping("/{id}")
     public ResponseEntity<FileSystemResource> serve(@Parameter(description = "附件 ID") @PathVariable long id) {
         AttachmentStore.Loaded f = store.load(id);
+        AttachmentStore.Row row = store.get(id);
         MediaType ct;
         try {
             ct = MediaType.parseMediaType(f.mime());
         } catch (Exception e) {
             ct = MediaType.APPLICATION_OCTET_STREAM;
         }
-        return ResponseEntity.ok()
-                .contentType(ct)
-                .body(new FileSystemResource(f.absolutePath()));
+        var builder = ResponseEntity.ok().contentType(ct);
+        if (!f.mime().startsWith("image/")) {
+            String filename = row.originalName() != null ? row.originalName() : "attachment";
+            builder = builder.header(
+                org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
+                "attachment; filename=\"" + filename.replace("\"", "") + "\""
+            );
+        }
+        return builder.body(new FileSystemResource(f.absolutePath()));
     }
 
     @Operation(summary = "获取附件元信息", description = "获取附件的 JSON 元数据")

@@ -3,12 +3,14 @@ import { FilterProvider } from './context/FilterContext'
 import { ModalProvider } from './context/ModalContext'
 import { ToastProvider } from './context/ToastContext'
 import { ChatProvider } from './context/ChatContext'
+import { UploadQueueProvider } from './context/UploadQueueContext'
 import { Masthead } from './components/layout/Masthead'
 import { Shell } from './components/layout/Shell'
 import { Sidebar } from './components/sidebar/Sidebar'
 import { SettingsSidebar } from './components/sidebar/SettingsSidebar'
 import { Modal } from './components/modal/Modal'
 import { Toast } from './components/shared/Toast'
+import { UploadQueuePanel } from './components/shared/UploadQueue'
 import { ChatBubble } from './components/chat/ChatBubble'
 import { ChatWindow } from './components/chat/ChatWindow'
 import { DataDirGate } from './components/layout/DataDirGate'
@@ -66,6 +68,7 @@ export default function App() {
         <ModalProvider>
           <ToastProvider>
             <ChatProvider>
+              <UploadQueueProvider>
               <DataDirGate>
                 <div className="grain" aria-hidden="true" />
                 <WatchAlertsMount />
@@ -84,9 +87,11 @@ export default function App() {
                 </AppLayout>
                 <Modal />
                 <Toast />
+                <UploadQueuePanel />
                 <ChatBubble />
                 <ChatWindow />
               </DataDirGate>
+              </UploadQueueProvider>
             </ChatProvider>
           </ToastProvider>
         </ModalProvider>

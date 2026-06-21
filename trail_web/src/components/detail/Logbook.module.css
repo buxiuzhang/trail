@@ -429,6 +429,96 @@
   word-break: break-word;
 }
 
+/* 附件区 */
+.attachments {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.attachmentRow {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 0;
+  cursor: default;
+  user-select: none;
+}
+
+.attachmentRow:hover .attachmentName {
+  border-bottom-color: var(--ink-faded);
+  color: var(--ink);
+}
+
+.attachmentSeq {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink-ghost);
+  letter-spacing: 0.04em;
+  min-width: 16px;
+  flex-shrink: 0;
+}
+
+.attachmentIcon {
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.attachmentName {
+  font-family: var(--body);
+  font-size: 13px;
+  color: var(--ink-soft);
+  transition: color 150ms;
+}
+
+.attachmentRow:hover .attachmentName {
+  color: var(--ink);
+}
+
+.attachmentDel {
+  display: none;
+  background: none;
+  border: none;
+  padding: 0 2px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--ink-ghost);
+  line-height: 1;
+  transition: color 150ms;
+}
+
+.attachmentDel:hover {
+  color: #c55;
+}
+
+.attachmentRow:hover .attachmentDel {
+  display: inline;
+}
+
+/* 附件右键菜单 */
+.attCtxMenu {
+  background: var(--card);
+  border: 0.5px solid var(--rule);
+  box-shadow: var(--shadow-md);
+  min-width: 140px;
+  padding: 4px 0;
+}
+
+.attCtxItem {
+  padding: 7px 14px;
+  font-family: var(--body);
+  font-size: 13.5px;
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: background 80ms;
+}
+
+.attCtxItem:hover {
+  background: var(--card-deep);
+  color: var(--ink);
+}
+
 .polish {
   margin-top: 10px;
   padding: 10px 14px;

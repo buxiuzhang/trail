@@ -1,8 +1,23 @@
+import { useState } from 'react'
 import type { TaskOut, LogOut, TodoOut } from '@/types'
 import { isSealed } from '@/constants'
 import { LogCompose } from './LogCompose'
 import { ContentViewer } from '@/components/shared/ContentViewer'
+import { useConfirm } from '@/utils/confirm'
+import { useUpdateLog } from '@/api/logs'
+import { useDeleteAttachment } from '@/api/attachments'
 import styles from './Logbook.module.css'
+
+/** 从 markdown 内容中提取附件链接 */
+function extractAttachments(content: string): Array<{ name: string; url: string; id: number }> {
+  const re = /\[([^\]]+)\]\((\/api\/attachments\/(\d+))\)/g
+  const out: Array<{ name: string; url: string; id: number }> = []
+  let m: RegExpExecArray | null
+  while ((m = re.exec(content)) !== null) {
+    out.push({ name: m[1], url: m[2], id: Number(m[3]) })
+  }
+  return out
+}
 
 interface LogEntryProps {
   task: TaskOut
@@ -19,6 +34,30 @@ interface LogEntryProps {
 
 export function LogEntry({ task, log, todos, tasks = [], isEditing, onEdit, onDelete, onSaveEdit, onCancelEdit }: LogEntryProps) {
   const sealed = isSealed(task)
+  const confirm = useConfirm()
+  const updateLog = useUpdateLog(task.id)
+  const deleteAttachment = useDeleteAttachment()
+  const [ctxMenu, setCtxMenu] = useState<{
+    x: number; y: number
+    att: { name: string; url: string; id: number }
+  } | null>(null)
+
+  async function handleDeleteAttachment(att: { name: string; url: string; id: number }) {
+    const ok = await confirm({
+      level: 'critical',
+      title: '删除附件？',
+      body: <p>将永久删除「{att.name}」，并从日志中移除引用，无法恢复。</p>,
+      confirmLabel: '删除',
+    })
+    if (!ok) return
+    // 1. 物理删除附件文件
+    await deleteAttachment.mutateAsync(att.id)
+    // 2. 从 content 中移除对应 markdown 链接
+    const escaped = att.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const re = new RegExp(`\\[${escaped}\\]\\(${att.url}\\)`, 'g')
+    const newContent = (log.content ?? '').replace(re, '').replace(/\n{3,}/g, '\n\n').trim()
+    await updateLog.mutateAsync({ logId: log.id, data: { content: newContent } })
+  }
 
   // 编辑态：整条替换为 compose form
   if (isEditing) {
@@ -67,6 +106,79 @@ export function LogEntry({ task, log, todos, tasks = [], isEditing, onEdit, onDe
           todos={todos}
           tasks={tasks}
         />
+        {/* 附件区 */}
+        {(() => {
+          const attachments = extractAttachments(log.content ?? '')
+          if (attachments.length === 0) return null
+          return (
+            <div className={styles.attachments}>
+              {attachments.map((att, i) => (
+                <div
+                  key={att.id}
+                  className={styles.attachmentRow}
+                  onContextMenu={e => {
+                    e.preventDefault()
+                    setCtxMenu({ x: e.clientX, y: e.clientY, att })
+                  }}
+                >
+                  <span className={styles.attachmentSeq}>{i + 1}.</span>
+                  <span className={styles.attachmentIcon}>📎</span>
+                  <span className={styles.attachmentName}>{att.name}</span>
+                  <button
+                    type="button"
+                    className={styles.attachmentDel}
+                    onClick={e => { e.stopPropagation(); handleDeleteAttachment(att) }}
+                    title="删除附件"
+                  >×</button>
+                </div>
+              ))}
+            </div>
+          )
+        })()}
+        {/* 附件右键菜单 */}
+        {ctxMenu && (
+          <>
+            <div
+              style={{ position: 'fixed', inset: 0, zIndex: 999 }}
+              onClick={() => setCtxMenu(null)}
+            />
+            <div
+              className={styles.attCtxMenu}
+              style={{ position: 'fixed', top: ctxMenu.y, left: ctxMenu.x, zIndex: 1000 }}
+            >
+              <div
+                className={styles.attCtxItem}
+                onClick={async () => {
+                  const att = ctxMenu.att
+                  setCtxMenu(null)
+                  const ok = await confirm({
+                    level: 'moderate',
+                    title: '下载附件？',
+                    body: <p>将下载「{att.name}」到本地。</p>,
+                    confirmLabel: '下载',
+                  })
+                  if (ok) {
+                    const a = document.createElement('a')
+                    a.href = att.url
+                    a.download = att.name
+                    a.click()
+                  }
+                }}
+              >
+                下载
+              </div>
+              <div
+                className={styles.attCtxItem}
+                onClick={() => {
+                  window.open(ctxMenu.att.url, '_blank')
+                  setCtxMenu(null)
+                }}
+              >
+                在浏览器中预览
+              </div>
+            </div>
+          </>
+        )}
         {/* 关联待办展示 */}
         {log.todo_ids && log.todo_ids.length > 0 && (
           <div className={styles.todoRefs}>

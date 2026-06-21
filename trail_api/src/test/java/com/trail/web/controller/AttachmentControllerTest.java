@@ -233,7 +233,7 @@ class AttachmentControllerTest {
         @DisplayName("0 引用 → 204")
         void deleteUnused() throws Exception {
             when(store.findReferences(1L)).thenReturn(List.of());
-            when(store.delete(1L)).thenReturn(true);
+            org.mockito.Mockito.doNothing().when(store).delete(1L);
 
             mvc.perform(delete("/api/attachments/1"))
                     .andExpect(status().isNoContent());

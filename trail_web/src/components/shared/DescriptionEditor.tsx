@@ -32,9 +32,7 @@ import { Extension } from '@tiptap/core'
 import { HighlightedCodeBlock } from './HighlightedCodeBlock'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
-import {
-  useUploadAttachment,
-} from '@/api/attachments'
+import { useUploadQueue } from '@/context/UploadQueueContext'
 import { useToastContext } from '@/context/ToastContext'
 import { normalizeMentions } from './richtext-utils'
 import { ImagePreview } from './ImagePreview'
@@ -199,7 +197,7 @@ export const DescriptionEditor = forwardRef<HTMLTextAreaElement, DescriptionEdit
   }, [])
 
   // hooks
-  const upload = useUploadAttachment()
+  const { uploadFile: queueUpload } = useUploadQueue()
   const { showToast } = useToastContext()
 
   // 图片预览状态
@@ -223,6 +221,38 @@ export const DescriptionEditor = forwardRef<HTMLTextAreaElement, DescriptionEdit
   /** ref 镜像，供 onKeyDown 闭包读取最新值（避免闭包陷阱） */
   const mentionStateRef = useRef(mentionState)
   useEffect(() => { mentionStateRef.current = mentionState }, [mentionState])
+
+  // / 斜杠命令状态
+  const [slashState, setSlashState] = useState<{
+    active: boolean
+    position: { top: number; left: number }
+    selectedIndex: number
+  }>({ active: false, position: { top: 0, left: 0 }, selectedIndex: 0 })
+  const slashStateRef = useRef(slashState)
+  useEffect(() => { slashStateRef.current = slashState }, [slashState])
+
+  // 隐藏的文件选择器（图片 + 文件统一）
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const editorRef = useRef<import('@tiptap/core').Editor | null>(null)
+
+  // 上传文件（通过队列）—— 斜杠命令和文件 input 使用
+  const uploadFileRef = useRef<(file: File) => void>(() => {})
+  const uploadFile = useCallback((file: File) => {
+    queueUpload(file, (url, name, mime) => {
+      const ed = editorRef.current
+      if (!ed) return
+      if (mime.startsWith('image/')) {
+        ed.chain().focus().setImage({ src: url }).run()
+      } else {
+        ed.chain().focus().insertContent({
+          type: 'text',
+          marks: [{ type: 'link', attrs: { href: url, target: null } }],
+          text: name,
+        }).run()
+      }
+    })
+  }, [queueUpload])
+  useEffect(() => { uploadFileRef.current = uploadFile }, [uploadFile])
 
   // TipTap 编辑器初始化
   const editor = useEditor({
@@ -391,23 +421,55 @@ export const DescriptionEditor = forwardRef<HTMLTextAreaElement, DescriptionEdit
       handlePaste: (view, event) => {
         const items = event.clipboardData?.items
         if (!items) return false
-
         for (const item of items) {
           if (item.type.startsWith('image/')) {
             const file = item.getAsFile()
             if (file) {
               event.preventDefault()
-              uploadImage(file).then((url) => {
-                editor?.chain().focus().setImage({ src: url }).run()
-              })
+              uploadFileRef.current(file)
               return true
             }
           }
         }
         return false
       },
+      handleKeyDown: (view, event) => {
+        // 斜杠命令面板导航
+        const slash = slashStateRef.current
+        if (slash.active) {
+          if (event.key === 'Escape') {
+            setSlashState(prev => ({ ...prev, active: false }))
+            return true
+          }
+          if (event.key === 'ArrowDown') {
+            setSlashState(prev => ({ ...prev, selectedIndex: Math.min(prev.selectedIndex + 1, 1) }))
+            return true
+          }
+          if (event.key === 'ArrowUp') {
+            setSlashState(prev => ({ ...prev, selectedIndex: Math.max(prev.selectedIndex - 1, 0) }))
+            return true
+          }
+          if (event.key === 'Enter') {
+            event.preventDefault()
+            setSlashState(prev => ({ ...prev, active: false }))
+            view.dispatch(view.state.tr.delete(view.state.selection.from - 1, view.state.selection.from))
+            fileInputRef.current?.click()
+            return true
+          }
+        }
+        // 触发斜杠命令
+        if (event.key === '/') {
+          const coords = view.coordsAtPos(view.state.selection.from)
+          setSlashState({ active: true, position: { top: coords.bottom + 4, left: coords.left }, selectedIndex: 0 })
+          return false // 让 "/" 正常插入，面板只是覆盖层
+        }
+        return false
+      },
     },
   })
+
+  // 同步 editorRef
+  useEffect(() => { editorRef.current = editor }, [editor])
 
   // 更新编辑器内容（当外部 value 变化时）
   useEffect(() => {
@@ -428,21 +490,6 @@ export const DescriptionEditor = forwardRef<HTMLTextAreaElement, DescriptionEdit
     if (!editor) return
     editor.view.dispatch(editor.state.tr)
   }, [editor, todos, tasks])
-
-  // 上传图片
-  const uploadImage = useCallback(
-    async (file: File): Promise<string> => {
-      try {
-        const att = await upload.mutateAsync(file)
-        return `/api/attachments/${att.id}`
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err)
-        showToast('上传失败：' + msg)
-        throw err
-      }
-    },
-    [upload, showToast],
-  )
 
   // ref 兼容
   useImperativeHandle(
@@ -466,11 +513,24 @@ export const DescriptionEditor = forwardRef<HTMLTextAreaElement, DescriptionEdit
     }
   }
 
+  // 斜杠命令选择
+  function handleSlashSelect(_index: number) {
+    const ed = editorRef.current
+    if (!ed) return
+    const { state } = ed.view
+    ed.view.dispatch(state.tr.delete(state.selection.from - 1, state.selection.from))
+    setSlashState(prev => ({ ...prev, active: false }))
+    fileInputRef.current?.click()
+  }
+
   return (
     <div
       className={`${styles.editorBox} ${textareaClassName ?? ''}`}
       style={{ minHeight }}
     >
+      {/* 隐藏文件选择器 */}
+      <input ref={fileInputRef} type="file" style={{ display: 'none' }}
+        onChange={e => { const f = e.target.files?.[0]; if (f) uploadFile(f); e.target.value = '' }} />
       <div ref={editorRootRef} className={`${styles.tiptapContainer} ${tiptapStyles.content}`}>
         {editor && <EditorContent editor={editor} />}
       </div>
@@ -495,6 +555,15 @@ export const DescriptionEditor = forwardRef<HTMLTextAreaElement, DescriptionEdit
           }
         />
       )}
+      {/* / 斜杠命令面板 */}
+      {slashState.active && (
+        <SlashCommandPortal
+          selectedIndex={slashState.selectedIndex}
+          position={slashState.position}
+          onSelect={handleSlashSelect}
+          onClose={() => setSlashState(prev => ({ ...prev, active: false }))}
+        />
+      )}
       {/* 图片预览 */}
       {previewImage && (
         <ImagePreview
@@ -507,8 +576,53 @@ export const DescriptionEditor = forwardRef<HTMLTextAreaElement, DescriptionEdit
 })
 
 // ---------------------------------------------------------------------------
-// MentionPortal · @ 提及候选浮层
+// SlashCommandPortal · / 斜杠命令面板
 // ---------------------------------------------------------------------------
+const SLASH_COMMANDS = [
+  { label: '上传附件', desc: '图片 / 文件', icon: '📎' },
+]
+
+interface SlashCommandPortalProps {
+  selectedIndex: number
+  position: { top: number; left: number }
+  onSelect: (index: number) => void
+  onClose: () => void
+}
+
+function SlashCommandPortal({ selectedIndex, position, onSelect, onClose }: SlashCommandPortalProps) {
+  const listRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (listRef.current && !listRef.current.contains(e.target as Node)) onClose()
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [onClose])
+
+  return createPortal(
+    <div
+      ref={listRef}
+      className={styles.slashPopup}
+      style={{ position: 'fixed', top: position.top, left: position.left, zIndex: 9999 }}
+    >
+      <div className={styles.slashHeader}>插入</div>
+      {SLASH_COMMANDS.map((cmd, i) => (
+        <div
+          key={i}
+          className={`${styles.slashItem} ${i === selectedIndex ? styles.slashItemActive : ''}`}
+          onMouseDown={e => e.preventDefault()}
+          onClick={() => onSelect(i)}
+        >
+          <span className={styles.slashIcon}>{cmd.icon}</span>
+          <span className={styles.slashLabel}>{cmd.label}</span>
+          <span className={styles.slashDesc}>{cmd.desc}</span>
+        </div>
+      ))}
+    </div>,
+    document.body,
+  )
+}
 interface MentionPortalProps {
   items: MentionCandidate[]
   selectedIndex: number

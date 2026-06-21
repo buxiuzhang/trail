@@ -90,6 +90,12 @@ export function MarkdownRenderer({ text, className, todos = [], tasks = [] }: Ma
 
   const handleClick = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement
+    // 附件链接：阻止下载，内容区只作展示，下载从下方附件区操作
+    const link = target.closest('a')
+    if (link?.getAttribute('href')?.startsWith('/api/attachments/')) {
+      e.preventDefault()
+      return
+    }
     // 图片预览
     const img = target.closest('img')
     if (img) {

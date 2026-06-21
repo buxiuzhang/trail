@@ -32,14 +32,45 @@ import java.util.UUID;
 public class AttachmentStore {
 
     private static final Set<String> ALLOWED_MIMES = Set.of(
-            "image/png", "image/jpeg", "image/gif", "image/webp"
+            // 图片
+            "image/png", "image/jpeg", "image/gif", "image/webp",
+            // PDF
+            "application/pdf",
+            // Word
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            // Excel
+            "application/vnd.ms-excel",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            // PowerPoint
+            "application/vnd.ms-powerpoint",
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            // 文本
+            "text/plain",
+            "text/csv",
+            // 压缩包
+            "application/zip",
+            "application/x-rar-compressed",
+            "application/x-7z-compressed"
     );
-    private static final long DEFAULT_MAX_BYTES = 10L * 1024 * 1024; // 10MB
-    private static final Map<String, String> EXT_BY_MIME = Map.of(
-            "image/png", ".png",
-            "image/jpeg", ".jpg",
-            "image/gif", ".gif",
-            "image/webp", ".webp"
+    private static final long DEFAULT_MAX_BYTES = 50L * 1024 * 1024; // 50MB
+    private static final Map<String, String> EXT_BY_MIME = Map.ofEntries(
+            Map.entry("image/png", ".png"),
+            Map.entry("image/jpeg", ".jpg"),
+            Map.entry("image/gif", ".gif"),
+            Map.entry("image/webp", ".webp"),
+            Map.entry("application/pdf", ".pdf"),
+            Map.entry("application/msword", ".doc"),
+            Map.entry("application/vnd.openxmlformats-officedocument.wordprocessingml.document", ".docx"),
+            Map.entry("application/vnd.ms-excel", ".xls"),
+            Map.entry("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ".xlsx"),
+            Map.entry("application/vnd.ms-powerpoint", ".ppt"),
+            Map.entry("application/vnd.openxmlformats-officedocument.presentationml.presentation", ".pptx"),
+            Map.entry("text/plain", ".txt"),
+            Map.entry("text/csv", ".csv"),
+            Map.entry("application/zip", ".zip"),
+            Map.entry("application/x-rar-compressed", ".rar"),
+            Map.entry("application/x-7z-compressed", ".7z")
     );
     private static final int DEFAULT_DISPLAY_SIZE = 100;
 
@@ -111,7 +142,7 @@ public class AttachmentStore {
         LocalDate today = LocalDate.now();
         String yyyy = String.format("%04d", today.getYear());
         String mm = String.format("%02d", today.getMonthValue());
-        String ext = EXT_BY_MIME.get(mime);
+        String ext = EXT_BY_MIME.getOrDefault(mime, "");
         String name = UUID.randomUUID().toString().replace("-", "") + ext;
         String relPath = yyyy + "/" + mm + "/" + name;
 
@@ -190,11 +221,11 @@ public class AttachmentStore {
         out.addAll(scanColumn("task", "maintenance_summary",
                 "SELECT id, title, maintenance_summary AS col FROM tasks WHERE maintenance_summary LIKE ?", pat, "id"));
 
-        // work_logs 两个字段（含 is_deleted 供前端标记已删除引用）
+        // work_logs 两个字段（含 is_deleted 供前端标记已删除引用，只扫未删除的）
         out.addAll(scanColumn("log", "content",
-                "SELECT id, task_id, log_date, is_deleted, content AS col FROM work_logs WHERE content LIKE ?", pat, "task_id"));
+                "SELECT id, task_id, log_date, is_deleted, content AS col FROM work_logs WHERE is_deleted = 0 AND content LIKE ?", pat, "task_id"));
         out.addAll(scanColumn("log", "polished_content",
-                "SELECT id, task_id, log_date, is_deleted, polished_content AS col FROM work_logs WHERE polished_content LIKE ?", pat, "task_id"));
+                "SELECT id, task_id, log_date, is_deleted, polished_content AS col FROM work_logs WHERE is_deleted = 0 AND polished_content LIKE ?", pat, "task_id"));
 
         // todos.description
         out.addAll(scanColumn("todo", "description",
@@ -211,12 +242,9 @@ public class AttachmentStore {
     }
 
     /**
-     * 物理删除。0 引用→删磁盘 + DB 行；>0 引用→不删返 false（controller 转 409）。
+     * 物理删除磁盘文件 + DB 行，引用检查由 controller 负责。
      */
-    public boolean delete(long id) {
-        if (!findReferences(id).isEmpty()) {
-            return false;
-        }
+    public void delete(long id) {
         Row r = mustRow(id);
         Path dataDirPath = dataDir.currentDataDir();
         if (dataDirPath != null) {
@@ -227,7 +255,6 @@ public class AttachmentStore {
             }
         }
         db.update("DELETE FROM attachments WHERE id = ?", id);
-        return true;
     }
 
     // ============================================================

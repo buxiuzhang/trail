@@ -84,6 +84,17 @@
   text-decoration: underline;
 }
 
+/* 附件链接（/api/attachments/） */
+.content :global(.tiptap a[href^="/api/attachments/"]) {
+  color: var(--ink-soft);
+  text-decoration: none;
+  cursor: default;
+}
+.content :global(.tiptap a[href^="/api/attachments/"])::before {
+  content: '📎 ';
+  font-size: 12px;
+}
+
 /* 图片 */
 .content :global(.tiptap img) {
   max-width: 100%;
