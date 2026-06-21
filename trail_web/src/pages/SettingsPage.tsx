@@ -13,8 +13,28 @@ import { useSettingsContext } from '@/App'
 import { Crumbs } from '@/components/shared/Crumbs'
 import { DescriptionEditorWithMode, type EditorMode } from '@/components/shared/DescriptionEditorWithMode'
 import { CronEditor } from '@/components/shared/CronEditor'
+import { FileManagerSection } from '@/components/settings/FileManagerSection'
 import { useConfirm } from '@/utils/confirm'
 import styles from './SettingsPage.module.css'
+
+function PromptGroup({ name, desc, children, defaultOpen = false }: {
+  name: string
+  desc?: string
+  children: React.ReactNode
+  defaultOpen?: boolean
+}) {
+  const [open, setOpen] = useState(defaultOpen)
+  return (
+    <div className={styles.promptGroup}>
+      <button type="button" className={styles.promptGroupHeader} onClick={() => setOpen(v => !v)}>
+        <span className={styles.promptGroupTitle}>{name}</span>
+        {desc && <span className={styles.promptGroupBadge}>{desc}</span>}
+        <span className={`${styles.promptGroupChevron} ${open ? styles.promptGroupChevronOpen : ''}`}>▾</span>
+      </button>
+      {open && <div className={styles.promptGroupBody}>{children}</div>}
+    </div>
+  )
+}
 
 export function SettingsPage() {
   const { showToast } = useToastContext()
@@ -35,7 +55,7 @@ export function SettingsPage() {
 
   // M8：数据目录
   const { data: dataDir, isLoading: dirLoading } = useDataDir({
-    enabled: activeSection === 'data',
+    enabled: activeSection === 'interface',
   })
   const saveDir = useSaveDataDir()
   const [dirDraft, setDirDraft] = useState('')
@@ -113,7 +133,7 @@ export function SettingsPage() {
   const [todoNoteDraft, setTodoNoteDraft] = useState('')
 
   const { data: placeholders, isLoading: placeholdersLoading } = usePlaceholders({
-    enabled: activeSection === 'placeholders',
+    enabled: activeSection === 'interface',
   })
   const savePlaceholders = useSavePlaceholders()
 
@@ -389,55 +409,13 @@ export function SettingsPage() {
         <span className={styles.sub}>偏好与配置</span>
       </header>
 
-      {/* 数据目录 */}
-      {activeSection === 'data' && (
+      {/* 文件管理 */}
+      {activeSection === 'files' && (
         <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>数据目录</h2>
-          <p className={styles.sectionHint}>
-            SQLite 主库、密钥、导出、附件、运行日志都保存在这个目录下（系统自动分子目录）。
-            {!dataDir?.configured && ' 系统已为你准备了默认目录，点击按钮确认后开始初始化。'}
-          </p>
-        {dirLoading ? (
-          <p className={styles.sectionHint}>载入中...</p>
-        ) : (
-          <form onSubmit={handleSaveDir}>
-            <div className="field">
-              <div className="field__label">
-                <span>目录绝对路径</span>
-                <span className="field__hint">{dataDir?.configured ? '已配置' : '待确认'}</span>
-              </div>
-              <input
-                className="field__input"
-                value={dirDraft}
-                onChange={e => setDirDraft(e.target.value)}
-                placeholder="/Users/you/Documents/trail-data"
-                style={{ fontFamily: 'var(--mono)', fontSize: '13.5px' }}
-                required
-              />
-              <p className={styles.fieldHint}>
-                {dataDir?.configured
-                  ? '必须是绝对路径。保存即切换：后端关旧连接、在新目录建库并跑建表、初始化子目录。'
-                  : '确认后系统将在该目录创建 db/、exports/、attachments/、logs/ 及 .secret_key 等文件。'}
-              </p>
-            </div>
-
-            {dataDir?.configured && dataDir.dataDir && (
-              <div className={styles.statusLine}>
-                <span>当前目录 <span className={`${styles.statusValue} ${styles.statusMono}`}>{dataDir.dataDir}</span></span>
-              </div>
-            )}
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16, gap: 8 }}>
-              <span style={{ fontFamily: 'var(--mono)', fontSize: '10.5px', color: 'var(--ink-faded)', letterSpacing: '0.06em', flex: 1, alignSelf: 'center' }}>
-                — {dataDir?.configured ? '即时生效 · 配置写入 ~/.trail/config.yaml —' : '确认即初始化 · 配置写入 ~/.trail/config.yaml —'}
-              </span>
-              <button type="submit" className="btn btn--primary" disabled={saveDir.isPending || !dirDraft.trim()}>
-                {saveDir.isPending ? '处理中...' : dataDir?.configured ? '保存并切换' : '确认并初始化'}
-              </button>
-            </div>
-          </form>
-        )}
-      </section>
+          <h2 className={styles.sectionTitle}>文件管理</h2>
+          <p className={styles.sectionHint}>管理任务描述、日志、待办中上传的附件，支持按文件类型和任务筛选。</p>
+          <FileManagerSection />
+        </section>
       )}
 
       {/* 大模型配置 */}
@@ -578,10 +556,9 @@ export function SettingsPage() {
           <p className={styles.sectionHint}>载入中...</p>
         ) : (
           <form onSubmit={handleSaveRecord}>
-            <div className={styles.promptField}>
+            <PromptGroup name="日志润色" desc="日志书面化">
               <div className={styles.promptLabel}>
                 <span className={styles.promptName}>
-                  日志润色
                   <button type="button" onClick={async () => { if (await confirm({ level: 'moderate', title: '重置日志润色提示词？', body: <p>将恢复为系统默认值。</p>, confirmLabel: '重置' })) setPolishPrompt('') }} className={styles.resetBtn}>重置</button>
                 </span>
                 <button type="button" className={styles.modeToggle} onClick={() => setPolishPromptMode(polishPromptMode === 'source' ? 'preview' : 'source')}>{polishPromptMode === 'source' ? '预览模式' : '源码模式'}</button>
@@ -590,11 +567,10 @@ export function SettingsPage() {
               <div style={{ marginTop: '8px' }}>
                 <DescriptionEditorWithMode value={polishPrompt || ''} onChange={setPolishPrompt} mode={polishPromptMode} onModeChange={setPolishPromptMode} minHeight={150} textareaClassName="field__textarea" hideInlineToggle autoGrow maxHeight={300} />
               </div>
-            </div>
-            <div className={styles.promptField}>
+            </PromptGroup>
+            <PromptGroup name="草稿生成" desc="关键词→日志">
               <div className={styles.promptLabel}>
                 <span className={styles.promptName}>
-                  草稿生成
                   <button type="button" onClick={async () => { if (await confirm({ level: 'moderate', title: '重置草稿生成提示词？', body: <p>将恢复为系统默认值。</p>, confirmLabel: '重置' })) setDraftLogPrompt('') }} className={styles.resetBtn}>重置</button>
                 </span>
                 <button type="button" className={styles.modeToggle} onClick={() => setDraftLogPromptMode(draftLogPromptMode === 'source' ? 'preview' : 'source')}>{draftLogPromptMode === 'source' ? '预览模式' : '源码模式'}</button>
@@ -603,11 +579,10 @@ export function SettingsPage() {
               <div style={{ marginTop: '8px' }}>
                 <DescriptionEditorWithMode value={draftLogPrompt || ''} onChange={setDraftLogPrompt} mode={draftLogPromptMode} onModeChange={setDraftLogPromptMode} minHeight={150} textareaClassName="field__textarea" hideInlineToggle autoGrow maxHeight={300} />
               </div>
-            </div>
-            <div className={styles.promptField}>
+            </PromptGroup>
+            <PromptGroup name="待办润色" desc="补充说明">
               <div className={styles.promptLabel}>
                 <span className={styles.promptName}>
-                  待办润色
                   <button type="button" onClick={async () => { if (await confirm({ level: 'moderate', title: '重置待办润色提示词？', body: <p>将恢复为系统默认值。</p>, confirmLabel: '重置' })) setPolishTodoPrompt('') }} className={styles.resetBtn}>重置</button>
                 </span>
                 <button type="button" className={styles.modeToggle} onClick={() => setPolishTodoPromptMode(polishTodoPromptMode === 'source' ? 'preview' : 'source')}>{polishTodoPromptMode === 'source' ? '预览模式' : '源码模式'}</button>
@@ -616,11 +591,10 @@ export function SettingsPage() {
               <div style={{ marginTop: '8px' }}>
                 <DescriptionEditorWithMode value={polishTodoPrompt || ''} onChange={setPolishTodoPrompt} mode={polishTodoPromptMode} onModeChange={setPolishTodoPromptMode} minHeight={150} textareaClassName="field__textarea" hideInlineToggle autoGrow maxHeight={300} />
               </div>
-            </div>
-            <div className={styles.promptField}>
+            </PromptGroup>
+            <PromptGroup name="任务描述润色" desc="任务描述">
               <div className={styles.promptLabel}>
                 <span className={styles.promptName}>
-                  任务描述润色
                   <button type="button" onClick={async () => { if (await confirm({ level: 'moderate', title: '重置任务描述润色提示词？', body: <p>将恢复为系统默认值。</p>, confirmLabel: '重置' })) setPolishTaskDescPrompt('') }} className={styles.resetBtn}>重置</button>
                 </span>
                 <button type="button" className={styles.modeToggle} onClick={() => setPolishTaskDescPromptMode(polishTaskDescPromptMode === 'source' ? 'preview' : 'source')}>{polishTaskDescPromptMode === 'source' ? '预览模式' : '源码模式'}</button>
@@ -629,7 +603,7 @@ export function SettingsPage() {
               <div style={{ marginTop: '8px' }}>
                 <DescriptionEditorWithMode value={polishTaskDescPrompt || ''} onChange={setPolishTaskDescPrompt} mode={polishTaskDescPromptMode} onModeChange={setPolishTaskDescPromptMode} minHeight={150} textareaClassName="field__textarea" hideInlineToggle autoGrow maxHeight={300} />
               </div>
-            </div>
+            </PromptGroup>
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
               <button type="submit" className="btn btn--primary" disabled={saveLLM.isPending}>{saveLLM.isPending ? '保存中...' : '保存'}</button>
             </div>
@@ -645,10 +619,9 @@ export function SettingsPage() {
           <p className={styles.sectionHint}>载入中...</p>
         ) : (
           <form onSubmit={handleSaveDialog}>
-            <div className={styles.promptField}>
+            <PromptGroup name="对话提示词" desc="AI 角色设定">
               <div className={styles.promptLabel}>
                 <span className={styles.promptName}>
-                  对话提示词
                   <button type="button" onClick={async () => { if (await confirm({ level: 'moderate', title: '重置对话提示词？', body: <p>将恢复为系统默认值。</p>, confirmLabel: '重置' })) setChatPrompt('') }} className={styles.resetBtn}>重置</button>
                 </span>
                 <button type="button" className={styles.modeToggle} onClick={() => setChatPromptMode(chatPromptMode === 'source' ? 'preview' : 'source')}>{chatPromptMode === 'source' ? '预览模式' : '源码模式'}</button>
@@ -657,11 +630,10 @@ export function SettingsPage() {
               <div style={{ marginTop: '8px' }}>
                 <DescriptionEditorWithMode value={chatPrompt || ''} onChange={setChatPrompt} mode={chatPromptMode} onModeChange={setChatPromptMode} minHeight={120} textareaClassName="field__textarea" hideInlineToggle autoGrow maxHeight={300} />
               </div>
-            </div>
-            <div className={styles.promptField}>
+            </PromptGroup>
+            <PromptGroup name="今日工作模板" desc="日报">
               <div className={styles.promptLabel}>
                 <span className={styles.promptName}>
-                  今日工作模板
                   <button type="button" onClick={async () => { if (await confirm({ level: 'moderate', title: '重置今日工作模板？', body: <p>将恢复为系统默认值。</p>, confirmLabel: '重置' })) setDailyReportTemplate('') }} className={styles.resetBtn}>重置</button>
                 </span>
                 <button type="button" className={styles.modeToggle} onClick={() => setDailyReportTemplateMode(dailyReportTemplateMode === 'source' ? 'preview' : 'source')}>{dailyReportTemplateMode === 'source' ? '预览模式' : '源码模式'}</button>
@@ -670,11 +642,10 @@ export function SettingsPage() {
               <div style={{ marginTop: '8px' }}>
                 <DescriptionEditorWithMode value={dailyReportTemplate || ''} onChange={setDailyReportTemplate} mode={dailyReportTemplateMode} onModeChange={setDailyReportTemplateMode} minHeight={180} textareaClassName="field__textarea" hideInlineToggle autoGrow maxHeight={300} />
               </div>
-            </div>
-            <div className={styles.promptField}>
+            </PromptGroup>
+            <PromptGroup name="本周工作模板" desc="周报">
               <div className={styles.promptLabel}>
                 <span className={styles.promptName}>
-                  本周工作模板
                   <button type="button" onClick={async () => { if (await confirm({ level: 'moderate', title: '重置本周工作模板？', body: <p>将恢复为系统默认值。</p>, confirmLabel: '重置' })) setWeeklyReportTemplate('') }} className={styles.resetBtn}>重置</button>
                 </span>
                 <button type="button" className={styles.modeToggle} onClick={() => setWeeklyReportTemplateMode(weeklyReportTemplateMode === 'source' ? 'preview' : 'source')}>{weeklyReportTemplateMode === 'source' ? '预览模式' : '源码模式'}</button>
@@ -683,7 +654,7 @@ export function SettingsPage() {
               <div style={{ marginTop: '8px' }}>
                 <DescriptionEditorWithMode value={weeklyReportTemplate || ''} onChange={setWeeklyReportTemplate} mode={weeklyReportTemplateMode} onModeChange={setWeeklyReportTemplateMode} minHeight={180} textareaClassName="field__textarea" hideInlineToggle autoGrow maxHeight={300} />
               </div>
-            </div>
+            </PromptGroup>
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
               <button type="submit" className="btn btn--primary" disabled={saveLLM.isPending}>{saveLLM.isPending ? '保存中...' : '保存'}</button>
             </div>
@@ -699,10 +670,9 @@ export function SettingsPage() {
           <p className={styles.sectionHint}>载入中...</p>
         ) : (
           <form onSubmit={handleSaveDisabled}>
-            <div className={styles.promptField}>
+            <PromptGroup name="总结提示词" desc="主体阶段">
               <div className={styles.promptLabel}>
                 <span className={styles.promptName}>
-                  总结提示词
                   <button type="button" onClick={async () => { if (await confirm({ level: 'moderate', title: '重置总结提示词？', body: <p>将恢复为系统默认值。</p>, confirmLabel: '重置' })) setSummarizePrompt('') }} className={styles.resetBtn}>重置</button>
                 </span>
                 <button type="button" className={styles.modeToggle} onClick={() => setSummarizePromptMode(summarizePromptMode === 'source' ? 'preview' : 'source')}>{summarizePromptMode === 'source' ? '预览模式' : '源码模式'}</button>
@@ -711,11 +681,10 @@ export function SettingsPage() {
               <div style={{ marginTop: '8px' }}>
                 <DescriptionEditorWithMode value={summarizePrompt || ''} onChange={setSummarizePrompt} mode={summarizePromptMode} onModeChange={setSummarizePromptMode} minHeight={150} textareaClassName="field__textarea" hideInlineToggle autoGrow maxHeight={300} />
               </div>
-            </div>
-            <div className={styles.promptField}>
+            </PromptGroup>
+            <PromptGroup name="维护期总结" desc="维护阶段">
               <div className={styles.promptLabel}>
                 <span className={styles.promptName}>
-                  维护期总结
                   <button type="button" onClick={async () => { if (await confirm({ level: 'moderate', title: '重置维护期总结提示词？', body: <p>将恢复为系统默认值。</p>, confirmLabel: '重置' })) setSummarizeMaintenancePrompt('') }} className={styles.resetBtn}>重置</button>
                 </span>
                 <button type="button" className={styles.modeToggle} onClick={() => setSummarizeMaintenancePromptMode(summarizeMaintenancePromptMode === 'source' ? 'preview' : 'source')}>{summarizeMaintenancePromptMode === 'source' ? '预览模式' : '源码模式'}</button>
@@ -724,11 +693,10 @@ export function SettingsPage() {
               <div style={{ marginTop: '8px' }}>
                 <DescriptionEditorWithMode value={summarizeMaintenancePrompt || ''} onChange={setSummarizeMaintenancePrompt} mode={summarizeMaintenancePromptMode} onModeChange={setSummarizeMaintenancePromptMode} minHeight={150} textareaClassName="field__textarea" hideInlineToggle autoGrow maxHeight={300} />
               </div>
-            </div>
-            <div className={styles.promptField}>
+            </PromptGroup>
+            <PromptGroup name="维护建议" desc="阶段判断">
               <div className={styles.promptLabel}>
                 <span className={styles.promptName}>
-                  维护建议
                   <button type="button" onClick={async () => { if (await confirm({ level: 'moderate', title: '重置维护建议提示词？', body: <p>将恢复为系统默认值。</p>, confirmLabel: '重置' })) setAskMaintenancePrompt('') }} className={styles.resetBtn}>重置</button>
                 </span>
                 <button type="button" className={styles.modeToggle} onClick={() => setAskMaintenancePromptMode(askMaintenancePromptMode === 'source' ? 'preview' : 'source')}>{askMaintenancePromptMode === 'source' ? '预览模式' : '源码模式'}</button>
@@ -737,7 +705,7 @@ export function SettingsPage() {
               <div style={{ marginTop: '8px' }}>
                 <DescriptionEditorWithMode value={askMaintenancePrompt || ''} onChange={setAskMaintenancePrompt} mode={askMaintenancePromptMode} onModeChange={setAskMaintenancePromptMode} minHeight={150} textareaClassName="field__textarea" hideInlineToggle autoGrow maxHeight={300} />
               </div>
-            </div>
+            </PromptGroup>
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
               <button type="submit" className="btn btn--primary" disabled={saveLLM.isPending}>{saveLLM.isPending ? '保存中...' : '保存'}</button>
             </div>
@@ -750,9 +718,56 @@ export function SettingsPage() {
       {/* 界面偏好 */}
       {activeSection === 'interface' && (
         <>
-        <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>界面偏好</h2>
-          <p className={styles.sectionHint}>自定义界面风格和行为。</p>
+        {/* 数据目录 */}
+        <section id="interface-data" className={styles.section}>
+          <h2 className={styles.sectionTitle}>数据目录</h2>
+          <p className={styles.sectionHint}>
+            SQLite 主库、密钥、导出、附件、运行日志都保存在这个目录下（系统自动分子目录）。
+            {!dataDir?.configured && ' 系统已为你准备了默认目录，点击按钮确认后开始初始化。'}
+          </p>
+          {dirLoading ? (
+            <p className={styles.sectionHint}>载入中...</p>
+          ) : (
+            <form onSubmit={handleSaveDir}>
+              <div className="field">
+                <div className="field__label">
+                  <span>目录绝对路径</span>
+                  <span className="field__hint">{dataDir?.configured ? '已配置' : '待确认'}</span>
+                </div>
+                <input
+                  className="field__input"
+                  value={dirDraft}
+                  onChange={e => setDirDraft(e.target.value)}
+                  placeholder="/Users/you/Documents/trail-data"
+                  style={{ fontFamily: 'var(--mono)', fontSize: '13.5px' }}
+                  required
+                />
+                <p className={styles.fieldHint}>
+                  {dataDir?.configured
+                    ? '必须是绝对路径。保存即切换：后端关旧连接、在新目录建库并跑建表、初始化子目录。'
+                    : '确认后系统将在该目录创建 db/、exports/、attachments/、logs/ 及 .secret_key 等文件。'}
+                </p>
+              </div>
+              {dataDir?.configured && dataDir.dataDir && (
+                <div className={styles.statusLine}>
+                  <span>当前目录 <span className={`${styles.statusValue} ${styles.statusMono}`}>{dataDir.dataDir}</span></span>
+                </div>
+              )}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16, gap: 8 }}>
+                <span style={{ fontFamily: 'var(--mono)', fontSize: '10.5px', color: 'var(--ink-faded)', letterSpacing: '0.06em', flex: 1, alignSelf: 'center' }}>
+                  — {dataDir?.configured ? '即时生效 · 配置写入 ~/.trail/config.yaml —' : '确认即初始化 · 配置写入 ~/.trail/config.yaml —'}
+                </span>
+                <button type="submit" className="btn btn--primary" disabled={saveDir.isPending || !dirDraft.trim()}>
+                  {saveDir.isPending ? '处理中...' : dataDir?.configured ? '保存并切换' : '确认并初始化'}
+                </button>
+              </div>
+            </form>
+          )}
+        </section>
+
+        <section id="interface-general" className={styles.section}>
+          <h2 className={styles.sectionTitle}>通用设置</h2>
+          <p className={styles.sectionHint}>卷首语、语音输入时长、工具调用次数等通用偏好。</p>
 
           {/* 卷首语 */}
           <div className="field">
@@ -1001,8 +1016,8 @@ export function SettingsPage() {
       )}
 
       {/* 占位提示语 */}
-      {activeSection === 'placeholders' && (
-        <section className={styles.section}>
+      {activeSection === 'interface' && (
+        <section id="interface-placeholders" className={styles.section}>
           <h2 className={styles.sectionTitle}>占位提示语</h2>
           <p className={styles.sectionHint}>编辑器输入框为空时显示的灰色提示文字。</p>
           {placeholdersLoading ? (

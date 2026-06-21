@@ -1,6 +1,7 @@
 package com.trail.web.controller;
 
 import com.trail.store.AttachmentStore;
+import com.trail.web.dto.AttachmentListItemResponse;
 import com.trail.web.dto.AttachmentResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -27,6 +28,22 @@ public class AttachmentController {
 
     public AttachmentController(AttachmentStore store) {
         this.store = store;
+    }
+
+    @Operation(summary = "有附件的任务列表", description = "返回有附件引用的任务 id 和 title，用于筛选下拉")
+    @GetMapping("/tasks")
+    public List<Map<String, Object>> referencedTasks() {
+        return store.listReferencedTasks();
+    }
+
+    @Operation(summary = "附件列表", description = "查询所有附件，支持按 MIME 类型和任务 ID 筛选")
+    @GetMapping
+    public List<AttachmentListItemResponse> list(
+            @RequestParam(required = false) List<String> mime,
+            @RequestParam(required = false) List<Long> taskId) {
+        return store.listAttachments(mime, taskId).stream()
+                .map(AttachmentListItemResponse::from)
+                .toList();
     }
 
     @Operation(summary = "上传附件", description = "上传图片等文件，返回附件 ID 和访问路径")
@@ -106,11 +123,12 @@ public class AttachmentController {
             long taskId,
             String title,
             String logDate,
-            String snippet
+            String snippet,
+            boolean deleted
     ) {
         public static ReferenceDto from(AttachmentStore.Reference r) {
             return new ReferenceDto(r.sourceType(), r.sourceId(), r.column(),
-                    r.taskId(), r.title(), r.logDate(), r.snippet());
+                    r.taskId(), r.title(), r.logDate(), r.snippet(), r.deleted());
         }
     }
 }

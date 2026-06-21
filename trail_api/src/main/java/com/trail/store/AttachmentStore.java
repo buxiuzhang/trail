@@ -190,11 +190,11 @@ public class AttachmentStore {
         out.addAll(scanColumn("task", "maintenance_summary",
                 "SELECT id, title, maintenance_summary AS col FROM tasks WHERE maintenance_summary LIKE ?", pat, "id"));
 
-        // work_logs 两个字段
+        // work_logs 两个字段（含 is_deleted 供前端标记已删除引用）
         out.addAll(scanColumn("log", "content",
-                "SELECT id, task_id, log_date, content AS col FROM work_logs WHERE content LIKE ?", pat, "task_id"));
+                "SELECT id, task_id, log_date, is_deleted, content AS col FROM work_logs WHERE content LIKE ?", pat, "task_id"));
         out.addAll(scanColumn("log", "polished_content",
-                "SELECT id, task_id, log_date, polished_content AS col FROM work_logs WHERE polished_content LIKE ?", pat, "task_id"));
+                "SELECT id, task_id, log_date, is_deleted, polished_content AS col FROM work_logs WHERE polished_content LIKE ?", pat, "task_id"));
 
         // todos.description
         out.addAll(scanColumn("todo", "description",
@@ -260,10 +260,10 @@ public class AttachmentStore {
                     : ((Number) r.get(taskIdAlias)).longValue();
             String title = r.get("title") == null ? null : (String) r.get("title");
             String logDate = r.get("log_date") == null ? null : (String) r.get("log_date");
+            boolean deleted = r.get("is_deleted") != null && ((Number) r.get("is_deleted")).intValue() == 1;
             String col = (String) r.get("col");
-            // 提一段 snippet：截 col 中匹配子串前后 20 字符
             String snippet = snippetAround(col, "/api/attachments/", 20);
-            out.add(new Reference(sourceType, sourceId, column, taskId, title, logDate, snippet));
+            out.add(new Reference(sourceType, sourceId, column, taskId, title, logDate, snippet, deleted));
         }
         return out;
     }
@@ -290,6 +290,176 @@ public class AttachmentStore {
         }
     }
 
+    /** 返回所有有附件引用的任务（id + title），用于文件管理筛选下拉。 */
+    public List<Map<String, Object>> listReferencedTasks() {
+        return db.query("""
+            SELECT DISTINCT t.id, t.title FROM tasks t
+            WHERE EXISTS (
+              SELECT 1 FROM attachments a WHERE (
+                t.description        LIKE '%/api/attachments/' || a.id || ')%'
+             OR t.summary            LIKE '%/api/attachments/' || a.id || ')%'
+             OR t.maintenance_summary LIKE '%/api/attachments/' || a.id || ')%'
+              )
+            )
+            UNION
+            SELECT DISTINCT t2.id, t2.title FROM tasks t2
+            JOIN work_logs w ON w.task_id = t2.id
+            JOIN attachments a2 ON (
+              w.content         LIKE '%/api/attachments/' || a2.id || ')%'
+           OR w.polished_content LIKE '%/api/attachments/' || a2.id || ')%'
+            )
+            UNION
+            SELECT DISTINCT t3.id, t3.title FROM tasks t3
+            JOIN todos td ON td.task_id = t3.id
+            JOIN attachments a3 ON (
+              td.description LIKE '%/api/attachments/' || a3.id || ')%'
+            )
+            ORDER BY 1 DESC
+            """);
+    }
+
+    /**
+     * 附件列表查询（文件管理页）。
+     * mimeTypes 为空 = 不过滤；taskIds 为空 = 不过滤。
+     * taskId 筛选：找引用了该 task 的附件（扫 tasks/work_logs/todos 三张表）。
+     */
+    public List<ListItem> listAttachments(List<String> mimeTypes, List<Long> taskIds) {
+        StringBuilder sql = new StringBuilder("""
+            SELECT a.id, a.rel_path, a.mime, a.byte_size, a.original_name,
+                   a.display_size, a.created_at,
+                   (
+                     SELECT COUNT(*) FROM (
+                       SELECT 1 FROM tasks
+                         WHERE description        LIKE '%/api/attachments/' || a.id || ')%'
+                            OR summary            LIKE '%/api/attachments/' || a.id || ')%'
+                            OR maintenance_summary LIKE '%/api/attachments/' || a.id || ')%'
+                       UNION ALL
+                       SELECT 1 FROM work_logs
+                         WHERE content          LIKE '%/api/attachments/' || a.id || ')%'
+                            OR polished_content  LIKE '%/api/attachments/' || a.id || ')%'
+                       UNION ALL
+                       SELECT 1 FROM todos
+                         WHERE description LIKE '%/api/attachments/' || a.id || ')%'
+                     )
+                   ) AS ref_count,
+                   (
+                     SELECT COUNT(*) FROM (
+                       SELECT 1 FROM tasks
+                         WHERE description        LIKE '%/api/attachments/' || a.id || ')%'
+                            OR summary            LIKE '%/api/attachments/' || a.id || ')%'
+                            OR maintenance_summary LIKE '%/api/attachments/' || a.id || ')%'
+                       UNION ALL
+                       SELECT 1 FROM work_logs
+                         WHERE is_deleted = 0
+                           AND (content         LIKE '%/api/attachments/' || a.id || ')%'
+                            OR polished_content  LIKE '%/api/attachments/' || a.id || ')%')
+                       UNION ALL
+                       SELECT 1 FROM todos
+                         WHERE description LIKE '%/api/attachments/' || a.id || ')%'
+                     )
+                   ) AS active_ref_count
+            FROM attachments a
+            WHERE 1=1
+            """);
+        List<Object> params = new ArrayList<>();
+
+        if (mimeTypes != null && !mimeTypes.isEmpty()) {
+            sql.append(" AND a.mime IN (")
+               .append("?,".repeat(mimeTypes.size()).replaceAll(",$", ""))
+               .append(")");
+            params.addAll(mimeTypes);
+        }
+
+        if (taskIds != null && !taskIds.isEmpty()) {
+            String placeholders = "?,".repeat(taskIds.size()).replaceAll(",$", "");
+            sql.append("""
+                 AND a.id IN (
+                   SELECT DISTINCT a2.id FROM attachments a2
+                   JOIN tasks t ON (
+                     t.description        LIKE '%/api/attachments/' || a2.id || ')%'
+                  OR t.summary            LIKE '%/api/attachments/' || a2.id || ')%'
+                  OR t.maintenance_summary LIKE '%/api/attachments/' || a2.id || ')%'
+                   ) WHERE t.id IN (""" + placeholders + """
+                   )
+                   UNION
+                   SELECT DISTINCT a3.id FROM attachments a3
+                   JOIN work_logs w ON (
+                     w.content         LIKE '%/api/attachments/' || a3.id || ')%'
+                  OR w.polished_content LIKE '%/api/attachments/' || a3.id || ')%'
+                   ) WHERE w.task_id IN (""" + placeholders + """
+                   )
+                   UNION
+                   SELECT DISTINCT a4.id FROM attachments a4
+                   JOIN todos td ON (
+                     td.description LIKE '%/api/attachments/' || a4.id || ')%'
+                   ) WHERE td.task_id IN (""" + placeholders + """
+                   )
+                 )
+                """);
+            params.addAll(taskIds);
+            params.addAll(taskIds);
+            params.addAll(taskIds);
+        }
+
+        sql.append("""
+             ORDER BY
+               CASE WHEN (
+                 SELECT MAX(tc.created_at) FROM tasks tc WHERE tc.id IN (
+                   SELECT t1.id FROM tasks t1 WHERE (
+                     t1.description        LIKE '%/api/attachments/' || a.id || ')%'
+                  OR t1.summary            LIKE '%/api/attachments/' || a.id || ')%'
+                  OR t1.maintenance_summary LIKE '%/api/attachments/' || a.id || ')%'
+                   )
+                   UNION
+                   SELECT w.task_id FROM work_logs w WHERE (
+                     w.content         LIKE '%/api/attachments/' || a.id || ')%'
+                  OR w.polished_content LIKE '%/api/attachments/' || a.id || ')%'
+                   )
+                   UNION
+                   SELECT td.task_id FROM todos td WHERE (
+                     td.description LIKE '%/api/attachments/' || a.id || ')%'
+                   )
+                 )
+               ) IS NULL THEN 1 ELSE 0 END,
+               (
+                 SELECT MAX(tc.created_at) FROM tasks tc WHERE tc.id IN (
+                   SELECT t1.id FROM tasks t1 WHERE (
+                     t1.description        LIKE '%/api/attachments/' || a.id || ')%'
+                  OR t1.summary            LIKE '%/api/attachments/' || a.id || ')%'
+                  OR t1.maintenance_summary LIKE '%/api/attachments/' || a.id || ')%'
+                   )
+                   UNION
+                   SELECT w.task_id FROM work_logs w WHERE (
+                     w.content         LIKE '%/api/attachments/' || a.id || ')%'
+                  OR w.polished_content LIKE '%/api/attachments/' || a.id || ')%'
+                   )
+                   UNION
+                   SELECT td.task_id FROM todos td WHERE (
+                     td.description LIKE '%/api/attachments/' || a.id || ')%'
+                   )
+                 )
+               ) DESC,
+               a.created_at DESC
+            """);
+
+        List<Map<String, Object>> rows = db.query(sql.toString(), params.toArray());
+        List<ListItem> out = new ArrayList<>();
+        for (Map<String, Object> r : rows) {
+            out.add(new ListItem(
+                ((Number) r.get("id")).longValue(),
+                (String) r.get("rel_path"),
+                (String) r.get("mime"),
+                ((Number) r.get("byte_size")).longValue(),
+                (String) r.get("original_name"),
+                ((Number) r.get("display_size")).intValue(),
+                (String) r.get("created_at"),
+                ((Number) r.get("ref_count")).intValue(),
+                ((Number) r.get("active_ref_count")).intValue()
+            ));
+        }
+        return out;
+    }
+
     /** save() 返回的内部 record */
     public record Saved(long id, String url, String mime, long byteSize, String originalName, int displaySize) {}
 
@@ -298,10 +468,16 @@ public class AttachmentStore {
         public String url() { return "/api/attachments/" + id; }
     }
 
+    /** listAttachments 返回的内部 record */
+    public record ListItem(long id, String relPath, String mime, long byteSize,
+                           String originalName, int displaySize, String createdAt, int refCount, int activeRefCount) {
+        public String url() { return "/api/attachments/" + id; }
+    }
+
     /** load() 返回的内部 record */
     public record Loaded(Path absolutePath, String mime) {}
 
     /** findReferences 返的内部 record */
     public record Reference(String sourceType, long sourceId, String column,
-                            long taskId, String title, String logDate, String snippet) {}
+                            long taskId, String title, String logDate, String snippet, boolean deleted) {}
 }

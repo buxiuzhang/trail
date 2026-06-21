@@ -34,6 +34,38 @@ export interface DeleteInUseError {
   }>
 }
 
+export interface AttachmentListItem {
+  id: number
+  url: string
+  mime: string
+  byte_size: number
+  original_name: string | null
+  display_size: number
+  created_at: string
+  ref_count: number
+  active_ref_count: number
+}
+
+export function useAttachmentTasks() {
+  return useQuery({
+    queryKey: ['attachments', 'tasks'],
+    queryFn: () => api.get<Array<{ id: number; title: string }>>('/api/attachments/tasks'),
+    staleTime: 30_000,
+  })
+}
+
+export function useAttachmentList(filters: { mimes?: string[]; taskIds?: number[] } = {}) {
+  const params = new URLSearchParams()
+  filters.mimes?.forEach(m => params.append('mime', m))
+  filters.taskIds?.forEach(id => params.append('taskId', String(id)))
+  const query = params.toString()
+  return useQuery({
+    queryKey: ['attachments', 'list', filters.mimes, filters.taskIds],
+    queryFn: () => api.get<AttachmentListItem[]>(`/api/attachments${query ? '?' + query : ''}`),
+    staleTime: 30_000,
+  })
+}
+
 export function useUploadAttachment() {
   return useMutation({
     mutationFn: async (file: File): Promise<AttachmentOut> => {

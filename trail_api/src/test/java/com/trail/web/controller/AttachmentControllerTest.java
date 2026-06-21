@@ -198,10 +198,10 @@ class AttachmentControllerTest {
             when(store.findReferences(1L)).thenReturn(List.of(
                     new AttachmentStore.Reference("task", 10L, "description",
                             10L, "数据湖巡检", null,
-                            "…前文… ![x](/api/attachments/1) …后文…"),
+                            "…前文… ![x](/api/attachments/1) …后文…", false),
                     new AttachmentStore.Reference("log", 30L, "content",
                             10L, null, "2026-06-10",
-                            "…日志里也引用了… ![x](/api/attachments/1) …")
+                            "…日志里也引用了… ![x](/api/attachments/1) …", false)
             ));
 
             mvc.perform(get("/api/attachments/1/references"))
@@ -244,7 +244,7 @@ class AttachmentControllerTest {
         void deleteInUse() throws Exception {
             when(store.findReferences(1L)).thenReturn(List.of(
                     new AttachmentStore.Reference("task", 10L, "description",
-                            10L, "数据湖巡检", null, "…[/api/attachments/1)…" )
+                            10L, "数据湖巡检", null, "…[/api/attachments/1)…", false)
             ));
 
             mvc.perform(delete("/api/attachments/1"))

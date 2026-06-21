@@ -15,8 +15,7 @@ interface SettingsSidebarProps {
 const SECTIONS = [
   { key: 'interface', label: '界面偏好' },
   { key: 'llm', label: '大模型' },
-  { key: 'placeholders', label: '占位提示语' },
-  { key: 'data', label: '数据目录' },
+  { key: 'files', label: '文件管理' },
 ]
 
 const LLM_SUB = [
@@ -26,8 +25,11 @@ const LLM_SUB = [
 ]
 
 const INTERFACE_SUB = [
+  { id: 'interface-data', label: '数据目录' },
+  { id: 'interface-general', label: '通用设置' },
   { id: 'interface-watch', label: '特别关注推送配置' },
   { id: 'interface-todo-alert', label: '待办事项推送配置' },
+  { id: 'interface-placeholders', label: '占位提示语' },
 ]
 
 export function SettingsSidebar({ activeSection, onSectionChange }: SettingsSidebarProps) {
