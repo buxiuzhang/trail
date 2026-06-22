@@ -34,13 +34,16 @@ public class ApiToolExecutor {
     private final ObjectMapper mapper;
     private final HttpClient client;
     private final WorkLogStore workLogStore;
+    private final McpClientManager mcpClientManager;
 
-    public ApiToolExecutor(OpenApiService openApiService, SqliteDb db, ObjectMapper mapper, WorkLogStore workLogStore) {
+    public ApiToolExecutor(OpenApiService openApiService, SqliteDb db, ObjectMapper mapper,
+                           WorkLogStore workLogStore, McpClientManager mcpClientManager) {
         this.openApiService = openApiService;
         this.db = db;
         this.mapper = mapper;
         this.client = HttpClient.newHttpClient();
         this.workLogStore = workLogStore;
+        this.mcpClientManager = mcpClientManager;
     }
 
     /**
@@ -56,7 +59,12 @@ public class ApiToolExecutor {
                 case "call_api" -> executeCallApi(input);
                 case "export_daily_report" -> executeExportDailyReport(input);
                 case "export_weekly_report" -> executeExportWeeklyReport(input);
-                default -> throw new IllegalArgumentException("未知工具：" + name);
+                default -> {
+                    if (name.startsWith("mcp__")) {
+                        yield mcpClientManager.callTool(name, input);
+                    }
+                    throw new IllegalArgumentException("未知工具：" + name);
+                }
             };
             return toJson(result);
         } catch (Exception e) {

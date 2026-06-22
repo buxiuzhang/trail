@@ -273,6 +273,13 @@ public class SqliteDb {
                     log.info("M14 迁移: FTS5 索引回填完成（tasks={}, 触发 work_logs 同步）", taskRows);
                 }
             }
+            // Skills scope 字段迁移
+            if (tableExists("skills") && !columnExists("skills", "scope")) {
+                try (Statement s = c.createStatement()) {
+                    s.execute("ALTER TABLE skills ADD COLUMN scope TEXT NOT NULL DEFAULT '[\"chat\"]'");
+                    log.info("skills.scope 列已添加");
+                }
+            }
             log.info("ensureSchema 完成");
         } catch (Exception e) {
             throw new RuntimeException("ensureSchema 失败: " + e.getMessage(), e);

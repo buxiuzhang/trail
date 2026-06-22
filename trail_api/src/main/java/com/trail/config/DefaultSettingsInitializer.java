@@ -1,6 +1,7 @@
 package com.trail.config;
 
 import com.trail.config.AppProperties.Defaults;
+import com.trail.llm.McpClientManager;
 import com.trail.store.LLMSettingsStore;
 import com.trail.store.exception.DataDirNotConfiguredException;
 import org.slf4j.Logger;
@@ -25,11 +26,14 @@ public class DefaultSettingsInitializer {
     private final AppProperties props;
     private final LLMSettingsStore store;
     private final DataDirService dataDirService;
+    private final McpClientManager mcpClientManager;
 
-    public DefaultSettingsInitializer(AppProperties props, LLMSettingsStore store, DataDirService dataDirService) {
+    public DefaultSettingsInitializer(AppProperties props, LLMSettingsStore store,
+                                      DataDirService dataDirService, McpClientManager mcpClientManager) {
         this.props = props;
         this.store = store;
         this.dataDirService = dataDirService;
+        this.mcpClientManager = mcpClientManager;
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -90,6 +94,8 @@ public class DefaultSettingsInitializer {
         } else {
             log.debug("默认配置已存在，跳过初始化");
         }
+
+        mcpClientManager.refreshAll();
     }
 
     private void putIfPresent(Map<String, String> map, String key, String value) {

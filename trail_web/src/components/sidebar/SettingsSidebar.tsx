@@ -21,6 +21,8 @@ const SECTIONS = [
 const LLM_SUB = [
   { id: 'llm-record', label: '工作记录' },
   { id: 'llm-dialog', label: '对话与报表' },
+  { id: 'llm-mcp', label: 'MCP 工具服务' },
+  { id: 'llm-skills', label: 'Skills 扩展' },
   { id: 'llm-disabled', label: '暂不可用' },
 ]
 

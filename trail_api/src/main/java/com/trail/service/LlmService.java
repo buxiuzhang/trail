@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.trail.config.AppProperties;
 import com.trail.store.AiRecordStore;
 import com.trail.store.LLMSettingsStore;
+import com.trail.store.SkillStore;
 import com.trail.store.TaskStore;
 import com.trail.store.TodoStore;
 import com.trail.store.WorkLogStore;
@@ -72,6 +73,7 @@ public class LlmService {
     private final TodoStore todoStore;
     private final WorkLogStore workLogStore;
     private final AiRecordStore aiRecordStore;
+    private final SkillStore skillStore;
     private final ObjectMapper mapper;
     private final ExecutorService executor;
 
@@ -86,13 +88,15 @@ public class LlmService {
     private volatile String cachedDraftLogPrompt;
 
     public LlmService(AppProperties props, LLMSettingsStore settingsStore, TaskStore taskStore,
-                      TodoStore todoStore, WorkLogStore workLogStore, AiRecordStore aiRecordStore) {
+                      TodoStore todoStore, WorkLogStore workLogStore, AiRecordStore aiRecordStore,
+                      SkillStore skillStore) {
         this.props = props;
         this.settingsStore = settingsStore;
         this.taskStore = taskStore;
         this.todoStore = todoStore;
         this.workLogStore = workLogStore;
         this.aiRecordStore = aiRecordStore;
+        this.skillStore = skillStore;
         this.mapper = new ObjectMapper();
         this.executor = Executors.newCachedThreadPool();
 
@@ -179,6 +183,10 @@ public class LlmService {
         } else {
             system = cachedPolishPrompt;
         }
+        String polishScope = "todo".equals(type) ? "polish_todo"
+                           : "task_desc".equals(type) ? "polish_task"
+                           : "polish_log";
+        system = appendSkills(system, polishScope);
 
         // 自动注入任务上下文
         if (taskId != null) {
@@ -265,7 +273,7 @@ public class LlmService {
                 .map(t -> "- " + t.get("title"))
                 .collect(java.util.stream.Collectors.joining("\n"));
 
-        String system = cachedDraftLogPrompt;
+        String system = appendSkills(cachedDraftLogPrompt, "draft");
         String user = DRAFT_LOG_USER_TEMPLATE
             .replace("{title}", title)
             .replace("{status}", status)
@@ -755,6 +763,28 @@ public class LlmService {
             sb.append("[").append(date).append("] ").append(content).append("\n\n");
         }
         return sb.toString();
+    }
+
+    // ============================================================
+    // Skills 注入
+    // ============================================================
+
+    private String appendSkills(String base, String scope) {
+        try {
+            List<Map<String, Object>> skills = skillStore.findEnabledByScope(scope);
+            if (skills.isEmpty()) return base;
+            StringBuilder sb = new StringBuilder(base != null ? base : "");
+            for (Map<String, Object> skill : skills) {
+                String snippet = (String) skill.get("system_prompt");
+                if (snippet != null && !snippet.isBlank()) {
+                    sb.append("\n\n---\n\n").append(snippet.strip());
+                }
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            log.warn("appendSkills({}) 失败: {}", scope, e.getMessage());
+            return base;
+        }
     }
 
     // ============================================================

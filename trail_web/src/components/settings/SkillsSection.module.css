@@ -1,0 +1,458 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.hint {
+  font-size: 13px;
+  color: var(--ink-ghost);
+  font-style: italic;
+  margin: 0 0 var(--space-md);
+}
+
+.empty {
+  font-size: 13px;
+  color: var(--ink-ghost);
+  padding: var(--space-md) 0;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.card {
+  position: relative;
+  padding: var(--space-md) var(--space-lg);
+  border: 0.5px solid var(--rule);
+  background: var(--card);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.cardIndex {
+  position: absolute;
+  top: 0;
+  left: 0;
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--ink-ghost);
+  letter-spacing: 0.06em;
+  line-height: 1;
+  padding: 3px 5px;
+}
+
+.cardDisabled {
+  opacity: 0.5;
+}
+
+.cardMain {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.cardInfo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.cardName {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.cardDesc {
+  display: block;
+  font-size: 12px;
+  color: var(--ink-ghost);
+  margin-top: 4px;
+}
+
+.scopeBadge {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 1px 6px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--ink-ghost) 12%, transparent);
+  color: var(--ink-faded);
+}
+
+.scopeBadge_chat {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+}
+
+.scopeBadge_draft {
+  background: color-mix(in srgb, #7a5 12%, transparent);
+  color: #7a5;
+}
+
+.scopeBadge_polish_log {
+  background: color-mix(in srgb, #a57 12%, transparent);
+  color: #a57;
+}
+
+.scopeBadge_polish_task {
+  background: color-mix(in srgb, #a57 12%, transparent);
+  color: #a57;
+}
+
+.scopeBadge_polish_todo {
+  background: color-mix(in srgb, #a57 12%, transparent);
+  color: #a57;
+}
+
+.scopePolishRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.scopePolishRow + .scopePolishRow {
+  margin-top: var(--space-sm);
+}
+
+.scopePolishLabel {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-ghost);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.scopeGroup {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.scopeOption {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--ink-ghost);
+  cursor: pointer;
+  user-select: none;
+  padding: 2px 0;
+  transition: color 0.12s;
+}
+
+.scopeOption:hover {
+  color: var(--ink-faded);
+}
+
+.scopeOption input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.scopeOption .scopeCheck {
+  width: 12px;
+  height: 12px;
+  border: 0.5px solid var(--rule);
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 9px;
+  color: var(--paper);
+  transition: border-color 0.12s, background 0.12s;
+}
+
+.scopeOptionChecked {
+  color: var(--ink);
+}
+
+.scopeOptionChecked .scopeCheck {
+  background: var(--ink);
+  border-color: var(--ink);
+}
+
+.promptPreview {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-faded);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.cardActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-shrink: 0;
+}
+
+.iconBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  opacity: 0.45;
+  transition: opacity 0.12s;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.iconBtn:hover {
+  opacity: 0.85;
+}
+
+.iconBtnDanger:hover {
+  opacity: 1;
+}
+
+.iconBtnDanger img {
+  filter: invert(30%) sepia(80%) saturate(600%) hue-rotate(330deg);
+}
+
+/* —— 表单 —— */
+.form {
+  position: relative;
+  padding: var(--space-lg);
+  border: 0.5px solid var(--rule-soft);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  transition: border-color 0.3s ease;
+}
+
+.formActive {
+  border-color: var(--ink-faded);
+}
+
+.formEditIcon {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.formTitle {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faded);
+  margin-bottom: var(--space-sm);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.promptHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-sm);
+}
+
+.modeToggle {
+  background: none;
+  border: none;
+  color: var(--ink-ghost);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  padding: 0;
+  cursor: pointer;
+  transition: color 150ms ease;
+}
+
+.modeToggle:hover {
+  color: var(--ink-faded);
+}
+
+.label {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  color: var(--ink-faded);
+  text-transform: uppercase;
+}
+
+.input {
+  font-family: var(--mono);
+  font-size: 13px;
+  background: transparent;
+  border: none;
+  border-bottom: 0.5px solid var(--rule-soft);
+  color: var(--ink);
+  padding: 6px 0;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.input:focus {
+  border-bottom-color: var(--ink-faded);
+}
+
+.textarea {
+  font-family: var(--mono);
+  font-size: 12px;
+  background: transparent;
+  border: none;
+  border-bottom: 0.5px solid var(--rule-soft);
+  color: var(--ink);
+  padding: 8px 0;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+  resize: none;
+  overflow: hidden;
+  line-height: 1.6;
+}
+
+.textarea:focus {
+  border-bottom-color: var(--ink-faded);
+}
+
+.promptPreviewFull {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink);
+  line-height: 1.6;
+  padding: 8px 0;
+  border-bottom: 0.5px solid var(--rule-soft);
+  min-height: 80px;
+}
+
+.formActions {
+  display: flex;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+}
+
+.addBtn {
+  align-self: flex-end;
+}
+
+/* —— 按钮 —— */
+.btn {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 5px 12px;
+  border: 0.5px solid var(--rule);
+  background: var(--card);
+  color: var(--ink-faded);
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.btn:hover {
+  border-color: var(--ink-ghost);
+  color: var(--ink);
+}
+
+.btnSm {
+  padding: 3px 8px;
+  font-size: 10px;
+}
+
+.btnPrimary {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+}
+
+.btnPrimary:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.btnDanger {
+  color: #e55;
+  border-color: #e5544;
+}
+
+.btnDanger:hover {
+  background: color-mix(in srgb, #e55 10%, transparent);
+}
+
+/* —— Toggle —— */
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  position: relative;
+}
+
+.toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+
+.toggleSlider {
+  width: 34px;
+  height: 20px;
+  background: #9A8E7A;
+  border-radius: 10px;
+  transition: background 0.15s;
+  position: relative;
+  border: 0.5px solid rgba(0,0,0,0.12);
+}
+
+.toggleSlider::after {
+  content: '';
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  background: #fff;
+  border-radius: 50%;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.15s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.toggle input:checked + .toggleSlider {
+  background: var(--accent);
+}
+
+.toggle input:checked + .toggleSlider::after {
+  transform: translateX(14px);
+}

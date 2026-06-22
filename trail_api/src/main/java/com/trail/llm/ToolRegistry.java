@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -14,11 +15,13 @@ import java.util.List;
 public class ToolRegistry {
 
     private final ObjectMapper mapper;
-    private final List<Tool> tools;
+    private final McpClientManager mcpClientManager;
+    private final List<Tool> builtinTools;
 
-    public ToolRegistry(ObjectMapper mapper) {
+    public ToolRegistry(ObjectMapper mapper, McpClientManager mcpClientManager) {
         this.mapper = mapper;
-        this.tools = List.of(
+        this.mcpClientManager = mcpClientManager;
+        this.builtinTools = List.of(
             listControllers(),
             listEndpoints(),
             getApiDocs(),
@@ -30,11 +33,13 @@ public class ToolRegistry {
     }
 
     public List<Tool> getTools() {
-        return tools;
+        List<Tool> all = new ArrayList<>(builtinTools);
+        all.addAll(mcpClientManager.getAllTools());
+        return all;
     }
 
     public List<ObjectNode> getToolsJson() {
-        return tools.stream().map(t -> t.toJson(mapper)).toList();
+        return getTools().stream().map(t -> t.toJson(mapper)).toList();
     }
 
     // ============================================================

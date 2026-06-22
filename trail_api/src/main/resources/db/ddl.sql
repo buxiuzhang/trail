@@ -164,6 +164,35 @@ CREATE VIRTUAL TABLE IF NOT EXISTS fts_logs USING fts5(
 -- 在 SqliteDb.ensureSchema() 中以 Statement.execute() 直接创建，
 -- 原因：触发器体含多条 SQL（BEGIN...END），ddl.sql 的分号分割逻辑会截断，无法在此定义。
 
+-- MCP Servers（支持 stdio 本地进程 和 SSE 远程服务两种类型）
+CREATE TABLE IF NOT EXISTS mcp_servers (
+    id          TEXT    PRIMARY KEY,
+    name        TEXT    NOT NULL,
+    type        TEXT    NOT NULL,           -- 'stdio' | 'sse'
+    command     TEXT,                       -- stdio: 可执行文件，如 "npx"
+    args        TEXT,                       -- stdio: JSON 数组，如 ["@modelcontextprotocol/server-filesystem","/tmp"]
+    env         TEXT,                       -- stdio: JSON 对象，额外环境变量
+    url         TEXT,                       -- sse: 端点 URL
+    headers     TEXT,                       -- sse: JSON 对象，额外请求头
+    enabled     INTEGER NOT NULL DEFAULT 1,
+    created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Skills（prompt 片段，聊天时合并进 chat_system_prompt）
+CREATE TABLE IF NOT EXISTS skills (
+    id              TEXT    PRIMARY KEY,
+    name            TEXT    NOT NULL,
+    description     TEXT,
+    system_prompt   TEXT    NOT NULL,
+    enabled         INTEGER NOT NULL DEFAULT 1,
+    sort_order      INTEGER NOT NULL DEFAULT 0,
+    scope           TEXT    NOT NULL DEFAULT '["chat"]',
+    created_at      TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_mcp_servers_enabled ON mcp_servers(enabled);
+CREATE INDEX IF NOT EXISTS idx_skills_enabled_order ON skills(enabled, sort_order);
+
 -- 3) 1 个视图
 --    DuckDB 版用 CURRENT_DATE - log_date → SQLite 用 julianday('now') - julianday(log_date)
 CREATE VIEW IF NOT EXISTS v_stale_tasks AS

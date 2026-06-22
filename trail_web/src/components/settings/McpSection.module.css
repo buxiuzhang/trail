@@ -1,0 +1,364 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.hint {
+  font-size: 13px;
+  color: var(--ink-ghost);
+  font-style: italic;
+  margin: 0 0 var(--space-md);
+}
+
+.empty {
+  font-size: 13px;
+  color: var(--ink-ghost);
+  padding: var(--space-md) 0;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.card {
+  position: relative;
+  padding: var(--space-md) var(--space-lg);
+  border: 0.5px solid var(--rule);
+  background: var(--card);
+}
+
+.cardIndex {
+  position: absolute;
+  top: 0;
+  left: 0;
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--ink-ghost);
+  letter-spacing: 0.06em;
+  line-height: 1;
+  padding: 3px 5px;
+}
+
+.cardDisabled {
+  opacity: 0.5;
+}
+
+.cardMain {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.cardInfo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.cardName {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.cardBadge {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  padding: 1px 6px;
+  border-radius: 2px;
+}
+
+.cardMeta {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-faded);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 280px;
+}
+
+.cardActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-shrink: 0;
+}
+
+.iconBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  opacity: 0.45;
+  transition: opacity 0.12s;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.iconBtn:hover {
+  opacity: 0.85;
+}
+
+.iconBtn:disabled {
+  opacity: 0.25;
+  cursor: not-allowed;
+}
+
+.iconBtnLoading {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.iconBtnDanger:hover {
+  opacity: 1;
+}
+
+.iconBtnDanger img {
+  filter: invert(30%) sepia(80%) saturate(600%) hue-rotate(330deg);
+}
+
+.testResult {
+  margin-top: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  font-size: 12px;
+  font-family: var(--mono);
+  border-radius: 2px;
+  position: relative;
+}
+
+.testClose {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 11px;
+  opacity: 0.5;
+  padding: 0 2px;
+  line-height: 1;
+  color: inherit;
+}
+
+.testClose:hover {
+  opacity: 1;
+}
+
+.testOk {
+  background: color-mix(in srgb, #2a7 12%, transparent);
+  color: #2a7;
+  border: 0.5px solid #2a744;
+}
+
+.testFail {
+  background: color-mix(in srgb, #e55 10%, transparent);
+  color: #e55;
+  border: 0.5px solid #e5544;
+}
+
+.toolList {
+  margin: var(--space-xs) 0 0;
+  padding-left: var(--space-md);
+  list-style: disc;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.toolList li {
+  font-size: 11px;
+}
+
+/* —— 表单 —— */
+.form {
+  padding: var(--space-lg);
+  border: 0.5px solid var(--rule-soft);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.formTitle {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faded);
+  margin-bottom: var(--space-sm);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.label {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  color: var(--ink-faded);
+  text-transform: uppercase;
+}
+
+.input {
+  font-family: var(--mono);
+  font-size: 13px;
+  background: var(--card);
+  border: 0.5px solid var(--rule);
+  color: var(--ink);
+  padding: 8px 10px;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.input:focus {
+  border-color: var(--accent);
+}
+
+.radioGroup {
+  display: flex;
+  gap: var(--space-lg);
+}
+
+.radio {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: 13px;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.formActions {
+  display: flex;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+}
+
+.addBtn {
+  align-self: flex-end;
+}
+
+/* —— 按钮 —— */
+.btn {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 5px 12px;
+  border: 0.5px solid var(--rule);
+  background: var(--card);
+  color: var(--ink-faded);
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.btn:hover {
+  border-color: var(--ink-ghost);
+  color: var(--ink);
+}
+
+.btnSm {
+  padding: 3px 8px;
+  font-size: 10px;
+}
+
+.btnPrimary {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+}
+
+.btnPrimary:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.btnDanger {
+  color: #e55;
+  border-color: #e5544;
+}
+
+.btnDanger:hover {
+  background: color-mix(in srgb, #e55 10%, transparent);
+}
+
+/* —— Toggle —— */
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  position: relative;
+  margin-right: 2px;
+}
+
+.toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+
+.toggleSlider {
+  width: 34px;
+  height: 20px;
+  background: #9A8E7A;
+  border-radius: 10px;
+  transition: background 0.15s;
+  position: relative;
+  border: 0.5px solid rgba(0,0,0,0.12);
+}
+
+.toggleSlider::after {
+  content: '';
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  background: #fff;
+  border-radius: 50%;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.15s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.toggle input:checked + .toggleSlider {
+  background: var(--accent);
+}
+
+.toggle input:checked + .toggleSlider::after {
+  transform: translateX(14px);
+}
+
+.toggle:hover .toggleSlider {
+  filter: brightness(0.95);
+}

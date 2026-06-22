@@ -14,6 +14,8 @@ import { Crumbs } from '@/components/shared/Crumbs'
 import { DescriptionEditorWithMode, type EditorMode } from '@/components/shared/DescriptionEditorWithMode'
 import { CronEditor } from '@/components/shared/CronEditor'
 import { FileManagerSection } from '@/components/settings/FileManagerSection'
+import { McpSection } from '@/components/settings/McpSection'
+import { SkillsSection } from '@/components/settings/SkillsSection'
 import { useConfirm } from '@/utils/confirm'
 import styles from './SettingsPage.module.css'
 
@@ -660,6 +662,18 @@ export function SettingsPage() {
             </div>
           </form>
         )}
+      </section>
+
+      {/* 卡片 3b：MCP 工具服务 */}
+      <section id="llm-mcp" className={styles.section}>
+        <h2 className={styles.sectionTitle}>MCP 工具服务</h2>
+        <McpSection />
+      </section>
+
+      {/* 卡片 3c：Skills 扩展 */}
+      <section id="llm-skills" className={styles.section}>
+        <h2 className={styles.sectionTitle}>Skills 扩展</h2>
+        <SkillsSection />
       </section>
 
       {/* 卡片 4：暂不可用 Prompt */}

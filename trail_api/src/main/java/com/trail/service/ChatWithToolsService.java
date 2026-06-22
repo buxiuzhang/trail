@@ -8,6 +8,7 @@ import com.trail.config.AppProperties;
 import com.trail.llm.ApiToolExecutor;
 import com.trail.llm.ToolRegistry;
 import com.trail.store.AiRecordStore;
+import com.trail.store.SkillStore;
 import com.trail.store.LLMSettingsStore;
 import com.trail.store.exception.LlmNotConfiguredException;
 import org.slf4j.Logger;
@@ -53,6 +54,7 @@ public class ChatWithToolsService {
     private final ToolRegistry toolRegistry;
     private final ApiToolExecutor apiToolExecutor;
     private final AiRecordStore aiRecordStore;
+    private final SkillStore skillStore;
     private final ObjectMapper mapper;
     private final ExecutorService executor;
 
@@ -62,6 +64,7 @@ public class ChatWithToolsService {
         ToolRegistry toolRegistry,
         ApiToolExecutor apiToolExecutor,
         AiRecordStore aiRecordStore,
+        SkillStore skillStore,
         ObjectMapper mapper
     ) {
         this.props = props;
@@ -69,6 +72,7 @@ public class ChatWithToolsService {
         this.toolRegistry = toolRegistry;
         this.apiToolExecutor = apiToolExecutor;
         this.aiRecordStore = aiRecordStore;
+        this.skillStore = skillStore;
         this.mapper = mapper;
         this.executor = Executors.newCachedThreadPool();
     }
@@ -436,6 +440,19 @@ public class ChatWithToolsService {
         // 从配置读取 chat_system_prompt（已含工具说明）
         Map<String, String> settings = settingsStore.getAll();
         String systemPrompt = settings.getOrDefault("chat_system_prompt", "");
+
+        // 追加 enabled skills 的 system_prompt 片段
+        List<Map<String, Object>> enabledSkills = skillStore.findEnabledByScope("chat");
+        if (!enabledSkills.isEmpty()) {
+            StringBuilder sb = new StringBuilder(systemPrompt);
+            for (Map<String, Object> skill : enabledSkills) {
+                String snippet = (String) skill.get("system_prompt");
+                if (snippet != null && !snippet.isBlank()) {
+                    sb.append("\n\n---\n\n").append(snippet.strip());
+                }
+            }
+            systemPrompt = sb.toString();
+        }
 
         return nowBlock + systemPrompt;
     }
