@@ -20,27 +20,33 @@
 .list {
   display: flex;
   flex-direction: column;
-  gap: var(--space-sm);
 }
 
 .card {
   position: relative;
-  padding: var(--space-md) var(--space-lg);
-  border: 0.5px solid var(--rule);
-  background: var(--card);
+  padding: var(--space-md) var(--space-md) var(--space-md) var(--space-xl);
+  border: none;
+  border-bottom: 0.5px solid var(--rule-soft);
+  background: transparent;
+}
+
+.card:first-child {
+  border-top: none;
 }
 
 .cardIndex {
   position: absolute;
-  top: 0;
+  top: 50%;
   left: 0;
+  transform: translateY(-50%);
   font-family: var(--mono);
   font-size: 9px;
   font-weight: 600;
   color: var(--ink-ghost);
   letter-spacing: 0.06em;
   line-height: 1;
-  padding: 3px 5px;
+  width: var(--space-xl);
+  text-align: center;
 }
 
 .cardDisabled {

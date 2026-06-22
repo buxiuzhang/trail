@@ -33,6 +33,10 @@
   gap: var(--space-xs);
 }
 
+.card:first-child {
+  border-top: 0.5px solid var(--rule);
+}
+
 .cardIndex {
   position: absolute;
   top: 0;
