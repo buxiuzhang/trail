@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAttachmentList, useAttachmentTasks, useDeleteAttachment, type AttachmentListItem } from '@/api/attachments'
 import { MultiSelect } from '@/components/shared/MultiSelect'
@@ -6,6 +6,7 @@ import { useConfirm } from '@/utils/confirm'
 import { useToastContext } from '@/context/ToastContext'
 import { useModalContext } from '@/context/ModalContext'
 import { useQueryClient } from '@tanstack/react-query'
+import { api } from '@/api/client'
 
 const FILE_TYPE_GROUPS = [
   { label: '图片',   value: 'image',    mimes: ['image/png', 'image/jpeg', 'image/gif', 'image/webp'] },
@@ -60,6 +61,7 @@ export function FileManagerSection() {
   const [pageSize, setPageSize] = useState(10)
   const [expandedRefs, setExpandedRefs] = useState<Record<number, any[]>>({})
   const [loadingRefs, setLoadingRefs] = useState<Record<number, boolean>>({})
+  const [rowCtxMenu, setRowCtxMenu] = useState<{ x: number; y: number; item: AttachmentListItem } | null>(null)
 
   const navigate = useNavigate()
   const mimes = groupToMimes(selectedTypes)
@@ -146,6 +148,47 @@ export function FileManagerSection() {
     } catch { showToast('删除失败') }
   }, [confirm, deleteAttachment, openModal, showToast, qc])
 
+  const handleRename = useCallback((item: AttachmentListItem) => {
+    let newName = item.original_name || ''
+    openModal({
+      eyebrow: '重命名',
+      title: '修改文件名',
+      titleMode: 'zh',
+      body: (
+        <div>
+          <input
+            type="text"
+            defaultValue={newName}
+            autoFocus
+            onChange={e => { newName = e.target.value }}
+            onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.form?.requestSubmit?.() }}
+            style={{
+              width: '100%', fontFamily: 'var(--mono)', fontSize: 14,
+              border: 'none', borderBottom: '0.5px solid var(--ink)',
+              padding: '6px 0', background: 'transparent', color: 'var(--ink)',
+              outline: 'none',
+            }}
+          />
+        </div>
+      ),
+      buttons: [
+        { label: '取消', className: 'btn btn--ghost', action: () => {} },
+        {
+          label: '确认', className: 'btn btn--primary',
+          action: async () => {
+            const trimmed = newName.trim()
+            if (!trimmed) return
+            try {
+              await api.put(`/api/attachments/${item.id}`, { originalName: trimmed })
+              showToast('已重命名')
+              qc.invalidateQueries({ queryKey: ['attachments', 'list'] })
+            } catch { showToast('重命名失败') }
+          },
+        },
+      ],
+    })
+  }, [openModal, showToast, qc])
+
   return (
     <div>
       {/* 筛选栏 */}
@@ -206,10 +249,13 @@ export function FileManagerSection() {
             return (
             <div key={item.id} style={{ borderBottom: (!isLast || refs) ? '0.5px solid var(--rule-soft)' : 'none' }}>
               {/* 主行 */}
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 12,
-                padding: '10px 12px', background: 'var(--card)',
-              }}>
+              <div
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  padding: '10px 12px', background: 'var(--card)',
+                }}
+                onContextMenu={e => { e.preventDefault(); setRowCtxMenu({ x: e.clientX, y: e.clientY, item }) }}
+              >
                 {item.mime.startsWith('image/') ? (
                   <img
                     src={item.url} alt={item.original_name || ''}
@@ -325,6 +371,32 @@ export function FileManagerSection() {
             )
           })}
         </div>
+      )}
+
+      {/* 行右键菜单 */}
+      {rowCtxMenu && (
+        <>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 999 }} onClick={() => setRowCtxMenu(null)} />
+          <div style={{
+            position: 'fixed', top: rowCtxMenu.y, left: rowCtxMenu.x, zIndex: 1000,
+            background: 'var(--card)', border: '0.5px solid var(--rule)',
+            boxShadow: 'var(--shadow-md)', minWidth: 120, padding: '4px 0',
+          }}>
+            {[
+              { label: '重命名', action: () => { setRowCtxMenu(null); handleRename(rowCtxMenu.item) } },
+              { label: '删除',   action: () => { setRowCtxMenu(null); handleDelete(rowCtxMenu.item) } },
+            ].map(opt => (
+              <div key={opt.label} onClick={opt.action} style={{
+                padding: '7px 14px', cursor: 'pointer',
+                fontFamily: 'var(--body)', fontSize: 13.5, color: 'var(--ink-soft)',
+                transition: 'background 80ms',
+              }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'var(--card-deep)'; e.currentTarget.style.color = 'var(--ink)' }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--ink-soft)' }}
+              >{opt.label}</div>
+            ))}
+          </div>
+        </>
       )}
 
       {/* 分页 */}

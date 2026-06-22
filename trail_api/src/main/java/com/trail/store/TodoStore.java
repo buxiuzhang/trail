@@ -24,9 +24,11 @@ import java.util.Map;
 public class TodoStore {
 
     private final SqliteDb db;
+    private final EntityRefStore entityRefStore;
 
-    public TodoStore(SqliteDb db) {
+    public TodoStore(SqliteDb db, EntityRefStore entityRefStore) {
         this.db = db;
+        this.entityRefStore = entityRefStore;
     }
 
     /**
@@ -75,6 +77,7 @@ public class TodoStore {
             RETURNING id
             """, taskId, t, d);
         if (newId == null) throw new StoreError("写待办失败");
+        if (d != null) entityRefStore.syncAllRefs("todo", newId, "description", d);
         return getTodo(newId);
     }
 
@@ -107,12 +110,15 @@ public class TodoStore {
           + " RETURNING id",
             params.toArray());
         if (n == 0) {
-            // 区分"不存在"和"已终态"
             List<Map<String, Object>> rows = db.query(
                 "SELECT 1 FROM todos WHERE id = ? AND task_id = ?", todoId, taskId);
             if (rows.isEmpty())
                 throw new NotFoundException("待办不存在或不属于此任务：todo=" + todoId + " task=" + taskId);
             throw new StoreError("已完成/已废弃的 todo 不可编辑");
+        }
+        if (description != null) {
+            String d = description.isBlank() ? "" : description.strip();
+            entityRefStore.syncAllRefs("todo", todoId, "description", d);
         }
         return getTodo(todoId);
     }
@@ -166,6 +172,7 @@ public class TodoStore {
             todoId, taskId);
         if (n == 0)
             throw new NotFoundException("待办不存在或不属于此任务：todo=" + todoId + " task=" + taskId);
+        entityRefStore.removeAll("todo", todoId);
     }
 
     /**

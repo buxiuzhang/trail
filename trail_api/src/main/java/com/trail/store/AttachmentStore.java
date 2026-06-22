@@ -77,11 +77,13 @@ public class AttachmentStore {
     private final SqliteDb db;
     private final DataDirService dataDir;
     private final AppProperties props;
+    private final EntityRefStore entityRefStore;
 
-    public AttachmentStore(SqliteDb db, DataDirService dataDir, AppProperties props) {
+    public AttachmentStore(SqliteDb db, DataDirService dataDir, AppProperties props, EntityRefStore entityRefStore) {
         this.db = db;
         this.dataDir = dataDir;
         this.props = props;
+        this.entityRefStore = entityRefStore;
     }
 
     /** 获取配置的最大文件大小 */
@@ -202,34 +204,48 @@ public class AttachmentStore {
     }
 
     /**
-     * 扫 5 个文本字段,找哪些位置引用了 attachment id。
-     * LIKE pattern: "%/api/attachments/N)%"  末尾 ) 锚定避免 N=12 误命中 123
-     * 5 字段：
-     *   tasks.description / tasks.summary / tasks.maintenance_summary
-     *   work_logs.content / work_logs.polished_content
-     *   todos.description
+     * 查找引用了此附件的所有位置（log / task / todo）。
+     * 全部走 entity_refs 表，不再 LIKE 扫描。
      */
     public List<Reference> findReferences(long id) {
-        String pat = "%/api/attachments/" + id + ")%";
         List<Reference> out = new ArrayList<>();
 
-        // tasks 三个字段
-        out.addAll(scanColumn("task", "description",
-                "SELECT id, title, description AS col FROM tasks WHERE description LIKE ?", pat, "id"));
-        out.addAll(scanColumn("task", "summary",
-                "SELECT id, title, summary AS col FROM tasks WHERE summary LIKE ?", pat, "id"));
-        out.addAll(scanColumn("task", "maintenance_summary",
-                "SELECT id, title, maintenance_summary AS col FROM tasks WHERE maintenance_summary LIKE ?", pat, "id"));
+        // work_logs
+        List<Map<String, Object>> logRows = db.query("""
+            SELECT w.id, w.task_id, w.log_date, w.is_deleted
+            FROM entity_refs r
+            JOIN work_logs w ON w.id = r.src_id
+            WHERE r.src_type='log' AND r.src_field='content'
+              AND r.ref_type='file' AND r.ref_id=? AND w.is_deleted=0
+            """, id);
+        for (Map<String, Object> r : logRows) {
+            out.add(new Reference("log", ((Number) r.get("id")).longValue(), "content",
+                ((Number) r.get("task_id")).longValue(), null,
+                r.get("log_date") == null ? null : r.get("log_date").toString(), null, false));
+        }
 
-        // work_logs 两个字段（含 is_deleted 供前端标记已删除引用，只扫未删除的）
-        out.addAll(scanColumn("log", "content",
-                "SELECT id, task_id, log_date, is_deleted, content AS col FROM work_logs WHERE is_deleted = 0 AND content LIKE ?", pat, "task_id"));
-        out.addAll(scanColumn("log", "polished_content",
-                "SELECT id, task_id, log_date, is_deleted, polished_content AS col FROM work_logs WHERE is_deleted = 0 AND polished_content LIKE ?", pat, "task_id"));
+        // tasks
+        List<Map<String, Object>> taskRows = db.query("""
+            SELECT r.src_id, r.src_field, t.title
+            FROM entity_refs r JOIN tasks t ON t.id = r.src_id
+            WHERE r.src_type='task' AND r.ref_type='file' AND r.ref_id=?
+            """, id);
+        for (Map<String, Object> r : taskRows) {
+            long taskId = ((Number) r.get("src_id")).longValue();
+            out.add(new Reference("task", taskId, (String) r.get("src_field"),
+                taskId, (String) r.get("title"), null, null, false));
+        }
 
-        // todos.description
-        out.addAll(scanColumn("todo", "description",
-                "SELECT id, task_id, title, description AS col FROM todos WHERE description LIKE ?", pat, "task_id"));
+        // todos
+        List<Map<String, Object>> todoRows = db.query("""
+            SELECT r.src_id, td.task_id, td.title
+            FROM entity_refs r JOIN todos td ON td.id = r.src_id
+            WHERE r.src_type='todo' AND r.src_field='description' AND r.ref_type='file' AND r.ref_id=?
+            """, id);
+        for (Map<String, Object> r : todoRows) {
+            out.add(new Reference("todo", ((Number) r.get("src_id")).longValue(), "description",
+                ((Number) r.get("task_id")).longValue(), (String) r.get("title"), null, null, false));
+        }
 
         return out;
     }
@@ -241,11 +257,48 @@ public class AttachmentStore {
         return mustRow(id);
     }
 
-    /**
-     * 物理删除磁盘文件 + DB 行，引用检查由 controller 负责。
+    /** 更新文件名。content 里用 @file:N 存储，名称从 DB 读取，无需同步 content。 */
+    public Row updateName(long id, String name) {
+        mustRow(id);
+        db.update("UPDATE attachments SET original_name = ? WHERE id = ?", name, id);
+        return mustRow(id);
+    }
+
+    /** + DB 行，引用检查由 controller 负责。
      */
     public void delete(long id) {
         Row r = mustRow(id);
+
+        // 清理所有引用该附件的文本字段中的 @file:N token
+        String token = "@file:" + id;
+        List<Map<String, Object>> refs = db.query(
+            "SELECT src_type, src_id, src_field FROM entity_refs WHERE ref_type='file' AND ref_id=?", id);
+        for (Map<String, Object> ref : refs) {
+            String srcType  = (String) ref.get("src_type");
+            long   srcId    = ((Number) ref.get("src_id")).longValue();
+            String srcField = (String) ref.get("src_field");
+            String table    = switch (srcType) {
+                case "log"  -> "work_logs";
+                case "task" -> "tasks";
+                case "todo" -> "todos";
+                default     -> null;
+            };
+            if (table == null) continue;
+            String col = "log".equals(srcType) ? "content" : srcField;
+            List<Map<String, Object>> rows2 = db.query(
+                "SELECT " + col + " AS txt FROM " + table + " WHERE id=?", srcId);
+            if (rows2.isEmpty()) continue;
+            String txt = (String) rows2.get(0).get("txt");
+            if (txt == null) continue;
+            String updated = txt.replaceAll(java.util.regex.Pattern.quote(token) + "(?!\\d)", "")
+                .replaceAll("\n{3,}", "\n\n").strip();
+            if (!updated.equals(txt)) {
+                db.update("UPDATE " + table + " SET " + col + "=? WHERE id=?", updated, srcId);
+            }
+        }
+        // 清理 entity_refs
+        db.update("DELETE FROM entity_refs WHERE ref_type='file' AND ref_id=?", id);
+
         Path dataDirPath = dataDir.currentDataDir();
         if (dataDirPath != null) {
             Path attachRoot = dataDirPath.resolve("attachments").toAbsolutePath().normalize();
@@ -320,28 +373,17 @@ public class AttachmentStore {
     /** 返回所有有附件引用的任务（id + title），用于文件管理筛选下拉。 */
     public List<Map<String, Object>> listReferencedTasks() {
         return db.query("""
-            SELECT DISTINCT t.id, t.title FROM tasks t
-            WHERE EXISTS (
-              SELECT 1 FROM attachments a WHERE (
-                t.description        LIKE '%/api/attachments/' || a.id || ')%'
-             OR t.summary            LIKE '%/api/attachments/' || a.id || ')%'
-             OR t.maintenance_summary LIKE '%/api/attachments/' || a.id || ')%'
-              )
+            SELECT DISTINCT t.id, t.title
+            FROM entity_refs r
+            JOIN tasks t ON t.id = (
+                CASE r.src_type
+                    WHEN 'task' THEN r.src_id
+                    WHEN 'log'  THEN (SELECT task_id FROM work_logs WHERE id = r.src_id)
+                    WHEN 'todo' THEN (SELECT task_id FROM todos WHERE id = r.src_id)
+                END
             )
-            UNION
-            SELECT DISTINCT t2.id, t2.title FROM tasks t2
-            JOIN work_logs w ON w.task_id = t2.id
-            JOIN attachments a2 ON (
-              w.content         LIKE '%/api/attachments/' || a2.id || ')%'
-           OR w.polished_content LIKE '%/api/attachments/' || a2.id || ')%'
-            )
-            UNION
-            SELECT DISTINCT t3.id, t3.title FROM tasks t3
-            JOIN todos td ON td.task_id = t3.id
-            JOIN attachments a3 ON (
-              td.description LIKE '%/api/attachments/' || a3.id || ')%'
-            )
-            ORDER BY 1 DESC
+            WHERE r.ref_type = 'file'
+            ORDER BY t.id DESC
             """);
     }
 
@@ -354,36 +396,12 @@ public class AttachmentStore {
         StringBuilder sql = new StringBuilder("""
             SELECT a.id, a.rel_path, a.mime, a.byte_size, a.original_name,
                    a.display_size, a.created_at,
-                   (
-                     SELECT COUNT(*) FROM (
-                       SELECT 1 FROM tasks
-                         WHERE description        LIKE '%/api/attachments/' || a.id || ')%'
-                            OR summary            LIKE '%/api/attachments/' || a.id || ')%'
-                            OR maintenance_summary LIKE '%/api/attachments/' || a.id || ')%'
-                       UNION ALL
-                       SELECT 1 FROM work_logs
-                         WHERE content          LIKE '%/api/attachments/' || a.id || ')%'
-                            OR polished_content  LIKE '%/api/attachments/' || a.id || ')%'
-                       UNION ALL
-                       SELECT 1 FROM todos
-                         WHERE description LIKE '%/api/attachments/' || a.id || ')%'
-                     )
+                   (SELECT COUNT(*) FROM entity_refs WHERE ref_type='file' AND ref_id=a.id
                    ) AS ref_count,
-                   (
-                     SELECT COUNT(*) FROM (
-                       SELECT 1 FROM tasks
-                         WHERE description        LIKE '%/api/attachments/' || a.id || ')%'
-                            OR summary            LIKE '%/api/attachments/' || a.id || ')%'
-                            OR maintenance_summary LIKE '%/api/attachments/' || a.id || ')%'
-                       UNION ALL
-                       SELECT 1 FROM work_logs
-                         WHERE is_deleted = 0
-                           AND (content         LIKE '%/api/attachments/' || a.id || ')%'
-                            OR polished_content  LIKE '%/api/attachments/' || a.id || ')%')
-                       UNION ALL
-                       SELECT 1 FROM todos
-                         WHERE description LIKE '%/api/attachments/' || a.id || ')%'
-                     )
+                   (SELECT COUNT(*) FROM entity_refs r2
+                     LEFT JOIN work_logs w2 ON r2.src_type='log' AND w2.id=r2.src_id
+                     WHERE r2.ref_type='file' AND r2.ref_id=a.id
+                       AND (r2.src_type != 'log' OR w2.is_deleted=0)
                    ) AS active_ref_count
             FROM attachments a
             WHERE 1=1
@@ -398,29 +416,21 @@ public class AttachmentStore {
         }
 
         if (taskIds != null && !taskIds.isEmpty()) {
-            String placeholders = "?,".repeat(taskIds.size()).replaceAll(",$", "");
+            String ph = "?,".repeat(taskIds.size()).replaceAll(",$", "");
             sql.append("""
                  AND a.id IN (
-                   SELECT DISTINCT a2.id FROM attachments a2
-                   JOIN tasks t ON (
-                     t.description        LIKE '%/api/attachments/' || a2.id || ')%'
-                  OR t.summary            LIKE '%/api/attachments/' || a2.id || ')%'
-                  OR t.maintenance_summary LIKE '%/api/attachments/' || a2.id || ')%'
-                   ) WHERE t.id IN (""" + placeholders + """
-                   )
-                   UNION
-                   SELECT DISTINCT a3.id FROM attachments a3
-                   JOIN work_logs w ON (
-                     w.content         LIKE '%/api/attachments/' || a3.id || ')%'
-                  OR w.polished_content LIKE '%/api/attachments/' || a3.id || ')%'
-                   ) WHERE w.task_id IN (""" + placeholders + """
-                   )
-                   UNION
-                   SELECT DISTINCT a4.id FROM attachments a4
-                   JOIN todos td ON (
-                     td.description LIKE '%/api/attachments/' || a4.id || ')%'
-                   ) WHERE td.task_id IN (""" + placeholders + """
-                   )
+                   SELECT ref_id FROM entity_refs r3
+                   WHERE r3.ref_type='file'
+                     AND (
+                       (r3.src_type='task' AND r3.src_id IN (""" + ph + """
+                       ))
+                       OR (r3.src_type='log' AND r3.src_id IN (
+                             SELECT id FROM work_logs WHERE task_id IN (""" + ph + """
+                           )))
+                       OR (r3.src_type='todo' AND r3.src_id IN (
+                             SELECT id FROM todos WHERE task_id IN (""" + ph + """
+                           )))
+                     )
                  )
                 """);
             params.addAll(taskIds);
@@ -430,40 +440,22 @@ public class AttachmentStore {
 
         sql.append("""
              ORDER BY
-               CASE WHEN (
-                 SELECT MAX(tc.created_at) FROM tasks tc WHERE tc.id IN (
-                   SELECT t1.id FROM tasks t1 WHERE (
-                     t1.description        LIKE '%/api/attachments/' || a.id || ')%'
-                  OR t1.summary            LIKE '%/api/attachments/' || a.id || ')%'
-                  OR t1.maintenance_summary LIKE '%/api/attachments/' || a.id || ')%'
-                   )
-                   UNION
-                   SELECT w.task_id FROM work_logs w WHERE (
-                     w.content         LIKE '%/api/attachments/' || a.id || ')%'
-                  OR w.polished_content LIKE '%/api/attachments/' || a.id || ')%'
-                   )
-                   UNION
-                   SELECT td.task_id FROM todos td WHERE (
-                     td.description LIKE '%/api/attachments/' || a.id || ')%'
-                   )
+               CASE WHEN (SELECT MAX(t.created_at) FROM tasks t
+                 WHERE t.id IN (
+                   SELECT CASE src_type
+                     WHEN 'task' THEN src_id
+                     WHEN 'log'  THEN (SELECT task_id FROM work_logs WHERE id=src_id)
+                     WHEN 'todo' THEN (SELECT task_id FROM todos WHERE id=src_id)
+                   END FROM entity_refs WHERE ref_type='file' AND ref_id=a.id
                  )
                ) IS NULL THEN 1 ELSE 0 END,
-               (
-                 SELECT MAX(tc.created_at) FROM tasks tc WHERE tc.id IN (
-                   SELECT t1.id FROM tasks t1 WHERE (
-                     t1.description        LIKE '%/api/attachments/' || a.id || ')%'
-                  OR t1.summary            LIKE '%/api/attachments/' || a.id || ')%'
-                  OR t1.maintenance_summary LIKE '%/api/attachments/' || a.id || ')%'
-                   )
-                   UNION
-                   SELECT w.task_id FROM work_logs w WHERE (
-                     w.content         LIKE '%/api/attachments/' || a.id || ')%'
-                  OR w.polished_content LIKE '%/api/attachments/' || a.id || ')%'
-                   )
-                   UNION
-                   SELECT td.task_id FROM todos td WHERE (
-                     td.description LIKE '%/api/attachments/' || a.id || ')%'
-                   )
+               (SELECT MAX(t.created_at) FROM tasks t
+                 WHERE t.id IN (
+                   SELECT CASE src_type
+                     WHEN 'task' THEN src_id
+                     WHEN 'log'  THEN (SELECT task_id FROM work_logs WHERE id=src_id)
+                     WHEN 'todo' THEN (SELECT task_id FROM todos WHERE id=src_id)
+                   END FROM entity_refs WHERE ref_type='file' AND ref_id=a.id
                  )
                ) DESC,
                a.created_at DESC

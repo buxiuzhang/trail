@@ -15,24 +15,19 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 /** 工作日志（M8 SQLite 适配版）。is_deleted 改 0/1，log_date 是 TEXT。 */
 @Component
 public class WorkLogStore {
 
     public static final Set<String> PHASES = Set.of("main", "maintenance");
-    private static final ObjectMapper JSON = new ObjectMapper();
 
     private final SqliteDb db;
-    private final LogTodoRefStore logTodoRefStore;
+    private final EntityRefStore entityRefStore;
     private final TaskStore taskStore;
 
-    public WorkLogStore(SqliteDb db, LogTodoRefStore logTodoRefStore, TaskStore taskStore) {
+    public WorkLogStore(SqliteDb db, EntityRefStore entityRefStore, TaskStore taskStore) {
         this.db = db;
-        this.logTodoRefStore = logTodoRefStore;
+        this.entityRefStore = entityRefStore;
         this.taskStore = taskStore;
     }
 
@@ -153,16 +148,23 @@ public class WorkLogStore {
 
         Long newId = db.insertReturningId("""
             INSERT INTO work_logs
-              (task_id, log_date, phase, ordinal, content, hours, task_ids, is_deleted, edit_count)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0)
+              (task_id, log_date, phase, ordinal, content, hours, is_deleted, edit_count)
+            VALUES (?, ?, ?, ?, ?, ?, 0, 0)
             RETURNING id
             """,
-            taskId, logDate, phase, ordinal, content.strip(), hours, toJsonArray(taskIds));
+            taskId, logDate, phase, ordinal, content.strip(), hours);
         if (newId == null) throw new StoreError("写日志失败");
 
-        // 添加待办关联
+        // 同步所有引用（file / task / todo 从 content 解析）
+        entityRefStore.syncAllRefs("log", newId, "content", content.strip());
+        // 显式传入的 todoIds / taskIds 优先覆盖 content 解析结果
         if (todoIds != null && !todoIds.isEmpty()) {
-            logTodoRefStore.addRefs(newId, todoIds, taskId);
+            entityRefStore.replaceRefs("log", newId, "content", "todo",
+                todoIds.stream().distinct().collect(java.util.stream.Collectors.toList()));
+        }
+        if (taskIds != null && !taskIds.isEmpty()) {
+            entityRefStore.replaceRefs("log", newId, "content", "task",
+                taskIds.stream().distinct().collect(java.util.stream.Collectors.toList()));
         }
 
         return getLog(newId);
@@ -176,7 +178,7 @@ public class WorkLogStore {
 
     /** 获取日志关联的待办 ID 列表 */
     public List<Long> getTodoIdsForLog(long logId) {
-        return logTodoRefStore.getTodoIdsForLog(logId);
+        return entityRefStore.getRefs("log", logId, "content", "todo");
     }
 
     public Map<String, Object> updateLog(long logId, long taskId,
@@ -247,18 +249,22 @@ public class WorkLogStore {
             sets.append(", ordinal = ?");
             params.add(newOrdinal);
         }
-        if (taskIds != null) {
-            sets.append(", task_ids = ?");
-            params.add(toJsonArray(taskIds));
-        }
         if (!sets.toString().equals("updated_at = CURRENT_TIMESTAMP, edit_count = edit_count + 1")) {
             params.add(logId);
             db.update("UPDATE work_logs SET " + sets + " WHERE id = ?", params.toArray());
         }
 
-        // 更新待办关联
+        // 同步引用：content 变更时重算所有引用；todoIds / taskIds 显式传入时优先覆盖
+        if (content != null) {
+            entityRefStore.syncAllRefs("log", logId, "content", content.strip());
+        }
         if (todoIds != null) {
-            logTodoRefStore.replaceRefs(logId, todoIds, taskId);
+            entityRefStore.replaceRefs("log", logId, "content", "todo",
+                todoIds.stream().distinct().collect(java.util.stream.Collectors.toList()));
+        }
+        if (taskIds != null) {
+            entityRefStore.replaceRefs("log", logId, "content", "task",
+                taskIds.stream().distinct().collect(java.util.stream.Collectors.toList()));
         }
 
         return getLog(logId);
@@ -270,6 +276,7 @@ public class WorkLogStore {
                 "DELETE FROM work_logs WHERE id = ? AND task_id = ? RETURNING id",
                 logId, taskId);
             if (n == 0) throw new NotFoundException("日志不存在或不属于此任务：log=" + logId + " task=" + taskId);
+            entityRefStore.removeAll("log", logId);
         } else {
             int n = db.update(
                 "UPDATE work_logs SET is_deleted = 1, deleted_at = CURRENT_TIMESTAMP"
@@ -287,7 +294,7 @@ public class WorkLogStore {
     public List<Map<String, Object>> getByDate(LocalDate date) {
         return db.query("""
             SELECT
-                w.id, w.task_id, w.log_date, w.phase, w.ordinal, w.hours, w.task_ids, w.content, w.polished_content,
+                w.id, w.task_id, w.log_date, w.phase, w.ordinal, w.hours, w.content, w.polished_content,
                 t.title AS task_title, t.alias AS task_alias, t.status, t.nature
             FROM work_logs w
             JOIN tasks t ON t.id = w.task_id
@@ -300,7 +307,7 @@ public class WorkLogStore {
     public List<Map<String, Object>> getByDateRange(LocalDate start, LocalDate end) {
         return db.query("""
             SELECT
-                w.id, w.task_id, w.log_date, w.phase, w.ordinal, w.hours, w.task_ids, w.content, w.polished_content,
+                w.id, w.task_id, w.log_date, w.phase, w.ordinal, w.hours, w.content, w.polished_content,
                 t.title AS task_title, t.alias AS task_alias, t.status, t.nature
             FROM work_logs w
             JOIN tasks t ON t.id = w.task_id
@@ -310,32 +317,20 @@ public class WorkLogStore {
     }
 
     /**
-     * 查询引用了指定待办的所有日志，经 enrichLogs 处理后返回。
-     * 最新日期在前（由 LogTodoRefStore.getLogIdsForTodo 保证顺序）。
+     * 查询引用了指定待办的所有日志，经 enrichLogs 处理后返回（log_date 倒序）。
      */
     public List<Map<String, Object>> getLogsForTodo(long todoId) {
-        List<Long> logIds = logTodoRefStore.getLogIdsForTodo(todoId);
-        if (logIds.isEmpty()) return Collections.emptyList();
-
-        String placeholders = logIds.stream().map(id -> "?").collect(Collectors.joining(","));
         List<Map<String, Object>> rows = db.query(
-            "SELECT w.id, w.task_id, w.log_date, w.phase, w.ordinal, w.hours, w.task_ids, w.content," +
+            "SELECT w.id, w.task_id, w.log_date, w.phase, w.ordinal, w.hours, w.content," +
             " t.title AS task_title" +
-            " FROM work_logs w JOIN tasks t ON t.id = w.task_id" +
-            " WHERE w.id IN (" + placeholders + ") AND w.is_deleted = 0",
-            logIds.toArray());
-
-        // 按 logIds 顺序（log_date DESC）重排，IN 查询不保证顺序
-        Map<Long, Map<String, Object>> byId = new LinkedHashMap<>();
-        for (Map<String, Object> row : rows) {
-            byId.put(((Number) row.get("id")).longValue(), row);
-        }
-        List<Map<String, Object>> ordered = new ArrayList<>();
-        for (Long id : logIds) {
-            if (byId.containsKey(id)) ordered.add(byId.get(id));
-        }
-
-        return enrichLogs(ordered);
+            " FROM entity_refs r" +
+            " JOIN work_logs w ON w.id = r.src_id" +
+            " JOIN tasks t ON t.id = w.task_id" +
+            " WHERE r.src_type='log' AND r.src_field='content'" +
+            "   AND r.ref_type='todo' AND r.ref_id=? AND w.is_deleted=0" +
+            " ORDER BY w.log_date DESC, w.ordinal DESC",
+            todoId);
+        return enrichLogs(rows);
     }
 
     /**
@@ -345,17 +340,31 @@ public class WorkLogStore {
     public List<Map<String, Object>> enrichLogs(List<Map<String, Object>> logs) {
         if (logs == null || logs.isEmpty()) return logs;
 
-        // 批量查所有日志的关联待办，避免 N+1
         List<Long> logIds = logs.stream()
             .map(log -> ((Number) log.get("id")).longValue())
             .collect(Collectors.toList());
-        Map<Long, List<Map<String, Object>>> todosByLogId = logTodoRefStore.getTodosForLogs(logIds);
 
-        // 批量查所有日志引用的任务标题，避免 N+1
-        Set<Long> allTaskIds = new java.util.LinkedHashSet<>();
-        for (Map<String, Object> log : logs) {
-            allTaskIds.addAll(parseTaskIds(log.getOrDefault("task_ids", "[]").toString()));
+        // 批量从 entity_refs 取 todo / task 引用
+        Map<Long, List<Long>> todoIdsByLogId = entityRefStore.getRefsForSources("log", logIds, "content", "todo");
+        Map<Long, List<Long>> taskIdsByLogId = entityRefStore.getRefsForSources("log", logIds, "content", "task");
+
+        // 批量查 todo 详情（title、状态）
+        Set<Long> allTodoIds = new java.util.LinkedHashSet<>();
+        todoIdsByLogId.values().forEach(allTodoIds::addAll);
+        Map<Long, Map<String, Object>> todoDetailMap = new LinkedHashMap<>();
+        if (!allTodoIds.isEmpty()) {
+            String ph = allTodoIds.stream().map(id -> "?").collect(Collectors.joining(","));
+            db.query("SELECT id, title, is_completed, is_abandoned FROM todos WHERE id IN (" + ph + ")",
+                allTodoIds.toArray()).forEach(r -> todoDetailMap.put(((Number) r.get("id")).longValue(), r));
         }
+        // 模拟 getTodosForLogs 返回格式（Map<logId, List<todoRow>>）
+        Map<Long, List<Map<String, Object>>> todosByLogId = new LinkedHashMap<>();
+        todoIdsByLogId.forEach((logId, tids) ->
+            todosByLogId.put(logId, tids.stream()
+                .map(todoDetailMap::get).filter(java.util.Objects::nonNull).toList()));
+
+        Set<Long> allTaskIds = new java.util.LinkedHashSet<>();
+        taskIdsByLogId.values().forEach(allTaskIds::addAll);
         Map<Long, String> taskTitleMap = taskStore.getTaskTitles(new ArrayList<>(allTaskIds));
 
         List<Map<String, Object>> result = new ArrayList<>();
@@ -375,7 +384,7 @@ public class WorkLogStore {
             }
 
             // 关联任务
-            List<Long> taskIds = parseTaskIds(log.getOrDefault("task_ids", "[]").toString());
+            List<Long> taskIds = taskIdsByLogId.getOrDefault(logId, List.of());
             Map<Long, String> taskIdToTitle = new LinkedHashMap<>();
             if (!taskIds.isEmpty()) {
                 List<String> taskTitles = new ArrayList<>();
@@ -391,17 +400,17 @@ public class WorkLogStore {
                 }
             }
 
-            // 替换 content 里的 @todo:id / @task:id 为真实标题
+            // 替换 content 里的 @todo:id / @task:id 为真实标题（用正则确保不误匹配前缀）
             Object contentObj = enriched.get("content");
             if (contentObj != null) {
                 String content = contentObj.toString();
                 for (Map<String, Object> todo : todos) {
                     long tid = ((Number) todo.get("id")).longValue();
                     String title = (String) todo.get("title");
-                    content = content.replace("@todo:" + tid, "@todo「" + title + "」");
+                    content = content.replaceAll("@todo:" + tid + "(?!\\d)", "@todo「" + title.replace("$", "\\$") + "」");
                 }
                 for (Map.Entry<Long, String> entry : taskIdToTitle.entrySet()) {
-                    content = content.replace("@task:" + entry.getKey(), "@task「" + entry.getValue() + "」");
+                    content = content.replaceAll("@task:" + entry.getKey() + "(?!\\d)", "@task「" + entry.getValue().replace("$", "\\$") + "」");
                 }
                 enriched.put("content", content);
             }
@@ -413,32 +422,8 @@ public class WorkLogStore {
 
 
 
-    /** 将 task_ids 列表序列化为 JSON 字符串 */
-    private String toJsonArray(List<Long> ids) {
-        if (ids == null || ids.isEmpty()) return "[]";
-        try {
-            return JSON.writeValueAsString(ids);
-        } catch (JsonProcessingException e) {
-            return "[]";
-        }
-    }
-
-    /** 从 JSON 字符串解析 task_ids 列表 */
-    public List<Long> parseTaskIds(String json) {
-        if (json == null || json.isBlank() || "[]".equals(json)) return Collections.emptyList();
-        try {
-            return JSON.readValue(json, new TypeReference<List<Long>>() {});
-        } catch (JsonProcessingException e) {
-            return Collections.emptyList();
-        }
-    }
-
     /** 获取日志关联的任务 ID 列表 */
     public List<Long> getTaskIdsForLog(long logId) {
-        List<Map<String, Object>> rows = db.query("SELECT task_ids FROM work_logs WHERE id = ?", logId);
-        if (rows.isEmpty()) return Collections.emptyList();
-        Object v = rows.get(0).get("task_ids");
-        if (v == null) return Collections.emptyList();
-        return parseTaskIds(v.toString());
+        return entityRefStore.getRefs("log", logId, "content", "task");
     }
 }

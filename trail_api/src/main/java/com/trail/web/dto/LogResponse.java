@@ -12,14 +12,13 @@ public record LogResponse(
         Integer ordinal,
         String content,
         String polishedContent,
-        Double hours,  // M11：工时（小时）
+        Double hours,
         Boolean isDeleted,
         Instant deletedAt,
         Instant updatedAt,
         Integer editCount,
         Instant createdAt,
-        // M12：关联待办 ID 列表
         List<Long> todoIds,
-        // 关联任务 ID 列表
-        List<Long> taskIds
+        List<Long> taskIds,
+        List<Long> attachmentIds
 ) {}

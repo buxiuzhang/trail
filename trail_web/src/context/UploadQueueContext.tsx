@@ -12,7 +12,7 @@ export interface UploadTask {
 
 interface UploadQueueContextValue {
   tasks: UploadTask[]
-  uploadFile: (file: File, onDone: (url: string, name: string, mime: string) => void) => void
+  uploadFile: (file: File, onDone: (url: string, name: string, mime: string, id: number) => void) => void
 }
 
 const UploadQueueContext = createContext<UploadQueueContextValue | null>(null)
@@ -44,7 +44,7 @@ export function UploadQueueProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('beforeunload', handler)
   }, [tasks])
 
-  const uploadFile = useCallback((file: File, onDone: (url: string, name: string, mime: string) => void) => {
+  const uploadFile = useCallback((file: File, onDone: (url: string, name: string, mime: string, id: number) => void) => {
     const dedupeKey = `${file.name}__${file.size}`
     if (inFlightRef.current.has(dedupeKey)) return   // 正在上传，跳过
 
@@ -71,7 +71,7 @@ export function UploadQueueProvider({ children }: { children: ReactNode }) {
             const res = JSON.parse(xhr.responseText)
             const url = res.url || `/api/attachments/${res.id}`
             updateTask(id, { status: 'done', progress: 100, url })
-            onDone(url, res.original_name || file.name, res.mime || file.type)
+            onDone(url, res.original_name || file.name, res.mime || file.type, res.id as number)
             // 3 秒后自动移除已完成项
             setTimeout(() => setTasks(prev => prev.filter(t => t.id !== id)), 3000)
           } catch {

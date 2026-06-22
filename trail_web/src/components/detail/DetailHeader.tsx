@@ -10,7 +10,6 @@ interface DetailHeaderProps {
 }
 
 export function DetailHeader({ task, catalog, logCount }: DetailHeaderProps) {
-
   return (
     <header className="detail__hd">
       <div className="detail__cat-row">

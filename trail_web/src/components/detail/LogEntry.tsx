@@ -1,23 +1,15 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { TaskOut, LogOut, TodoOut } from '@/types'
 import { isSealed } from '@/constants'
 import { LogCompose } from './LogCompose'
 import { ContentViewer } from '@/components/shared/ContentViewer'
 import { useConfirm } from '@/utils/confirm'
+import { useModalContext } from '@/context/ModalContext'
+import { useQueryClient } from '@tanstack/react-query'
 import { useUpdateLog } from '@/api/logs'
-import { useDeleteAttachment } from '@/api/attachments'
+import { useDeleteAttachment, useAttachmentsByIds } from '@/api/attachments'
+import { api } from '@/api/client'
 import styles from './Logbook.module.css'
-
-/** 从 markdown 内容中提取附件链接 */
-function extractAttachments(content: string): Array<{ name: string; url: string; id: number }> {
-  const re = /\[([^\]]+)\]\((\/api\/attachments\/(\d+))\)/g
-  const out: Array<{ name: string; url: string; id: number }> = []
-  let m: RegExpExecArray | null
-  while ((m = re.exec(content)) !== null) {
-    out.push({ name: m[1], url: m[2], id: Number(m[3]) })
-  }
-  return out
-}
 
 interface LogEntryProps {
   task: TaskOut
@@ -35,12 +27,25 @@ interface LogEntryProps {
 export function LogEntry({ task, log, todos, tasks = [], isEditing, onEdit, onDelete, onSaveEdit, onCancelEdit }: LogEntryProps) {
   const sealed = isSealed(task)
   const confirm = useConfirm()
+  const { openModal } = useModalContext()
+  const qc = useQueryClient()
   const updateLog = useUpdateLog(task.id)
   const deleteAttachment = useDeleteAttachment()
   const [ctxMenu, setCtxMenu] = useState<{
     x: number; y: number
-    att: { name: string; url: string; id: number }
+    att: { name: string; url: string; id: number; mime: string }
   } | null>(null)
+
+  const attIds = log.attachment_ids ?? []
+  const { data: attList = [] } = useAttachmentsByIds(attIds)
+
+  const attachmentMap = useMemo(() => {
+    const m = new Map<number, { name: string; mime: string }>()
+    for (const a of attList) {
+      m.set(a.id, { name: a.original_name || `文件 #${a.id}`, mime: a.mime })
+    }
+    return m
+  }, [attList])
 
   async function handleDeleteAttachment(att: { name: string; url: string; id: number }) {
     const ok = await confirm({
@@ -50,16 +55,15 @@ export function LogEntry({ task, log, todos, tasks = [], isEditing, onEdit, onDe
       confirmLabel: '删除',
     })
     if (!ok) return
-    // 1. 物理删除附件文件
     await deleteAttachment.mutateAsync(att.id)
-    // 2. 从 content 中移除对应 markdown 链接
-    const escaped = att.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    const re = new RegExp(`\\[${escaped}\\]\\(${att.url}\\)`, 'g')
-    const newContent = (log.content ?? '').replace(re, '').replace(/\n{3,}/g, '\n\n').trim()
+    // 从 content 中移除 @file:ID token
+    const newContent = (log.content ?? '')
+      .replace(new RegExp(`@file:${att.id}\\s?`, 'g'), '')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim()
     await updateLog.mutateAsync({ logId: log.id, data: { content: newContent } })
   }
 
-  // 编辑态：整条替换为 compose form
   if (isEditing) {
     return (
       <div className={`${styles.entry} ${log.phase === 'maintenance' ? styles.entryMt : ''} ${styles.entryEditing}`}>
@@ -72,17 +76,6 @@ export function LogEntry({ task, log, todos, tasks = [], isEditing, onEdit, onDe
   const editedTag = log.updated_at
     ? <span className={styles.edited} title={log.updated_at}>已改 {log.edit_count} 次</span>
     : null
-
-  // 用于渲染 @ 提及的回调
-  const getTodoTitle = (id: number) => todos.find(t => t.id === id)?.title
-  const getTodoStatus = (id: number) => {
-    const t = todos.find(t => t.id === id)
-    if (!t) return 'deleted'
-    if (t.is_completed) return 'completed'
-    if (t.is_abandoned) return 'abandoned'
-    return 'active'
-  }
-  const getTaskTitle = (id: number) => tasks.find(t => t.id === id)?.title
 
   return (
     <div id={`log-${log.id}`} className={`${styles.entry} ${isMt ? styles.entryMt : ''}`}>
@@ -107,34 +100,37 @@ export function LogEntry({ task, log, todos, tasks = [], isEditing, onEdit, onDe
           tasks={tasks}
         />
         {/* 附件区 */}
-        {(() => {
-          const attachments = extractAttachments(log.content ?? '')
-          if (attachments.length === 0) return null
-          return (
-            <div className={styles.attachments}>
-              {attachments.map((att, i) => (
+        {attIds.length > 0 && (
+          <div className={styles.attachments}>
+            {attIds.map((id, i) => {
+              const att = attachmentMap.get(id)
+              const name = att?.name ?? `文件 #${id}`
+              const mime = att?.mime ?? ''
+              const isImage = mime.startsWith('image/')
+              const url = `/api/attachments/${id}`
+              return (
                 <div
-                  key={att.id}
+                  key={id}
                   className={styles.attachmentRow}
                   onContextMenu={e => {
                     e.preventDefault()
-                    setCtxMenu({ x: e.clientX, y: e.clientY, att })
+                    setCtxMenu({ x: e.clientX, y: e.clientY, att: { name, url, id, mime } })
                   }}
                 >
                   <span className={styles.attachmentSeq}>{i + 1}.</span>
-                  <span className={styles.attachmentIcon}>📎</span>
-                  <span className={styles.attachmentName}>{att.name}</span>
+                  <span className={styles.attachmentIcon}>{isImage ? '🖼' : '📎'}</span>
+                  <span className={styles.attachmentName}>{name}</span>
                   <button
                     type="button"
                     className={styles.attachmentDel}
-                    onClick={e => { e.stopPropagation(); handleDeleteAttachment(att) }}
+                    onClick={e => { e.stopPropagation(); handleDeleteAttachment({ name, url, id }) }}
                     title="删除附件"
                   >×</button>
                 </div>
-              ))}
-            </div>
-          )
-        })()}
+              )
+            })}
+          </div>
+        )}
         {/* 附件右键菜单 */}
         {ctxMenu && (
           <>
@@ -146,6 +142,50 @@ export function LogEntry({ task, log, todos, tasks = [], isEditing, onEdit, onDe
               className={styles.attCtxMenu}
               style={{ position: 'fixed', top: ctxMenu.y, left: ctxMenu.x, zIndex: 1000 }}
             >
+              <div
+                className={styles.attCtxItem}
+                onClick={() => {
+                  const att = ctxMenu.att
+                  setCtxMenu(null)
+                  let newName = att.name
+                  openModal({
+                    eyebrow: '重命名',
+                    title: '修改文件名',
+                    titleMode: 'zh',
+                    body: (
+                      <div>
+                        <input
+                          type="text"
+                          defaultValue={newName}
+                          autoFocus
+                          onChange={e => { newName = e.target.value }}
+                          style={{
+                            width: '100%', fontFamily: 'var(--mono)', fontSize: 14,
+                            border: 'none', borderBottom: '0.5px solid var(--ink)',
+                            padding: '6px 0', background: 'transparent', color: 'var(--ink)',
+                            outline: 'none',
+                          }}
+                        />
+                      </div>
+                    ),
+                    buttons: [
+                      { label: '取消', className: 'btn btn--ghost', action: () => {} },
+                      {
+                        label: '确认', className: 'btn btn--primary',
+                        action: async () => {
+                          const trimmed = newName.trim()
+                          if (!trimmed) return
+                          await api.put(`/api/attachments/${att.id}`, { originalName: trimmed })
+                          // 重命名只改 DB original_name，content 里是 @file:ID 不含名字
+                          qc.invalidateQueries({ queryKey: ['attachments'] })
+                        },
+                      },
+                    ],
+                  })
+                }}
+              >
+                重命名
+              </div>
               <div
                 className={styles.attCtxItem}
                 onClick={async () => {

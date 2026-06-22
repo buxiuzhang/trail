@@ -49,7 +49,6 @@ CREATE TABLE IF NOT EXISTS work_logs (
     content           TEXT    NOT NULL,
     polished_content  TEXT,
     hours             REAL    NOT NULL DEFAULT 1.0,    -- 工时（小时），0 < hours < 12
-    task_ids          TEXT    NOT NULL DEFAULT '[]',   -- 关联任务 ID 列表（JSON 数组）
     is_deleted        INTEGER NOT NULL DEFAULT 0,      -- BOOLEAN → INTEGER
     deleted_at        TEXT,
     updated_at        TEXT,
@@ -114,18 +113,32 @@ CREATE INDEX IF NOT EXISTS idx_todos_abandoned      ON todos(is_abandoned);
 CREATE INDEX IF NOT EXISTS idx_todos_status_created ON todos(is_abandoned, is_completed, created_at);
 CREATE INDEX IF NOT EXISTS idx_attachments_sha256  ON attachments(sha256);
 
--- 8) 日志-待办关联（M12：日志关联待办）
-CREATE TABLE IF NOT EXISTS log_todo_refs (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    log_id      INTEGER NOT NULL,
-    todo_id     INTEGER NOT NULL,
-    created_at  TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+-- 8) 通用日志引用表（替代 log_todo_refs，支持 todo / task / file 三种引用类型）
+CREATE TABLE IF NOT EXISTS log_refs (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    log_id     INTEGER NOT NULL,
+    ref_type   TEXT    NOT NULL,   -- 'todo' | 'task' | 'file'
+    ref_id     INTEGER NOT NULL,
+    created_at TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (log_id) REFERENCES work_logs(id) ON DELETE CASCADE,
-    FOREIGN KEY (todo_id) REFERENCES todos(id) ON DELETE CASCADE,
-    UNIQUE(log_id, todo_id)
+    UNIQUE(log_id, ref_type, ref_id)
 );
-CREATE INDEX IF NOT EXISTS idx_log_todo_refs_log  ON log_todo_refs(log_id);
-CREATE INDEX IF NOT EXISTS idx_log_todo_refs_todo ON log_todo_refs(todo_id);
+CREATE INDEX IF NOT EXISTS idx_log_refs_log  ON log_refs(log_id);
+CREATE INDEX IF NOT EXISTS idx_log_refs_type ON log_refs(ref_type, ref_id);
+
+-- 通用实体引用表（替代 log_refs，统一管理 log/task/todo 的 todo/task/file 引用）
+CREATE TABLE IF NOT EXISTS entity_refs (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    src_type   TEXT NOT NULL,   -- 'log' | 'task' | 'todo'
+    src_id     INTEGER NOT NULL,
+    src_field  TEXT NOT NULL,   -- 'content' | 'description' | 'summary' | 'maintenance_summary'
+    ref_type   TEXT NOT NULL,   -- 'todo' | 'task' | 'file'
+    ref_id     INTEGER NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(src_type, src_id, src_field, ref_type, ref_id)
+);
+CREATE INDEX IF NOT EXISTS idx_entity_refs_src ON entity_refs(src_type, src_id);
+CREATE INDEX IF NOT EXISTS idx_entity_refs_ref ON entity_refs(ref_type, ref_id);
 
 -- 列表页最常用过滤+排序组合（status/nature 过滤 + start_date 排序）
 CREATE INDEX IF NOT EXISTS idx_tasks_status_nature_date ON tasks(status, nature, start_date DESC);

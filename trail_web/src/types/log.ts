@@ -38,4 +38,5 @@ export interface LogOut {
   created_at: string | null;
   todo_ids: number[];  // M12：关联待办 ID 列表
   task_ids: number[];  // 关联任务 ID 列表
+  attachment_ids: number[];  // 附件 ID 列表
 }

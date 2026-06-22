@@ -36,6 +36,19 @@ public class AttachmentController {
         return store.listReferencedTasks();
     }
 
+    @Operation(summary = "按 ID 批量获取附件元数据", description = "前端 @file:N decoration 按需获取名称和 MIME 类型")
+    @GetMapping("/by-ids")
+    public List<AttachmentResponse> byIds(@RequestParam List<Long> ids) {
+        if (ids == null || ids.isEmpty()) return List.of();
+        return ids.stream()
+            .map(id -> {
+                try { return AttachmentResponse.from(store.get(id)); }
+                catch (Exception e) { return null; }
+            })
+            .filter(java.util.Objects::nonNull)
+            .toList();
+    }
+
     @Operation(summary = "附件列表", description = "查询所有附件，支持按 MIME 类型和任务 ID 筛选")
     @GetMapping
     public List<AttachmentListItemResponse> list(
@@ -80,17 +93,21 @@ public class AttachmentController {
         return AttachmentResponse.from(store.get(id));
     }
 
-    @Operation(summary = "更新附件显示尺寸", description = "设置附件在描述中的显示宽度百分比（1-100）")
+    @Operation(summary = "更新附件", description = "更新显示尺寸或文件名")
     @PutMapping("/{id}")
     public AttachmentResponse update(@Parameter(description = "附件 ID") @PathVariable long id, @RequestBody UpdateRequest body) {
-        if (body == null || body.getDisplaySize() == null) {
-            throw new IllegalArgumentException("displaySize 必填");
+        if (body == null) throw new IllegalArgumentException("请求体不能为空");
+        if (body.getOriginalName() != null) {
+            String name = body.getOriginalName().strip();
+            if (name.isBlank()) throw new IllegalArgumentException("文件名不能为空");
+            store.updateName(id, name);
         }
-        int size = body.getDisplaySize();
-        if (size < 1 || size > 100) {
-            throw new IllegalArgumentException("displaySize 必须在 1-100 之间");
+        if (body.getDisplaySize() != null) {
+            int size = body.getDisplaySize();
+            if (size < 1 || size > 100) throw new IllegalArgumentException("displaySize 必须在 1-100 之间");
+            return AttachmentResponse.from(store.updateSize(id, size));
         }
-        return AttachmentResponse.from(store.updateSize(id, size));
+        return AttachmentResponse.from(store.get(id));
     }
 
     @Operation(summary = "查询附件引用", description = "反查此附件被哪些任务/日志引用")
@@ -119,8 +136,12 @@ public class AttachmentController {
     public static class UpdateRequest {
         @com.fasterxml.jackson.annotation.JsonProperty("displaySize")
         private Integer displaySize;
+        @com.fasterxml.jackson.annotation.JsonProperty("originalName")
+        private String originalName;
         public Integer getDisplaySize() { return displaySize; }
         public void setDisplaySize(Integer displaySize) { this.displaySize = displaySize; }
+        public String getOriginalName() { return originalName; }
+        public void setOriginalName(String originalName) { this.originalName = originalName; }
     }
 
     public record ReferenceDto(

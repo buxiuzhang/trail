@@ -1,6 +1,6 @@
 package com.trail.web.controller;
 
-import com.trail.store.LogTodoRefStore;
+import com.trail.store.EntityRefStore;
 import com.trail.store.TaskStore;
 import com.trail.store.WorkLogStore;
 import com.trail.web.dto.LogCreateRequest;
@@ -25,93 +25,80 @@ public class WorkLogController {
 
     private final WorkLogStore logs;
     private final TaskStore tasks;
-    private final LogTodoRefStore logTodoRefs;
+    private final EntityRefStore entityRefs;
 
-    public WorkLogController(WorkLogStore logs, TaskStore tasks, LogTodoRefStore logTodoRefs) {
+    public WorkLogController(WorkLogStore logs, TaskStore tasks, EntityRefStore entityRefs) {
         this.logs = logs;
         this.tasks = tasks;
-        this.logTodoRefs = logTodoRefs;
+        this.entityRefs = entityRefs;
     }
 
-    @Operation(summary = "查询任务的工作日志", description = "获取指定任务的工作日志，支持分页。默认 limit=5；不传 limit 时返回全量。")
+    @Operation(summary = "查询任务的工作日志")
     @GetMapping
     public PagedResponse<LogResponse> list(
-            @Parameter(description = "任务 ID")
             @PathVariable long taskId,
-            @Parameter(description = "按阶段筛选：main（主体阶段）或 maintenance（维护阶段）")
             @RequestParam(required = false) String phase,
-            @Parameter(description = "是否包含已删除的日志")
             @RequestParam(defaultValue = "false") boolean includeDeleted,
-            @Parameter(description = "每页条数，不传返回全量")
             @RequestParam(required = false) Integer limit,
-            @Parameter(description = "偏移量")
             @RequestParam(defaultValue = "0") int offset,
-            @Parameter(description = "排序方向：desc（最新在前）或 asc（最早在前）")
             @RequestParam(defaultValue = "desc") String sort) {
         int effectiveLimit = (limit == null) ? Integer.MAX_VALUE : limit;
         long total = logs.countLogs(taskId, phase, includeDeleted);
         List<Map<String, Object>> rows = logs.listLogs(taskId, phase, includeDeleted, null, effectiveLimit, offset, sort);
 
-        List<Long> logIds = rows.stream()
-                .map(r -> ((Number) r.get("id")).longValue())
-                .toList();
-        Map<Long, List<Long>> todoIdsByLogId = logTodoRefs.getTodoIdsForLogs(logIds);
+        List<Long> logIds = rows.stream().map(r -> ((Number) r.get("id")).longValue()).toList();
+        Map<Long, List<Long>> todoIdsByLogId = entityRefs.getRefsForSources("log", logIds, "content", "todo");
+        Map<Long, List<Long>> taskIdsByLogId = entityRefs.getRefsForSources("log", logIds, "content", "task");
+        Map<Long, List<Long>> attIdsByLogId  = entityRefs.getRefsForSources("log", logIds, "content", "file");
 
         List<LogResponse> items = rows.stream()
                 .map(row -> {
                     long logId = ((Number) row.get("id")).longValue();
-                    List<Long> todoIds = todoIdsByLogId.getOrDefault(logId, List.of());
-                    List<Long> taskIds = logs.parseTaskIds(
-                            row.getOrDefault("task_ids", "[]").toString());
-                    return LogMapper.toResponse(row, todoIds, taskIds);
+                    return LogMapper.toResponse(row,
+                        todoIdsByLogId.getOrDefault(logId, List.of()),
+                        taskIdsByLogId.getOrDefault(logId, List.of()),
+                        attIdsByLogId.getOrDefault(logId, List.of()));
                 })
                 .toList();
         return new PagedResponse<>(items, total);
     }
 
-    @Operation(summary = "添加工作日志（日报）", description = "为指定任务添加一条工作日志。如果是该任务的第一条日志，任务状态会自动从「未开始」变为「进行中」。")
+    @Operation(summary = "添加工作日志（日报）")
     @PostMapping
     public ResponseEntity<LogResponse> add(
-            @Parameter(description = "任务 ID")
             @PathVariable long taskId,
-            @Parameter(description = "日志内容，包含 log_date（日期 YYYY-MM-DD）、content（日志内容）、phase（阶段，默认 main）、hours（工时，默认 1.0）、todoIds（关联待办 ID 列表）、taskIds（关联任务 ID 列表）")
             @RequestBody LogCreateRequest req) {
         String phase = req.phase() == null ? "main" : req.phase();
         var created = logs.addLog(taskId, req.logDate(), req.content(), phase, req.hours(), req.todoIds(), req.taskIds());
-        // 首日志：未开始 → 进行中
         var task = tasks.getTask(taskId);
         if ("未开始".equals(task.get("status"))) {
             tasks.changeStatus(taskId, "进行中", null, false);
         }
         long logId = ((Number) created.get("id")).longValue();
-        List<Long> todoIds = logTodoRefs.getTodoIdsForLogs(List.of(logId)).getOrDefault(logId, List.of());
-        List<Long> taskIds = logs.parseTaskIds(created.getOrDefault("task_ids", "[]").toString());
-        return ResponseEntity.status(HttpStatus.CREATED).body(LogMapper.toResponse(created, todoIds, taskIds));
+        return ResponseEntity.status(HttpStatus.CREATED).body(LogMapper.toResponse(created,
+            entityRefs.getRefs("log", logId, "content", "todo"),
+            entityRefs.getRefs("log", logId, "content", "task"),
+            entityRefs.getRefs("log", logId, "content", "file")));
     }
 
-    @Operation(summary = "编辑工作日志", description = "修改已有工作日志的内容、日期、阶段、工时或关联待办。")
+    @Operation(summary = "编辑工作日志")
     @PutMapping("/{logId}")
     public LogResponse update(
-            @Parameter(description = "任务 ID")
             @PathVariable long taskId,
-            @Parameter(description = "日志 ID")
             @PathVariable long logId,
-            @Parameter(description = "要修改的字段，包含 content（内容）、log_date（日期）、phase（阶段）、hours（工时）、todoIds（关联待办 ID 列表）、taskIds（关联任务 ID 列表）")
             @RequestBody LogUpdateRequest req) {
         var updated = logs.updateLog(logId, taskId, req.content(), req.logDate(), req.phase(), req.hours(), req.todoIds(), req.taskIds());
-        List<Long> todoIds = logTodoRefs.getTodoIdsForLogs(List.of(logId)).getOrDefault(logId, List.of());
-        List<Long> taskIds = logs.parseTaskIds(updated.getOrDefault("task_ids", "[]").toString());
-        return LogMapper.toResponse(updated, todoIds, taskIds);
+        return LogMapper.toResponse(updated,
+            entityRefs.getRefs("log", logId, "content", "todo"),
+            entityRefs.getRefs("log", logId, "content", "task"),
+            entityRefs.getRefs("log", logId, "content", "file"));
     }
 
-    @Operation(summary = "删除工作日志", description = "删除指定的工作日志。默认软删除（标记为已删除），hard=true 时永久删除。")
+    @Operation(summary = "删除工作日志")
     @DeleteMapping("/{logId}")
     public ResponseEntity<Void> delete(
-            @Parameter(description = "任务 ID")
             @PathVariable long taskId,
-            @Parameter(description = "日志 ID")
             @PathVariable long logId,
-            @Parameter(description = "是否硬删除（永久删除），默认 false 为软删除")
             @RequestParam(defaultValue = "false") boolean hard) {
         logs.deleteLog(logId, taskId, hard);
         return ResponseEntity.noContent().build();

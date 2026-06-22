@@ -27,9 +27,11 @@ public class TaskStore {
     public static final List<String> TASK_NATURES  = List.of("长期", "临时", "维护");
 
     private final SqliteDb db;
+    private final EntityRefStore entityRefStore;
 
-    public TaskStore(SqliteDb db) {
+    public TaskStore(SqliteDb db, EntityRefStore entityRefStore) {
         this.db = db;
+        this.entityRefStore = entityRefStore;
     }
 
     // ============================================================
@@ -268,6 +270,7 @@ public class TaskStore {
             cleanTags(tags)
         );
         if (newId == null) throw new StoreError("创建任务失败");
+        if (description != null) entityRefStore.syncAllRefs("task", newId, "description", description);
         return getTask(newId);
     }
 
@@ -320,6 +323,13 @@ public class TaskStore {
 
         int affected = db.update("UPDATE tasks SET " + sets + " WHERE id = ?", params.toArray());
         if (affected == 0) throw new NotFoundException("任务不存在：" + taskId);
+        // 同步被修改的文本字段引用
+        for (String field : List.of("description", "summary", "maintenance_summary")) {
+            if (fields.containsKey(field)) {
+                String text = fields.get(field) instanceof String s ? s : null;
+                entityRefStore.syncAllRefs("task", taskId, field, text != null ? text : "");
+            }
+        }
         return getTask(taskId);
     }
 
@@ -447,6 +457,16 @@ public class TaskStore {
     public void deleteTask(long taskId) {
         if (db.query("SELECT 1 FROM tasks WHERE id = ?", taskId).isEmpty()) {
             throw new NotFoundException("任务不存在：" + taskId);
+        }
+        // 清理任务自身及其所有 todos / logs 的引用记录
+        entityRefStore.removeAll("task", taskId);
+        List<Map<String, Object>> todoRows = db.query("SELECT id FROM todos WHERE task_id = ?", taskId);
+        for (Map<String, Object> row : todoRows) {
+            entityRefStore.removeAll("todo", ((Number) row.get("id")).longValue());
+        }
+        List<Map<String, Object>> logRows = db.query("SELECT id FROM work_logs WHERE task_id = ?", taskId);
+        for (Map<String, Object> row : logRows) {
+            entityRefStore.removeAll("log", ((Number) row.get("id")).longValue());
         }
         db.runInTransaction(con -> {
             try {

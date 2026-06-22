@@ -3,6 +3,7 @@ package com.trail.config;
 import com.trail.crypto.PlainYamlImporter;
 import com.trail.crypto.SecretKeyService;
 import com.trail.db.SqliteDb;
+import com.trail.store.EntityRefStore;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,13 +24,16 @@ public class StartupChecks {
     private final SqliteDb db;
     private final SecretKeyService keys;
     private final PlainYamlImporter importer;
+    private final EntityRefStore entityRefStore;
 
     public StartupChecks(DataDirService dataDir, SqliteDb db,
-                         SecretKeyService keys, PlainYamlImporter importer) {
+                         SecretKeyService keys, PlainYamlImporter importer,
+                         EntityRefStore entityRefStore) {
         this.dataDir = dataDir;
         this.db = db;
         this.keys = keys;
         this.importer = importer;
+        this.entityRefStore = entityRefStore;
     }
 
     @PostConstruct
@@ -38,6 +42,7 @@ public class StartupChecks {
         if (dataDir.isConfigured()) {
             db.openConnection(dataDir.currentDataDir());
             db.ensureSchema();
+            entityRefStore.migrate();
             dataDir.ensureSubdirectories(dataDir.currentDataDir());
             LogSetup.configureFileAppender(dataDir.currentDataDir().resolve("logs"));
             keys.ensureInitialized();

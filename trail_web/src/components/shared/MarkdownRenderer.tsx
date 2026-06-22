@@ -11,13 +11,14 @@
  * 用法:
  *   <MarkdownRenderer text={log.content} className={styles.content} />
  */
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useMemo } from 'react'
 import { EditorContent, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Image from '@tiptap/extension-image'
 import { Markdown } from '@tiptap/markdown'
 import { HighlightedCodeBlock } from './HighlightedCodeBlock'
 import { createMentionDecorationExtension } from './DescriptionEditor'
+import { useAttachmentsByIds } from '@/api/attachments'
 import { ImagePreview } from './ImagePreview'
 import styles from './MarkdownRenderer.module.css'
 import tiptapStyles from './TipTapContent.module.css'
@@ -25,9 +26,7 @@ import tiptapStyles from './TipTapContent.module.css'
 interface MarkdownRendererProps {
   text: string | null | undefined
   className?: string
-  /** 待办列表（用于渲染 @todo:ID） */
   todos?: { id: number; title: string }[]
-  /** 任务列表（用于渲染 @task:ID） */
   tasks?: { id: number; title: string }[]
 }
 
@@ -37,13 +36,24 @@ export function MarkdownRenderer({ text, className, todos = [], tasks = [] }: Ma
   const tasksRef = useRef(tasks)
   const [previewImage, setPreviewImage] = useState<string | null>(null)
 
-  // 保持 ref 最新
+  // 自动从 text 解析 @file:N，拉取附件元数据
+  const fileIds = useMemo(() => {
+    const ids: number[] = []
+    const re = /@file:(\d+)/g
+    let m: RegExpExecArray | null
+    while ((m = re.exec(text ?? '')) !== null) ids.push(Number(m[1]))
+    return ids
+  }, [text])
+  const { data: attList = [] } = useAttachmentsByIds(fileIds)
+  const attachmentsRef = useRef<Map<number, { name: string; mime: string }>>(new Map())
+
+  useEffect(() => { todosRef.current = todos }, [todos])
+  useEffect(() => { tasksRef.current = tasks }, [tasks])
   useEffect(() => {
-    todosRef.current = todos
-  }, [todos])
-  useEffect(() => {
-    tasksRef.current = tasks
-  }, [tasks])
+    const m = new Map<number, { name: string; mime: string }>()
+    for (const a of attList) m.set(a.id, { name: a.original_name || `文件 #${a.id}`, mime: a.mime })
+    attachmentsRef.current = m
+  }, [attList])
 
   const editor = useEditor({
     extensions: [
@@ -63,11 +73,11 @@ export function MarkdownRenderer({ text, className, todos = [], tasks = [] }: Ma
         HTMLAttributes: { class: 'tiptap-image' },
       }),
       Markdown,
-      // 添加 mention decoration 扩展，渲染 @todo:ID 和 @task:ID
+      // 添加 mention decoration 扩展，渲染 @todo:ID、@task:ID 和 @file:ID
       createMentionDecorationExtension(todosRef, tasksRef, {
         todoMentionDecor: styles.todoMentionDecor,
         taskMentionDecor: styles.taskMentionDecor,
-      }),
+      }, attachmentsRef),
     ],
     content: text ?? '',
     contentType: 'markdown',
@@ -80,11 +90,11 @@ export function MarkdownRenderer({ text, className, todos = [], tasks = [] }: Ma
     editor.commands.setContent(text, { contentType: 'markdown' })
   }, [editor, text])
 
-  // todos/tasks 异步加载后，触发 decoration 重新计算（@ 提及渲染）
+  // todos/tasks/attList 变化后触发 decoration 重新计算
   useEffect(() => {
     if (!editor) return
     editor.view.dispatch(editor.state.tr)
-  }, [editor, todos, tasks])
+  }, [editor, todos, tasks, attList])
 
   if (!text) return null
 

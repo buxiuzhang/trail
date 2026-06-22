@@ -11,14 +11,18 @@ public final class LogMapper {
     private LogMapper() {}
 
     public static LogResponse toResponse(Map<String, Object> row) {
-        return toResponse(row, Collections.emptyList(), Collections.emptyList());
+        return toResponse(row, Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
     }
 
     public static LogResponse toResponse(Map<String, Object> row, List<Long> todoIds) {
-        return toResponse(row, todoIds, Collections.emptyList());
+        return toResponse(row, todoIds, Collections.emptyList(), Collections.emptyList());
     }
 
     public static LogResponse toResponse(Map<String, Object> row, List<Long> todoIds, List<Long> taskIds) {
+        return toResponse(row, todoIds, taskIds, Collections.emptyList());
+    }
+
+    public static LogResponse toResponse(Map<String, Object> row, List<Long> todoIds, List<Long> taskIds, List<Long> attachmentIds) {
         return new LogResponse(
                 asLong(row.get("id")),
                 asLong(row.get("task_id")),
@@ -34,7 +38,8 @@ public final class LogMapper {
                 asInt(row.get("edit_count")),
                 asInstant(row.get("created_at")),
                 todoIds != null ? todoIds : Collections.emptyList(),
-                taskIds != null ? taskIds : Collections.emptyList()
+                taskIds != null ? taskIds : Collections.emptyList(),
+                attachmentIds != null ? attachmentIds : Collections.emptyList()
         );
     }
 }

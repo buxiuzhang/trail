@@ -47,7 +47,7 @@ interface MentionCandidate {
   title: string
 }
 
-/** 创建装饰器扩展，将 @task:ID 和 @todo:ID 显示为标题
+/** 创建装饰器扩展，将 @task:ID 和 @todo:ID 显示为标题，@file:ID 显示为图片或文件 chip
  *  使用 CSS ::after 显示标题，font-size: 0 隐藏原始文本
  *  当后面没有空格时，使用 widget decoration 插入空格确保光标可定位
  */
@@ -56,6 +56,8 @@ export function createMentionDecorationExtension(
   tasksRef: React.MutableRefObject<ReadonlyArray<{ id: number; title: string }>>,
   /** 样式类名，默认使用 DescriptionEditor 的样式 */
   styleClasses?: { todoMentionDecor: string; taskMentionDecor: string },
+  /** 附件元数据 ref，供 @file:N 渲染使用 */
+  attachmentsRef?: React.MutableRefObject<Map<number, { name: string; mime: string }>>,
 ) {
   const todoClass = styleClasses?.todoMentionDecor ?? styles.todoMentionDecor
   const taskClass = styleClasses?.taskMentionDecor ?? styles.taskMentionDecor
@@ -70,16 +72,15 @@ export function createMentionDecorationExtension(
             decorations(state) {
               const decorations: Decoration[] = []
               const doc = state.doc
-              // 从 ref 获取最新值
               const todos = todosRef.current
               const tasks = tasksRef.current
+              const attMap = attachmentsRef?.current
 
-              // 遍历文档中的所有文本节点
               doc.descendants((node, pos) => {
                 if (!node.isText) return
 
                 const text = node.text ?? ''
-                // 匹配 @todo:ID 或 @task:ID
+                // @todo:ID 和 @task:ID
                 const re = /@(todo|task):(\d+)/g
                 let m: RegExpExecArray | null
 
@@ -89,14 +90,10 @@ export function createMentionDecorationExtension(
                   const start = pos + m.index
                   const end = start + m[0].length
 
-                  // 从数据中查找标题
                   const items = type === 'todo' ? todos : tasks
                   const found = items.find((t) => t.id === id)
                   const title = found?.title || `@${type}:${id}`
 
-                  // 使用 inline decoration 添加样式和数据属性
-                  // CSS 通过 ::after 显示标题，font-size: 0 隐藏原始文本
-                  // inclusiveEnd: false 允许光标落在装饰末尾，不依赖尾部空格
                   const className = type === 'todo' ? todoClass : taskClass
                   decorations.push(
                     Decoration.inline(
@@ -112,6 +109,66 @@ export function createMentionDecorationExtension(
                       { inclusiveEnd: false },
                     ),
                   )
+                }
+
+                // @file:ID
+                const fileRe = /@file:(\d+)/g
+                while ((m = fileRe.exec(text)) !== null) {
+                  const id = parseInt(m[1], 10)
+                  const start = pos + m.index
+                  const end = start + m[0].length
+                  const att = attMap?.get(id)
+                  const name = att?.name || `文件 #${id}`
+                  const mime = att?.mime || ''
+                  const isImage = mime.startsWith('image/')
+
+                  if (isImage) {
+                    decorations.push(
+                      Decoration.inline(start, end, {
+                        style: 'font-size:0;color:transparent;',
+                      }),
+                    )
+                    decorations.push(
+                      Decoration.widget(start, () => {
+                        const img = document.createElement('img')
+                        img.src = `/api/attachments/${id}`
+                        img.alt = name
+                        img.className = 'tiptap-image file-token-img'
+                        img.style.cssText = 'max-width:100%;display:block;margin:8px 0;border-radius:4px;cursor:zoom-in;'
+                        return img
+                      }, { side: -1, key: `file-img-${id}-${name}` }),
+                    )
+                  } else {
+                    decorations.push(
+                      Decoration.inline(start, end, {
+                        class: 'file-token-chip',
+                        'data-file-id': String(id),
+                        'data-file-name': name,
+                        style: 'font-size:0;color:transparent;',
+                      }),
+                    )
+                    decorations.push(
+                      Decoration.widget(start, () => {
+                        const span = document.createElement('span')
+                        span.className = 'file-token-chip'
+                        span.setAttribute('data-file-id', String(id))
+                        span.style.cssText =
+                          'display:inline-flex;align-items:center;gap:4px;padding:1px 6px;' +
+                          'background:var(--card-deep);border:0.5px solid var(--rule-soft);' +
+                          'border-radius:3px;font-size:12px;color:var(--ink);cursor:pointer;font-family:var(--mono);'
+                        span.title = name
+                        span.textContent = '📎 ' + name
+                        span.addEventListener('click', (e) => {
+                          e.preventDefault()
+                          const a = document.createElement('a')
+                          a.href = `/api/attachments/${id}`
+                          a.download = name
+                          a.click()
+                        })
+                        return span
+                      }, { side: -1, key: `file-chip-${id}-${name}` }),
+                    )
+                  }
                 }
               })
 
@@ -137,6 +194,8 @@ interface DescriptionEditorProps {
   todos?: TodoOut[]
   /** 全局任务列表（用于 @ 任务引用） */
   tasks?: TaskOut[]
+  /** 附件元数据（用于 @file:N 渲染） */
+  attachments?: Map<number, { name: string; mime: string }>
 }
 
 export const DescriptionEditor = forwardRef<HTMLTextAreaElement, DescriptionEditorProps>(function DescriptionEditor(
@@ -149,6 +208,7 @@ export const DescriptionEditor = forwardRef<HTMLTextAreaElement, DescriptionEdit
     textareaClassName = 'field__textarea',
     todos = [],
     tasks = [],
+    attachments,
   },
   ref,
 ) {
@@ -162,6 +222,7 @@ export const DescriptionEditor = forwardRef<HTMLTextAreaElement, DescriptionEdit
   // 使用 ref 存储 todos 和 tasks 的最新值，供 Mention 扩展的 items 函数使用
   const todosRef = useRef(todos)
   const tasksRef = useRef(tasks)
+  const attachmentsRef = useRef<Map<number, { name: string; mime: string }>>(attachments ?? new Map())
   /** 已出现在文档中的 @mention 键集合，防止重复引用 */
   const usedMentionKeysRef = useRef(new Set<string>())
 
@@ -175,6 +236,9 @@ export const DescriptionEditor = forwardRef<HTMLTextAreaElement, DescriptionEdit
   useEffect(() => {
     tasksRef.current = tasks
   }, [tasks])
+  useEffect(() => {
+    attachmentsRef.current = attachments ?? new Map()
+  }, [attachments])
 
   // value 变化时，解析已使用的 @mention 键（用于过滤候选列表）
   useEffect(() => {
@@ -238,18 +302,10 @@ export const DescriptionEditor = forwardRef<HTMLTextAreaElement, DescriptionEdit
   // 上传文件（通过队列）—— 斜杠命令和文件 input 使用
   const uploadFileRef = useRef<(file: File) => void>(() => {})
   const uploadFile = useCallback((file: File) => {
-    queueUpload(file, (url, name, mime) => {
+    queueUpload(file, (_url, _name, _mime, id) => {
       const ed = editorRef.current
       if (!ed) return
-      if (mime.startsWith('image/')) {
-        ed.chain().focus().setImage({ src: url }).run()
-      } else {
-        ed.chain().focus().insertContent({
-          type: 'text',
-          marks: [{ type: 'link', attrs: { href: url, target: null } }],
-          text: name,
-        }).run()
-      }
+      ed.chain().focus().insertContent(`@file:${id} `).run()
     })
   }, [queueUpload])
   useEffect(() => { uploadFileRef.current = uploadFile }, [uploadFile])
@@ -278,8 +334,8 @@ export const DescriptionEditor = forwardRef<HTMLTextAreaElement, DescriptionEdit
         placeholder: placeholder ?? '',
       }),
       Markdown,
-      // 装饰器扩展：将 @task:ID 和 @todo:ID 显示为标题
-      createMentionDecorationExtension(todosRef, tasksRef),
+      // 装饰器扩展：将 @task:ID 和 @todo:ID 显示为标题，@file:ID 显示图片或文件 chip
+      createMentionDecorationExtension(todosRef, tasksRef, undefined, attachmentsRef),
       Mention.configure({
         HTMLAttributes: { class: 'mention-ref' },
         suggestion: {
@@ -485,11 +541,11 @@ export const DescriptionEditor = forwardRef<HTMLTextAreaElement, DescriptionEdit
     if (hiddenTaRef.current) hiddenTaRef.current.value = value
   }, [editor, value])
 
-  // todos/tasks 异步加载后，触发 decoration 重新计算（@ 提及渲染）
+  // todos/tasks/attachments 变化后，触发 decoration 重新计算
   useEffect(() => {
     if (!editor) return
     editor.view.dispatch(editor.state.tr)
-  }, [editor, todos, tasks])
+  }, [editor, todos, tasks, attachments])
 
   // ref 兼容
   useImperativeHandle(

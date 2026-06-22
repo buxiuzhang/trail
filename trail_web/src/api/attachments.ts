@@ -15,9 +15,9 @@ export interface AttachmentOut {
   id: number
   url: string
   mime: string
-  byteSize: number
-  originalName: string | null
-  displaySize: number
+  byte_size: number
+  original_name: string | null
+  display_size: number
 }
 
 export interface DeleteInUseError {
@@ -95,6 +95,21 @@ export function useAttachment(id: number | null) {
   })
 }
 
+/** 按 ID 列表批量获取附件元数据，用于 @file:N decoration 渲染。 */
+export function useAttachmentsByIds(ids: number[]) {
+  const key = ids.slice().sort((a, b) => a - b).join(',')
+  return useQuery({
+    queryKey: ['attachments', 'by-ids', key],
+    queryFn: () => {
+      if (ids.length === 0) return Promise.resolve([] as AttachmentOut[])
+      const params = ids.map(id => `ids=${id}`).join('&')
+      return api.get<AttachmentOut[]>(`/api/attachments/by-ids?${params}`)
+    },
+    enabled: ids.length > 0,
+    staleTime: 60_000,
+  })
+}
+
 /** 拿到 attachments 列表全部记录（用于一次性预热 size 缓存）。当前阶段未用，预留。 */
 // export function useAllAttachments() { ... }
 
@@ -107,8 +122,7 @@ export function useUpdateAttachment() {
     },
     onMutate: async ({ id, displaySize }) => {
       const prev = qc.getQueryData<AttachmentOut>(['attachment', id])
-      // 乐观更新
-      if (prev) qc.setQueryData(['attachment', id], { ...prev, displaySize })
+      if (prev) qc.setQueryData(['attachment', id], { ...prev, display_size: displaySize })
       return { prev }
     },
     onError: (_err, vars, ctx) => {
