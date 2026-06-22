@@ -6,6 +6,7 @@
  */
 import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import CloseCircleIcon from '@/icons/close-circle.svg'
 import styles from './ImagePreview.module.css'
 
 interface ImagePreviewProps {
@@ -33,7 +34,7 @@ export function ImagePreview({ src, onClose }: ImagePreviewProps) {
       }}
     >
       <button className={styles.close} onClick={onClose} aria-label="关闭">
-        ✕
+        <img src={CloseCircleIcon} width={20} height={20} alt="" aria-hidden="true" />
       </button>
       <img
         className={styles.image}

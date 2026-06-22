@@ -19,8 +19,6 @@
   height: 40px;
   border: none;
   background: rgba(255, 255, 255, 0.15);
-  color: #fff;
-  font-size: 20px;
   border-radius: 50%;
   cursor: pointer;
   display: flex;
@@ -28,7 +26,10 @@
   justify-content: center;
   transition: background 0.2s;
 }
-
+.close img {
+  filter: invert(1);
+  opacity: 0.85;
+}
 .close:hover {
   background: rgba(255, 255, 255, 0.3);
 }

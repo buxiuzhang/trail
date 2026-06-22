@@ -1,5 +1,6 @@
 import { useModalContext } from '@/context/ModalContext'
 import clsx from 'clsx'
+import CloseCircleIcon from '@/icons/close-circle.svg'
 import styles from './Modal.module.css'
 
 export function Modal() {
@@ -28,7 +29,7 @@ export function Modal() {
             </h3>
           </div>
           <button className={styles.close} type="button" onClick={closeModal} aria-label="关闭">
-            ×
+            <img src={CloseCircleIcon} width={18} height={18} alt="" aria-hidden="true" />
           </button>
         </div>
         <div className={styles.bd}>{config.body}</div>

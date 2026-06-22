@@ -34,7 +34,7 @@
   margin-bottom: 24px;
 }
 .composeRow {
-  display: flex; align-items: center; gap: 10px;
+  display: flex; align-items: baseline; gap: 10px;
   margin-bottom: 12px;
   flex-wrap: wrap;
 }
@@ -399,6 +399,46 @@
   color: var(--ink-ghost);
 }
 .entryMt .phase { color: var(--gold); }
+.hoursStepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.hoursInput {
+  width: 2.8em;
+  border: none;
+  border-bottom: 0.5px solid var(--rule-soft);
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 1px 2px;
+  background: transparent;
+  color: var(--ink);
+  outline: none;
+  -moz-appearance: textfield;
+}
+.hoursInput::-webkit-inner-spin-button,
+.hoursInput::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+}
+.hoursStepBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: none;
+  background: transparent;
+  color: var(--ink-ghost);
+  font-size: 13px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0;
+  border-radius: 2px;
+}
+.hoursStepBtn:hover {
+  color: var(--ink);
+}
 .hours {
   font-family: var(--mono);
   font-size: 10px;

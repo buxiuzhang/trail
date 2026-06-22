@@ -148,15 +148,29 @@ export function LogCompose({ task, todos, tasks = [], editing, onSave, onCancel 
           onChange={setPhase}
         />
         <label>工时</label>
-        <input
-          type="number"
-          step="0.5"
-          min="0.5"
-          max="11.5"
-          value={hours}
-          onChange={e => setHours(parseFloat(e.target.value) || 1)}
-          className={styles.hoursInput}
-        />
+        <div className={styles.hoursStepper}>
+          <button
+            type="button"
+            className={styles.hoursStepBtn}
+            onClick={() => setHours(h => Math.max(0.5, parseFloat((h - 0.5).toFixed(1))))}
+            tabIndex={-1}
+          >−</button>
+          <input
+            type="number"
+            step="0.5"
+            min="0.5"
+            max="11.5"
+            value={hours}
+            onChange={e => setHours(parseFloat(e.target.value) || 1)}
+            className={styles.hoursInput}
+          />
+          <button
+            type="button"
+            className={styles.hoursStepBtn}
+            onClick={() => setHours(h => Math.min(11.5, parseFloat((h + 0.5).toFixed(1))))}
+            tabIndex={-1}
+          >+</button>
+        </div>
         <ModeToggleButton mode={mode} onModeChange={setMode} style={{ marginLeft: 'auto' }} />
       </div>
       <DescriptionEditor

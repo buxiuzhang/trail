@@ -8,6 +8,7 @@ import { ignoreAlert } from '@/hooks/useWatchAlerts'
 import { MessageContent } from './MessageContent'
 import CopyIcon from './copy.svg'
 import CopiedIcon from './copied.svg'
+import CloseCircleIcon from './close-circle.svg'
 import styles from './ChatWindow.module.css'
 
 /** 最近消息条数上限（防 token 溢出） */
@@ -310,7 +311,7 @@ export function ChatWindow() {
       <div className={styles.header}>
         <span className={styles.title}>工作对话</span>
         <button className={styles.close} onClick={closeChat} aria-label="关闭对话">
-          ×
+          <img src={CloseCircleIcon} width={18} height={18} alt="" aria-hidden="true" />
         </button>
       </div>
 

@@ -55,16 +55,16 @@
 .close {
   background: none;
   border: none;
-  font-family: var(--body);
-  font-size: 16px;
-  color: var(--ink-ghost);
   cursor: pointer;
   padding: 0;
   line-height: 1;
-  transition: color 150ms ease;
+  opacity: 0.4;
+  transition: opacity 150ms ease;
+  display: flex;
+  align-items: center;
 }
 .close:hover {
-  color: var(--ink);
+  opacity: 0.8;
 }
 
 /* —— 消息列表 —— */

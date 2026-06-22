@@ -32,6 +32,7 @@ export function useCreateLog(taskId: number) {
       qc.invalidateQueries({ queryKey: ['logs', taskId] })
       qc.invalidateQueries({ queryKey: ['tasks', taskId] })
       qc.invalidateQueries({ queryKey: ['overview'] })
+      qc.invalidateQueries({ queryKey: ['watched-tasks'] })
     },
   })
 }
@@ -77,6 +78,7 @@ export function useDeleteLog(taskId: number) {
       })
       qc.invalidateQueries({ queryKey: ['todo-logs', taskId] })
       qc.invalidateQueries({ queryKey: ['overview'] })
+      qc.invalidateQueries({ queryKey: ['watched-tasks'] })
     },
     onError: () => {
       qc.invalidateQueries({ queryKey: ['logs', taskId] })

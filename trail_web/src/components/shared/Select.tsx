@@ -45,7 +45,7 @@ export function Select({ value, options, onChange, className }: SelectProps) {
           fontFamily: 'var(--body)',
           fontSize: '16px',
           color: 'var(--ink)',
-          padding: '8px 0',
+          padding: '1px 0',
           borderBottom: open ? '0.5px solid var(--ink)' : '0.5px solid var(--rule)',
           transition: 'border-bottom-color 200ms ease',
           display: 'flex',
