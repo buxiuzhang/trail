@@ -15,7 +15,7 @@ export function FormField({ label, hint, required, labelAction, children, style 
       <div className="field__label">
         <span>{label}</span>
         {hint && <span className="field__hint">{hint}</span>}
-        {required && <span className="field__hint">required</span>}
+        {required && <span className="field__hint field__hint--required">required</span>}
         {labelAction}
       </div>
       {children}

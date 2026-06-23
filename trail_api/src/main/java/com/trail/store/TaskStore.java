@@ -148,8 +148,11 @@ public class TaskStore {
             params.add(nature);
         }
         if (search != null && !search.isBlank()) {
-            sql.append(" AND EXISTS (SELECT 1 FROM fts_tasks WHERE fts_tasks MATCH ? AND rowid = t.id)");
-            params.add(search);
+            String like = "%" + search + "%";
+            sql.append(" AND (t.title LIKE ? OR t.description LIKE ? OR t.tags LIKE ?)");
+            params.add(like);
+            params.add(like);
+            params.add(like);
         }
         if (month != null && !month.isBlank()) {
             sql.append(" AND strftime('%Y-%m', COALESCE(t.processing_date, t.start_date)) = ?");

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { TaskOut, ContactIn, ContactOut } from '@/types'
 import { TODAY } from '@/constants'
@@ -13,6 +13,90 @@ import { DescriptionEditorWithMode as DescriptionEditor, type EditorMode } from 
 import { ModeToggleButton } from '@/components/shared/ModeToggleButton'
 import polishIcon from '@/icons/polish.svg'
 import styles from './TaskForm.module.css'
+
+function statusColor(status?: string): string {
+  switch (status) {
+    case '进行中': return 'var(--green)'
+    case '已完成': return 'var(--amber)'
+    case '已作废': return 'var(--oxblood)'
+    default:       return 'var(--ink-ghost)'
+  }
+}
+
+function natureColor(nature?: string): string {
+  switch (nature) {
+    case '长期': return 'var(--green)'
+    case '临时': return 'var(--ink-faded)'
+    case '维护': return 'var(--gold)'
+    default:     return 'var(--ink-ghost)'
+  }
+}
+
+// ── 标签输入组件 ──────────────────────────────────────────────────
+function TagField({ tags, onChange }: { tags: string[]; onChange: (tags: string[]) => void }) {
+  const [inputting, setInputting] = useState(false)
+  const [draft, setDraft] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  function commit() {
+    const val = draft.trim()
+    if (val && !tags.includes(val)) onChange([...tags, val])
+    setDraft('')
+    setInputting(false)
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === 'Enter' || e.key === ',' || e.key === ' ') {
+      e.preventDefault()
+      commit()
+    } else if (e.key === 'Escape') {
+      setDraft('')
+      setInputting(false)
+    } else if (e.key === 'Backspace' && draft === '' && tags.length > 0) {
+      onChange(tags.slice(0, -1))
+    }
+  }
+
+  function startInput() {
+    setInputting(true)
+    setTimeout(() => inputRef.current?.focus(), 0)
+  }
+
+  return (
+    <div className={styles.tagField}>
+      <span className={styles.tagFieldLabel}>标签</span>
+      <div className={styles.tagList}>
+        {tags.map(tag => (
+          <span key={tag} className={styles.tagChip}>
+            {tag}
+            <button
+              type="button"
+              className={styles.tagChipDel}
+              onClick={() => onChange(tags.filter(t => t !== tag))}
+              aria-label={`删除 ${tag}`}
+            >×</button>
+          </span>
+        ))}
+        {inputting ? (
+          <input
+            ref={inputRef}
+            className={styles.tagInput}
+            value={draft}
+            onChange={e => setDraft(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onBlur={commit}
+            placeholder="输入后按回车"
+            size={Math.max(6, draft.length + 2)}
+          />
+        ) : (
+          <button type="button" className={styles.tagAddBtn} onClick={startInput}>
+            + 添加标签
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
 
 interface TaskFormProps {
   mode: 'new' | 'edit'
@@ -65,7 +149,7 @@ export function TaskForm({ mode, task }: TaskFormProps) {
   const [processingDate, setProcessingDate] = useState(task?.processing_date || '')
   const [description, setDescription] = useState(task?.description || '')
   const [endDate, setEndDate] = useState(task?.end_date || '')
-  const [tagsStr, setTagsStr] = useState((task?.tags || []).join(', '))
+  const [tags, setTags] = useState<string[]>(task?.tags || [])
   const [contacts, setContacts] = useState<ContactIn[]>(
     task?.contacts?.length ? task.contacts.map(toContactIn) : [emptyContact()]
   )
@@ -97,10 +181,6 @@ export function TaskForm({ mode, task }: TaskFormProps) {
 
     // 过滤空联系人行
     const validContacts = contacts.filter(c => c.name.trim())
-    // 清理标签：去除首尾空白 + 不可见特殊字符（零宽空格、零宽非连接符等）
-    const tags = tagsStr.split(/[,，、\s]+/)
-      .map(s => s.replace(/^[​-‍﻿\s]+|[​-‍﻿\s]+$/g, '').trim())
-      .filter(Boolean)
 
     setSubmitting(true)
     try {
@@ -158,25 +238,16 @@ export function TaskForm({ mode, task }: TaskFormProps) {
           </span>
         </header>
 
-        {/* 身份栏：只读状态 + 性质 */}
-        <div className={styles.identityBar}>
-          <div className={styles.identityRow}>
-            <span className={`stamp ${statusToStampClass(isEdit ? (task?.status || '') : '未开始')}`}>
-              {isEdit ? task?.status : '未开始'}
-            </span>
-            <span className={styles.identityDot}>·</span>
-            <span className={`nature-badge ${natureToBadgeClass(isEdit ? (task?.nature || '临时') : '临时')}`}>
-              {isEdit ? task?.nature : '临时'}
-            </span>
-          </div>
-          {!isEdit && (
-            <div className={styles.identityHint}>
-              <span>添加日志后自动转入进行中</span>
+        {/* 身份栏：只读状态 + 性质，仅编辑时显示 */}
+        {isEdit && (
+          <div className={styles.identityBar}>
+            <div className={styles.identityRow}>
+              <span className={styles.identityText} style={{ color: statusColor(task?.status) }}>{task?.status}</span>
               <span className={styles.identityDot}>·</span>
-              <span>超过一月自动转长期 · 完成时可含维护期</span>
+              <span className={styles.identityText} style={{ color: natureColor(task?.nature) }}>{task?.nature}</span>
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         <FormField label="任务标题" required>
           <input
@@ -276,14 +347,7 @@ export function TaskForm({ mode, task }: TaskFormProps) {
           </div>
         </FormField>
 
-        <FormField label="标签（逗号 / 顿号 / 空格分隔）">
-          <input
-            className="field__input"
-            value={tagsStr}
-            onChange={e => setTagsStr(e.target.value)}
-            placeholder="监控, 钉钉, 时序"
-          />
-        </FormField>
+        <TagField tags={tags} onChange={setTags} />
 
         <div className={styles.foot}>
           <span className={styles.footSig}>
