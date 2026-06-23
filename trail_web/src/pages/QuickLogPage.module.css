@@ -1,0 +1,476 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  animation: fadeUp 0.5s ease backwards;
+}
+
+/* —— 标题栏 —— */
+.header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-bottom: var(--space-md);
+  border-bottom: 0.5px solid var(--rule);
+}
+
+.headerLeft {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-md);
+}
+
+.headerTitle {
+  font-family: var(--serif-sc);
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.headerDate {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--ink-faded);
+  background: transparent;
+  border: none;
+  border-bottom: 0.5px solid var(--rule-soft);
+  outline: none;
+  padding: 2px 0;
+  cursor: pointer;
+  transition: border-bottom-color 0.15s, color 0.15s;
+}
+
+.headerDate:focus,
+.headerDate:hover {
+  border-bottom-color: var(--ink-ghost);
+  color: var(--ink-soft);
+}
+
+.addBtn {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 6px 14px;
+  background: var(--ink);
+  color: var(--paper);
+  border: none;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.addBtn:hover {
+  background: var(--ink-soft);
+}
+
+/* —— 空态 —— */
+.empty {
+  font-family: var(--body);
+  font-style: italic;
+  font-size: 13px;
+  color: var(--ink-ghost);
+  padding: var(--space-xl) 0;
+}
+
+/* —— 分区标签 —— */
+.sectionLabel {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-ghost);
+  margin-bottom: var(--space-sm);
+}
+
+.sectionCount {
+  color: var(--ink-faded);
+}
+
+/* —— 草稿区 —— */
+.draftSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-md) var(--space-lg);
+  border: 0.5px dashed var(--rule);
+  background: var(--card-soft);
+}
+
+.draftList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.draftItem {
+  position: relative;
+  padding: var(--space-sm) var(--space-xl) var(--space-sm) var(--space-sm);
+  border-bottom: 0.5px solid var(--rule-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.draftRemove {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  font-size: 16px;
+  color: var(--ink-ghost);
+  cursor: pointer;
+  padding: 0 4px;
+  opacity: 0.5;
+  transition: opacity 0.12s, color 0.12s;
+}
+
+.draftRemove:hover {
+  opacity: 1;
+  color: var(--oxblood);
+}
+
+.submitRow {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--space-sm);
+}
+
+.submitBtn {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 7px 20px;
+  background: var(--ink);
+  color: var(--paper);
+  border: none;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.submitBtn:hover:not(:disabled) {
+  background: var(--ink-soft);
+}
+
+.submitBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* —— 已提交列表（表格） —— */
+.tableWrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.thNo {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--ink-faded);
+  text-align: center;
+  padding: 6px 12px 6px 0;
+  border-bottom: 0.5px solid var(--rule);
+  white-space: nowrap;
+  width: 32px;
+}
+
+.th {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faded);
+  text-align: left;
+  padding: 6px 12px 6px 0;
+  border-bottom: 0.5px solid var(--rule);
+  white-space: nowrap;
+}
+
+.tr {
+  border-bottom: 0.5px solid var(--rule-soft);
+}
+
+.tr:last-child {
+  border-bottom: none;
+}
+
+.tdNo {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink-ghost);
+  text-align: center;
+  padding: 10px 12px 10px 0;
+  vertical-align: top;
+  width: 32px;
+}
+
+.td {
+  font-family: var(--body);
+  font-size: 13px;
+  color: var(--ink-soft);
+  padding: 10px 12px 10px 0;
+  vertical-align: top;
+}
+
+.tdActions {
+  padding: 8px 0;
+  vertical-align: middle;
+  white-space: nowrap;
+  width: 56px;
+}
+
+.iconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  opacity: 0.4;
+  transition: opacity 0.12s;
+  padding: 0;
+}
+
+.iconBtn:hover { opacity: 0.85; }
+
+.iconBtnDanger:hover {
+  opacity: 1;
+}
+
+.iconBtnDanger img {
+  filter: invert(30%) sepia(80%) saturate(600%) hue-rotate(330deg);
+}
+
+.taskLink {
+  font-family: var(--serif-sc);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-soft);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  transition: color 0.12s;
+  white-space: nowrap;
+}
+
+.taskLink:hover {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--rule);
+}
+
+.logAttach {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+
+.logTaskName {
+  font-family: var(--serif-sc);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+
+.logPhase {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+  background: none;
+  padding: 0;
+}
+
+.logHours {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+
+.logContent {
+  font-family: var(--body);
+  font-size: 13px;
+  color: var(--ink-soft);
+  line-height: 1.6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 400px;
+  display: inline-block;
+  vertical-align: bottom;
+}
+
+.expandBtn {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  color: var(--ink-ghost);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0 0 0 6px;
+  transition: color 0.12s;
+}
+
+.expandBtn:hover {
+  color: var(--ink-faded);
+}
+
+/* —— 浮动卡片 —— */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  background: rgba(26, 22, 18, 0.3);
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.floatCard {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 501;
+  width: min(680px, 92vw);
+  max-height: 88vh;
+  overflow-y: auto;
+  background: var(--card);
+  border: 0.5px solid var(--rule);
+  box-shadow: var(--shadow-xl);
+  padding: var(--space-xl);
+  animation: slideUp 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translate(-50%, calc(-50% + 16px)); }
+  to   { opacity: 1; transform: translate(-50%, -50%); }
+}
+
+/* —— 任务选择器 —— */
+.taskRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 0.5px solid var(--rule-soft);
+}
+
+.taskLabel {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-ghost);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.taskSelectWrap {
+  position: relative;
+  flex: 1;
+}
+
+.taskInput {
+  width: 100%;
+  font-family: var(--body);
+  font-size: 14px;
+  color: var(--ink);
+  background: transparent;
+  border: none;
+  border-bottom: 0.5px solid var(--rule);
+  outline: none;
+  padding: 6px 20px 6px 0;
+  box-sizing: border-box;
+}
+
+.taskInput:focus {
+  border-bottom-color: var(--ink);
+}
+
+.taskInput::placeholder {
+  color: var(--ink-ghost);
+  font-style: italic;
+}
+
+.taskArrow {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
+  color: var(--ink-ghost);
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 2px 4px;
+  user-select: none;
+  opacity: 0.6;
+  transition: opacity 0.12s;
+}
+
+.taskArrow:hover {
+  opacity: 1;
+}
+
+.dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: var(--card);
+  border: 0.5px solid var(--rule);
+  box-shadow: var(--shadow-md);
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.dropdownItem {
+  padding: 8px 12px;
+  font-family: var(--body);
+  font-size: 13.5px;
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: background 80ms;
+}
+
+.dropdownItem:hover {
+  background: var(--card-deep);
+}
+
+.dropdownEmpty {
+  padding: 10px 12px;
+  font-family: var(--body);
+  font-size: 13px;
+  color: var(--ink-ghost);
+  font-style: italic;
+}

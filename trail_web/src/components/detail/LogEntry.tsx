@@ -281,7 +281,19 @@ export function LogEntry({ task, log, todos, tasks = [], isEditing, onEdit, onDe
         )}
         <div className={styles.actions}>
           <button type="button" onClick={onEdit} disabled={sealed}>编辑</button>
-          <button type="button" onClick={onDelete} disabled={sealed}>软删</button>
+          <button
+            type="button"
+            disabled={sealed}
+            onClick={async () => {
+              const ok = await confirm({
+                level: 'moderate',
+                title: '软删此条日志？',
+                body: <p>日志将被标记为已删除，可在任务详情中查看历史记录。</p>,
+                confirmLabel: '软删',
+              })
+              if (ok) onDelete()
+            }}
+          >软删</button>
         </div>
       </div>
     </div>

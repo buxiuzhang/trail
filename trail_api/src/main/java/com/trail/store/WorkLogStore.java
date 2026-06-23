@@ -295,7 +295,8 @@ public class WorkLogStore {
         return db.query("""
             SELECT
                 w.id, w.task_id, w.log_date, w.phase, w.ordinal, w.hours, w.content, w.polished_content,
-                t.title AS task_title, t.alias AS task_alias, t.status, t.nature
+                t.title AS task_title, t.alias AS task_alias, t.status, t.nature,
+                (SELECT COUNT(*) FROM entity_refs er WHERE er.src_type = 'log' AND er.src_id = w.id AND er.ref_type = 'file') AS attachment_count
             FROM work_logs w
             JOIN tasks t ON t.id = w.task_id
             WHERE w.log_date = ? AND w.is_deleted = 0

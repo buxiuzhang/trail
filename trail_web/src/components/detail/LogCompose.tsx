@@ -23,9 +23,11 @@ interface LogComposeProps {
   editing: LogOut | null
   onSave: (data: { log_date: string; content: string; phase: string; hours: number; todo_ids: number[]; task_ids: number[] }) => Promise<void>
   onCancel: () => void
+  saveDisabled?: boolean
+  saveLabel?: string
 }
 
-export function LogCompose({ task, todos, tasks = [], editing, onSave, onCancel }: LogComposeProps) {
+export function LogCompose({ task, todos, tasks = [], editing, onSave, onCancel, saveDisabled, saveLabel }: LogComposeProps) {
   // 封版（已完成+非维护 或 已作废）→ 不渲染日志表单
   if (task.status === '已作废' || (task.status === '已完成' && task.nature !== '维护')) return null
   const isEdit = !!editing
@@ -319,8 +321,8 @@ export function LogCompose({ task, todos, tasks = [], editing, onSave, onCancel 
               className={`${styles.polishIcon} ${polishLog.isPolished ? styles.polishIconActive : ''}`}
             />
           </button>
-          <button type="submit" className={styles.btnSave} disabled={submitting || !content.trim()}>
-            {isEdit ? '保存' : '落档'}
+          <button type="submit" className={styles.btnSave} disabled={submitting || !content.trim() || saveDisabled}>
+            {saveLabel ?? (isEdit ? '保存' : '落档')}
           </button>
         </div>
       </div>

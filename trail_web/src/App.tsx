@@ -1,4 +1,4 @@
-import { HashRouter, Routes, Route, useLocation } from 'react-router-dom'
+import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { FilterProvider } from './context/FilterContext'
 import { ModalProvider } from './context/ModalContext'
 import { ToastProvider } from './context/ToastContext'
@@ -8,6 +8,7 @@ import { Masthead } from './components/layout/Masthead'
 import { Shell } from './components/layout/Shell'
 import { Sidebar } from './components/sidebar/Sidebar'
 import { SettingsSidebar } from './components/sidebar/SettingsSidebar'
+import { WorkbenchSidebar } from './components/sidebar/WorkbenchSidebar'
 import { Modal } from './components/modal/Modal'
 import { Toast } from './components/shared/Toast'
 import { UploadQueuePanel } from './components/shared/UploadQueue'
@@ -15,10 +16,13 @@ import { ChatBubble } from './components/chat/ChatBubble'
 import { ChatWindow } from './components/chat/ChatWindow'
 import { DataDirGate } from './components/layout/DataDirGate'
 import { IndexPage } from './pages/IndexPage'
+import { WorkbenchPage } from './pages/WorkbenchPage'
+import { QuickLogPage } from './pages/QuickLogPage'
 import { DetailPage } from './pages/DetailPage'
 import { FormPage } from './pages/FormPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { SettingsPage } from './pages/SettingsPage'
+import { WorkbenchProvider } from './context/WorkbenchContext'
 import { useWatchAlerts } from './hooks/useWatchAlerts'
 import { createContext, useContext, useState, type ReactNode } from 'react'
 
@@ -45,12 +49,15 @@ function WatchAlertsMount() {
 function AppLayout({ children }: { children: ReactNode }) {
   const location = useLocation()
   const isSettingsPage = location.pathname === '/settings'
+  const isWorkbench = location.pathname === '/' || location.pathname === '/workbench'
   const [activeSection, setActiveSection] = useState('interface')
 
   return (
     <SettingsContext.Provider value={{ activeSection, setActiveSection }}>
       <Shell>
-        {isSettingsPage ? (
+        {isWorkbench ? (
+          <WorkbenchSidebar />
+        ) : isSettingsPage ? (
           <SettingsSidebar activeSection={activeSection} onSectionChange={setActiveSection} />
         ) : (
           <Sidebar />
@@ -73,10 +80,14 @@ export default function App() {
                 <div className="grain" aria-hidden="true" />
                 <WatchAlertsMount />
                 <Masthead />
+                <WorkbenchProvider>
                 <AppLayout>
                   <main className="main">
                     <Routes>
-                      <Route path="/" element={<IndexPage />} />
+                      <Route path="/" element={<WorkbenchPage />} />
+                      <Route path="/workbench" element={<WorkbenchPage />} />
+                      <Route path="/archive" element={<IndexPage />} />
+                      <Route path="/quick-log" element={<QuickLogPage />} />
                       <Route path="/task/:id" element={<DetailPage />} />
                       <Route path="/edit/:id" element={<FormPage />} />
                       <Route path="/new" element={<FormPage />} />
@@ -85,6 +96,7 @@ export default function App() {
                     </Routes>
                   </main>
                 </AppLayout>
+                </WorkbenchProvider>
                 <Modal />
                 <Toast />
                 <UploadQueuePanel />
