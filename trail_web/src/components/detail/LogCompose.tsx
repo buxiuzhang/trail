@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import type { LogOut, TaskOut, TodoOut } from '@/types'
 import { TODAY } from '@/constants'
 import { useDraftLog, LLM_AVAILABLE } from '@/api/llm'
@@ -6,6 +6,7 @@ import { usePolishContent } from '@/hooks/usePolishContent'
 import { usePlaceholders, DEFAULT_PLACEHOLDERS } from '@/api/settings'
 import { useToastContext } from '@/context/ToastContext'
 import { useModalContext } from '@/context/ModalContext'
+import { useAttachmentsByIds } from '@/api/attachments'
 import { Select } from '@/components/shared/Select'
 import { DescriptionEditorWithMode as DescriptionEditor } from '@/components/shared/DescriptionEditorWithMode'
 import { ModeToggleButton } from '@/components/shared/ModeToggleButton'
@@ -25,13 +26,14 @@ interface LogComposeProps {
   onCancel: () => void
   saveDisabled?: boolean
   saveLabel?: string
+  defaultLogDate?: string
 }
 
-export function LogCompose({ task, todos, tasks = [], editing, onSave, onCancel, saveDisabled, saveLabel }: LogComposeProps) {
+export function LogCompose({ task, todos, tasks = [], editing, onSave, onCancel, saveDisabled, saveLabel, defaultLogDate }: LogComposeProps) {
   // 封版（已完成+非维护 或 已作废）→ 不渲染日志表单
   if (task.status === '已作废' || (task.status === '已完成' && task.nature !== '维护')) return null
   const isEdit = !!editing
-  const [logDate, setLogDate] = useState(editing?.log_date || TODAY)
+  const [logDate, setLogDate] = useState(editing?.log_date || defaultLogDate || TODAY)
   const [phase, setPhase] = useState(editing?.phase || (task.nature === '维护' ? 'maintenance' : 'main'))
   const [hours, setHours] = useState(editing?.hours || 1)
   const [content, setContent] = useState(editing?.content || '')
@@ -48,6 +50,20 @@ export function LogCompose({ task, todos, tasks = [], editing, onSave, onCancel,
   const { showToast } = useToastContext()
   const { openModal, closeModal } = useModalContext()
   const { data: placeholders } = usePlaceholders()
+
+  const fileIds = useMemo(() => {
+    const ids: number[] = []
+    const re = /@file:(\d+)/g
+    let m: RegExpExecArray | null
+    while ((m = re.exec(content)) !== null) ids.push(Number(m[1]))
+    return ids
+  }, [content])
+  const { data: attList = [] } = useAttachmentsByIds(fileIds)
+  const attachments = useMemo(() => {
+    const map = new Map<number, { name: string; mime: string }>()
+    attList.forEach((a: any) => map.set(a.id, { name: a.original_name || `文件 #${a.id}`, mime: a.mime }))
+    return map
+  }, [attList])
 
   useEffect(() => {
     if (isEdit && textareaRef.current) {
@@ -188,6 +204,7 @@ export function LogCompose({ task, todos, tasks = [], editing, onSave, onCancel,
         textareaClassName=""
         todos={todos}
         tasks={tasks}
+        attachments={attachments}
       />
       {draftOpen && (
         <div className={styles.draftSection}>

@@ -1,15 +1,27 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useNavigate } from 'react-router-dom'
+import { useLogsByDate } from '@/api/insights'
+import { useNavigate, useLocation } from 'react-router-dom'
+
+function localToday(): string {
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
 import { useTasks, useTask } from '@/api/tasks'
 import { useToastContext } from '@/context/ToastContext'
 import { useConfirm } from '@/utils/confirm'
+import { useModalContext } from '@/context/ModalContext'
+import { useWorkbench } from '@/context/WorkbenchContext'
 import { LogCompose } from '@/components/detail/LogCompose'
 import { TODAY } from '@/constants'
 import type { TaskOut } from '@/types'
 import type { LogOut } from '@/types/log'
 import { api } from '@/api/client'
 import { useUpdateLog } from '@/api/logs'
+import ExportIcon from '@/icons/export.svg'
 import EditIcon from '@/icons/edit.svg'
 import DeleteIcon from '@/icons/delete.svg'
 import styles from './QuickLogPage.module.css'
@@ -29,15 +41,6 @@ interface DraftLog {
 
 let localIdSeq = 1
 
-// ── 指定日期日志 ──────────────────────────────────────────────────
-function useLogsByDate(date: string) {
-  return useQuery({
-    queryKey: ['logs', 'by-date', date],
-    queryFn: () => api.get<Record<string, unknown>[]>(`/api/logs/by-date?date=${date}`),
-    staleTime: 30_000,
-  })
-}
-
 // ── 占位 task ────────────────────────────────────────────────────
 function makePlaceholderTask(): TaskOut {
   return {
@@ -55,11 +58,12 @@ function makePlaceholderTask(): TaskOut {
 
 // ── 浮动填报卡片 ─────────────────────────────────────────────────
 function FloatingCard({
-  onAdd, onClose, editingLog,
+  onAdd, onClose, editingLog, defaultDate,
 }: {
   onAdd: (draft: DraftLog) => void
   onClose: () => void
   editingLog?: any
+  defaultDate?: string
 }) {
   const isEdit = !!editingLog
   const { data: tasks = [] } = useTasks()
@@ -126,6 +130,7 @@ function FloatingCard({
           editing={isEdit ? (editingLog as LogOut) : null}
           saveDisabled={!taskId}
           saveLabel={isEdit ? '保存' : undefined}
+          defaultLogDate={defaultDate}
           onSave={async (data) => {
             if (!taskId) return
             if (isEdit) {
@@ -226,16 +231,146 @@ function LogRow({ log, idx, onEdit }: { log: any; idx: number; onEdit: (log: any
   )
 }
 
+// ── 导出弹窗内容 ──────────────────────────────────────────────────
+const FORMATS = [
+  { value: 'markdown', label: 'Markdown', available: true },
+  { value: 'excel',    label: 'Excel',    available: false },
+  { value: 'word',     label: 'Word',     available: false },
+  { value: 'pdf',      label: 'PDF',      available: false },
+]
+
+const PRESETS = [
+  { label: '今天', getRange: () => ({ start: TODAY, end: TODAY }) },
+  {
+    label: '本周',
+    getRange: () => {
+      const d = new Date()
+      const day = d.getDay() || 7
+      const mon = new Date(d)
+      mon.setDate(d.getDate() - day + 1)
+      return { start: mon.toLocaleDateString('sv-SE'), end: localToday() }
+    },
+  },
+  {
+    label: '本月',
+    getRange: () => {
+      const d = new Date()
+      return { start: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`, end: localToday() }
+    },
+  },
+]
+
+function ExportModalBody({ defaultDate, onClose }: { defaultDate: string; onClose: () => void }) {
+  const [startDate, setStartDate] = useState(defaultDate)
+  const [endDate, setEndDate] = useState(defaultDate)
+  const [format, setFormat] = useState('markdown')
+
+  function handleExport() {
+    const apiBase = window.location.protocol === 'file:' ? 'http://localhost:8765' : ''
+    let url: string
+    if (startDate === endDate) {
+      url = `${apiBase}/api/reports/daily?date=${startDate}`
+    } else {
+      url = `${apiBase}/api/reports/weekly?start=${startDate}&end=${endDate}`
+    }
+    const a = document.createElement('a')
+    a.href = url
+    a.download = ''
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    onClose()
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {/* 时间范围 */}
+      <div>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-ghost)', marginBottom: 10 }}>时间范围</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+          <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
+            style={{ fontFamily: 'var(--mono)', fontSize: 13, background: 'transparent', border: 'none', borderBottom: '0.5px solid var(--rule)', outline: 'none', padding: '4px 0', color: 'var(--ink)' }} />
+          <span style={{ color: 'var(--ink-ghost)', fontFamily: 'var(--mono)', fontSize: 11 }}>—</span>
+          <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
+            style={{ fontFamily: 'var(--mono)', fontSize: 13, background: 'transparent', border: 'none', borderBottom: '0.5px solid var(--rule)', outline: 'none', padding: '4px 0', color: 'var(--ink)' }} />
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {PRESETS.map(p => (
+            <button key={p.label} type="button"
+              onClick={() => { const r = p.getRange(); setStartDate(r.start); setEndDate(r.end) }}
+              style={{ fontFamily: 'var(--mono)', fontSize: 10, letterSpacing: '0.06em', color: 'var(--ink-faded)', background: 'none', border: '0.5px solid var(--rule-soft)', padding: '2px 10px', cursor: 'pointer' }}>
+              {p.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* 导出格式 */}
+      <div>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-ghost)', marginBottom: 10 }}>导出格式</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          {FORMATS.map(f => (
+            <label key={f.value}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: f.available ? 'pointer' : 'not-allowed', opacity: f.available ? 1 : 0.4 }}>
+              <input type="radio" name="format" value={f.value}
+                checked={format === f.value}
+                disabled={!f.available}
+                onChange={() => f.available && setFormat(f.value)}
+              />
+              <span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--ink-soft)' }}>
+                {f.label}{!f.available && <span style={{ fontSize: 10, color: 'var(--ink-ghost)', marginLeft: 4 }}>开发中</span>}
+              </span>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      {/* 操作按钮 */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
+        <button type="button" className="btn btn--ghost" onClick={onClose}>取消</button>
+        <button type="button" className="btn btn--primary" onClick={handleExport}>导出</button>
+      </div>
+    </div>
+  )
+}
+
 // ── 主页面 ────────────────────────────────────────────────────────
 export function QuickLogPage() {
-  const [date, setDate] = useState(TODAY)
+  const [date, setDate] = useState(() => localToday())
   const { data: submitted = [], isLoading } = useLogsByDate(date)
   const [drafts, setDrafts] = useState<DraftLog[]>([])
   const [showCard, setShowCard] = useState(false)
   const [editingLog, setEditingLog] = useState<any>(null)
   const [submitting, setSubmitting] = useState(false)
   const { showToast } = useToastContext()
+  const { openModal, closeModal } = useModalContext()
   const qc = useQueryClient()
+
+  const { targetDate, clearTargetDate } = useWorkbench()
+
+  // 组件挂载时读取跳转传入的目标日期
+  useEffect(() => {
+    if (targetDate) {
+      setDate(targetDate)
+      clearTargetDate()
+    }
+  }, [])
+
+  // 每次导航到此页面时同步今日日期（无跳转目标时）
+  const location = useLocation()
+  useEffect(() => {
+    if (!targetDate) setDate(localToday())
+  }, [location.pathname])
+
+  function handleExportClick() {
+    openModal({
+      eyebrow: '导出',
+      title: '导出日报',
+      titleMode: 'zh',
+      body: <ExportModalBody defaultDate={date} onClose={closeModal} />,
+      buttons: [],
+    })
+  }
 
   function removeDraft(localId: number) {
     setDrafts(ds => ds.filter(d => d.localId !== localId))
@@ -326,12 +461,15 @@ export function QuickLogPage() {
       {/* 已提交 */}
       <div>
         <div className={styles.sectionLabel}>
-          已提交 <span className={styles.sectionCount}>{submitted.length} 条</span>
+          <span>已提交 <span className={styles.sectionCount}>{submitted.length} 条</span>
           {submitted.length > 0 && (
             <span className={styles.sectionCount}>
               · {parseFloat(submitted.reduce((sum: number, log: any) => sum + (log.hours || 0), 0).toFixed(1))} 小时
             </span>
-          )}
+          )}</span>
+          <button type="button" className={styles.exportBtn} title="导出" onClick={handleExportClick}>
+            <img src={ExportIcon} width={14} height={14} alt="导出" />
+          </button>
         </div>
         {isLoading ? (
           <div className={styles.empty}>加载中…</div>
@@ -366,6 +504,7 @@ export function QuickLogPage() {
         <FloatingCard
           onAdd={d => setDrafts(ds => [...ds, d])}
           editingLog={editingLog}
+          defaultDate={date}
           onClose={() => { setShowCard(false); setEditingLog(null) }}
         />
       )}

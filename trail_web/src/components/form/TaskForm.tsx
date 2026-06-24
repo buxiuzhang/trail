@@ -221,8 +221,7 @@ export function TaskForm({ mode, task }: TaskFormProps) {
   return (
     <article className={styles.formPage}>
       <nav className="crumbs">
-        <a href={isEdit ? `#/task/${taskId}` : '#/'}>
-          {isEdit ? '返回详情' : '编年档'}
+        <a href={isEdit ? `#/task/${taskId}` : '#/archive'}>          {isEdit ? '返回详情' : '编年档'}
         </a>
         <span className="crumbs__sep">/</span>
         <span>{isEdit ? '编辑条目' : '新建条目'}</span>

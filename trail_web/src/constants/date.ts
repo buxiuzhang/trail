@@ -1,5 +1,12 @@
 /** 今天的日期（YYYY-MM-DD 格式，取本地日历） */
-export const TODAY: string = new Date().toISOString().slice(0, 10);
+function getLocalToday(): string {
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+export const TODAY: string = getLocalToday();
 
 /** 月份编号 → 英文全称 */
 export const monthNames = [

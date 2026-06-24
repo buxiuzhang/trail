@@ -39,6 +39,14 @@
   padding: 2px 0;
   cursor: pointer;
   transition: border-bottom-color 0.15s, color 0.15s;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.headerDate::-webkit-calendar-picker-indicator {
+  opacity: 0.3;
+  cursor: pointer;
+  filter: invert(0.4);
 }
 
 .headerDate:focus,
@@ -83,6 +91,24 @@
   text-transform: uppercase;
   color: var(--ink-ghost);
   margin-bottom: var(--space-sm);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.exportBtn {
+  display: flex;
+  align-items: center;
+  background: none;
+  border: none;
+  padding: 2px;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.12s;
+}
+
+.exportBtn:hover {
+  opacity: 1;
 }
 
 .sectionCount {
@@ -380,7 +406,6 @@
   gap: var(--space-md);
   margin-bottom: 16px;
   padding-bottom: 12px;
-  border-bottom: 0.5px solid var(--rule-soft);
 }
 
 .taskLabel {

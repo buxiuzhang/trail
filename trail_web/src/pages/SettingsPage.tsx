@@ -404,7 +404,7 @@ export function SettingsPage() {
 
   return (
     <article className={styles.page}>
-      <Crumbs items={[{ label: '编年档', href: '/' }, { label: '设置' }]} />
+      <Crumbs items={[{ label: '编年档', href: '/archive' }, { label: '设置' }]} />
 
       <header className={styles.header}>
         <h1 className={styles.title}>设置</h1>

@@ -1,0 +1,145 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xl);
+  animation: fadeUp 0.5s ease backwards;
+}
+
+/* —— section —— */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.sectionTitle {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-ghost);
+  padding-bottom: var(--space-sm);
+  border-bottom: 0.5px solid var(--rule-soft);
+}
+
+.empty {
+  font-family: var(--body);
+  font-style: italic;
+  font-size: 13px;
+  color: var(--ink-ghost);
+}
+
+/* —— 4 卡概览 —— */
+.cards4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-md);
+}
+
+.statCard {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--space-md);
+  background: var(--card);
+  border: 0.5px solid var(--rule);
+  box-shadow: var(--shadow-sm);
+}
+
+.statValue {
+  font-family: var(--display);
+  font-size: 28px;
+  font-weight: 400;
+  color: var(--ink);
+  line-height: 1;
+  font-variation-settings: "opsz" 48;
+}
+
+.statUnit {
+  font-size: 14px;
+  color: var(--ink-faded);
+  margin-left: 2px;
+}
+
+.statLabel {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--ink-ghost);
+  text-transform: uppercase;
+}
+
+/* —— 预警列表 —— */
+.warnList {
+  display: flex;
+  flex-direction: column;
+}
+
+.warnItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 0;
+  border-bottom: 0.5px solid var(--rule-soft);
+  cursor: pointer;
+  transition: color 0.12s;
+}
+
+.warnItem:last-child { border-bottom: none; }
+.warnItem:hover .warnTitle { color: var(--ink); }
+
+.warnTitle {
+  font-family: var(--body);
+  font-size: 13px;
+  color: var(--ink-soft);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-right: var(--space-md);
+}
+
+.warnDays {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--oxblood-soft);
+  flex-shrink: 0;
+  letter-spacing: 0.04em;
+}
+
+/* —— 待办仪表盘 —— */
+.gaugeRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xl);
+}
+
+.todoMeta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.todoMetaItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.todoMetaLabel {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-ghost);
+}
+
+.todoMetaValue {
+  font-family: var(--display);
+  font-size: 22px;
+  font-weight: 400;
+  color: var(--ink);
+  line-height: 1;
+  font-variation-settings: "opsz" 48;
+}

@@ -37,6 +37,7 @@ interface Props {
   todos?: TodoOut[]
   tasks?: TaskOut[]
   autoGrow?: boolean
+  attachments?: Map<number, { name: string; mime: string }>
 }
 
 export const DescriptionEditorWithMode = forwardRef<HTMLTextAreaElement, Props>(
@@ -55,6 +56,7 @@ export const DescriptionEditorWithMode = forwardRef<HTMLTextAreaElement, Props>(
       todos = [],
       tasks = [],
       autoGrow = false,
+      attachments,
     },
     ref,
   ) {
@@ -131,6 +133,7 @@ export const DescriptionEditorWithMode = forwardRef<HTMLTextAreaElement, Props>(
         textareaClassName={textareaClassName}
         todos={todos}
         tasks={tasks}
+        attachments={attachments}
       />
     )
 

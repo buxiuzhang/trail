@@ -8,7 +8,7 @@ import { LLM_AVAILABLE } from '@/api/llm'
 import { usePolishContent } from '@/hooks/usePolishContent'
 import { useModalContext } from '@/context/ModalContext'
 import { useToastContext } from '@/context/ToastContext'
-import { ALLOWED_TRANSITIONS } from '@/constants'
+import { ALLOWED_TRANSITIONS, TODAY } from '@/constants'
 import { Crumbs } from '@/components/shared/Crumbs'
 import { EmptyState } from '@/components/detail/EmptyState'
 import { DetailHeader } from '@/components/detail/DetailHeader'
@@ -313,7 +313,7 @@ export function DetailPage() {
               try {
                 await changeStatus.mutateAsync({
                   new_status: '已完成',
-                  end_date: new Date().toISOString().slice(0, 10),
+                  end_date: TODAY,
                   maintenance: true,
                 })
                 showToast('已进入维护期')
@@ -327,7 +327,7 @@ export function DetailPage() {
               try {
                 await changeStatus.mutateAsync({
                   new_status: '已完成',
-                  end_date: new Date().toISOString().slice(0, 10),
+                  end_date: TODAY,
                 })
                 showToast('任务已完成')
               } catch (err: any) { showToast('操作失败：' + err.message) }
@@ -520,7 +520,7 @@ export function DetailPage() {
 
   return (
     <article className="detail">
-      <Crumbs items={[{ label: '编年档', href: '/' }, { label: `CAT. № ${catalog}` }]} />
+      <Crumbs items={[{ label: '编年档', href: '/archive' }, { label: `CAT. № ${catalog}` }]} />
 
       <DetailHeader
         task={task}

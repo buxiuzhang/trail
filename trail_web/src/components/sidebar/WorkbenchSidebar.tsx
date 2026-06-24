@@ -31,6 +31,15 @@ export function WorkbenchSidebar() {
           <span>工作档案</span>
         </div>
         <div
+          className={`${styles.item} ${isWorkbench && panel === 'dashboard' ? styles.isActive : ''}`}
+          role="button"
+          tabIndex={0}
+          onClick={() => { if (!isWorkbench) navigate('/'); setPanel('dashboard') }}
+          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { if (!isWorkbench) navigate('/'); setPanel('dashboard') } }}
+        >
+          <span>工作看板</span>
+        </div>
+        <div
           className={`${styles.item} ${location.pathname === '/settings' ? styles.isActive : ''}`}
           role="button"
           tabIndex={0}
