@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import ReactECharts from 'echarts-for-react'
 import { useWorkbench } from '@/context/WorkbenchContext'
@@ -105,9 +105,9 @@ export function DashboardPage() {
 
   const inProgress = overview?.by_status?.['进行中'] ?? 0
 
-  const activeCount = staleTasks.filter((t: any) => (t.days_idle ?? 0) <= 3).length
-  const coolCount   = staleTasks.filter((t: any) => (t.days_idle ?? 0) > 3 && (t.days_idle ?? 0) <= 7).length
-  const warnTasks   = staleTasks.filter((t: any) => (t.days_idle ?? 0) > 7 || t.days_idle == null)
+  const activeCount = staleTasks.filter((t: any) => t.days_idle != null && t.days_idle <= 3).length
+  const coolCount   = staleTasks.filter((t: any) => t.days_idle != null && t.days_idle >= 4 && t.days_idle <= 7).length
+  const warnTasks   = staleTasks.filter((t: any) => t.days_idle == null || t.days_idle > 7)
 
   const totalTodos     = (overview as any)?.todo_active_count ?? 0
   const completedTodos = (overview as any)?.todo_completed_count ?? 0
@@ -127,7 +127,7 @@ export function DashboardPage() {
     const dates = trendDates
     const hours  = trend14.map(d => d.hours)
     return {
-      grid: { top: 32, right: 60, bottom: 28, left: 40 },
+      grid: { top: 32, right: 20, bottom: 28, left: 40 },
       legend: {
         data: ['工时(h)', '日报数'],
         top: 4,
@@ -151,29 +151,16 @@ export function DashboardPage() {
           formatter: (val: string) => val.split(' ')[0],
         },
       },
-      yAxis: [
-        {
-          type: 'value',
-          name: 'h',
-          nameTextStyle: { color: '#B8AC95', fontSize: 9 },
-          minInterval: 1,
-          axisLabel: { color: '#B8AC95', fontSize: 10 },
-          splitLine: { lineStyle: { color: '#DDD0B5', type: 'dashed' } },
-        },
-        {
-          type: 'value',
-          name: '条',
-          nameTextStyle: { color: '#B8AC95', fontSize: 9 },
-          minInterval: 1,
-          axisLabel: { color: '#B8AC95', fontSize: 10 },
-          splitLine: { show: false },
-        },
-      ],
+      yAxis: {
+        type: 'value',
+        minInterval: 1,
+        axisLabel: { color: '#B8AC95', fontSize: 10 },
+        splitLine: { lineStyle: { color: '#DDD0B5', type: 'dashed' } },
+      },
       series: [
         {
           name: '工时(h)',
           type: 'line',
-          yAxisIndex: 0,
           data: hours,
           smooth: true,
           symbol: 'circle',
@@ -186,7 +173,6 @@ export function DashboardPage() {
         {
           name: '日报数',
           type: 'line',
-          yAxisIndex: 1,
           data: logCounts,
           smooth: true,
           symbol: 'circle',
@@ -203,6 +189,7 @@ export function DashboardPage() {
     grid: { top: 8, right: 40, bottom: 8, left: 80 },
     tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
     xAxis: { type: 'value', axisLabel: { color: '#B8AC95', fontSize: 10 },
+      axisLine: { show: false }, axisTick: { show: false },
       splitLine: { lineStyle: { color: '#DDD0B5', type: 'dashed' } } },
     yAxis: {
       type: 'category',
@@ -252,6 +239,17 @@ export function DashboardPage() {
       data: [{ value: todoRate, name: '完成率' }],
     }],
   }), [todoRate])
+
+  const [selectedHealth, setSelectedHealth] = useState<'active' | 'cool' | 'warn'>('warn')
+
+  const activeTasks = staleTasks.filter((t: any) => t.days_idle != null && t.days_idle <= 3)
+  const coolTasksList = staleTasks.filter((t: any) => t.days_idle != null && t.days_idle >= 4 && t.days_idle <= 7)
+
+  const healthBuckets = { active: activeTasks, cool: coolTasksList, warn: warnTasks }
+  const selectedTasks = healthBuckets[selectedHealth]
+
+  const healthDayLabel = (t: any) =>
+    t.days_idle != null ? `${t.days_idle} 天未记录` : '从未记录'
 
   const statusPieOption = useMemo(
     () => pieOption(overview?.by_status as Record<string, number>, STATUS_COLORS),
@@ -307,7 +305,72 @@ export function DashboardPage() {
             <div className={styles.pieCardTitle}>按性质</div>
             <ReactECharts option={naturePieOption} style={{ height: 160 }} />
           </div>
+          <div className={styles.pieCard}>
+            <div className={styles.pieCardTitle}>待办完成率</div>
+            <div className={styles.gaugeRow}>
+              <ReactECharts option={gaugeOption} style={{ height: 140, width: 140 }} />
+              <div className={styles.todoMeta}>
+                <div className={styles.todoMetaItem}>
+                  <span className={styles.todoMetaLabel}>未完成</span>
+                  <span className={styles.todoMetaValue}>{totalTodos}</span>
+                </div>
+                <div className={styles.todoMetaItem}>
+                  <span className={styles.todoMetaLabel}>已完成</span>
+                  <span className={styles.todoMetaValue}>{completedTodos}</span>
+                </div>
+                <div className={styles.todoMetaItem}>
+                  <span className={styles.todoMetaLabel}>合计</span>
+                  <span className={styles.todoMetaValue}>{todoTotal}</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
+      </section>
+
+      {/* 任务健康度 */}
+      <section className={styles.section}>
+        <div className={styles.sectionTitle}>任务健康度</div>
+        <ReactECharts
+          option={healthOption}
+          style={{ height: 120 }}
+          onEvents={{
+            click: (p: any) => {
+              const map = ['warn', 'cool', 'active'] as const
+              if (p.componentType === 'series' && p.dataIndex != null) {
+                setSelectedHealth(map[p.dataIndex])
+              }
+            },
+          }}
+        />
+        <div className={styles.healthTabs}>
+          {(['active', 'cool', 'warn'] as const).map(bucket => {
+            const labels = { active: '活跃', cool: '偏冷', warn: '预警' }
+            const counts = { active: activeCount, cool: coolCount, warn: warnTasks.length }
+            return (
+              <button
+                key={bucket}
+                type="button"
+                className={`${styles.healthTab} ${selectedHealth === bucket ? styles.healthTabActive : ''} ${styles[`healthTab_${bucket}`]}`}
+                onClick={() => setSelectedHealth(bucket)}
+              >
+                {labels[bucket]} <span className={styles.healthTabCount}>{counts[bucket]}</span>
+              </button>
+            )
+          })}
+        </div>
+        {selectedTasks.length > 0 ? (
+          <div className={styles.warnList}>
+            {selectedTasks.slice(0, 8).map((t: any) => (
+              <div key={t.id} className={styles.warnItem} onClick={() => navigate(`/task/${t.id}`)}>
+                <span className={styles.warnTitle}>{t.title}</span>
+                <span className={styles.warnDays}>{healthDayLabel(t)}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className={styles.empty}>暂无任务</div>
+        )}
       </section>
 
       {/* 工时趋势 */}
@@ -331,45 +394,6 @@ export function DashboardPage() {
         />
       </section>
 
-      {/* 任务健康度 */}
-      <section className={styles.section}>
-        <div className={styles.sectionTitle}>任务健康度</div>
-        <ReactECharts option={healthOption} style={{ height: 120 }} />
-        {warnTasks.length > 0 && (
-          <div className={styles.warnList}>
-            {warnTasks.slice(0, 5).map((t: any) => (
-              <div key={t.id} className={styles.warnItem} onClick={() => navigate(`/task/${t.id}`)}>
-                <span className={styles.warnTitle}>{t.title}</span>
-                <span className={styles.warnDays}>
-                  {t.days_idle != null ? `${t.days_idle} 天未记录` : '从未记录'}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* 待办完成率 */}
-      <section className={styles.section}>
-        <div className={styles.sectionTitle}>待办完成率</div>
-        <div className={styles.gaugeRow}>
-          <ReactECharts option={gaugeOption} style={{ height: 160, width: 200 }} />
-          <div className={styles.todoMeta}>
-            <div className={styles.todoMetaItem}>
-              <span className={styles.todoMetaLabel}>未完成</span>
-              <span className={styles.todoMetaValue}>{totalTodos}</span>
-            </div>
-            <div className={styles.todoMetaItem}>
-              <span className={styles.todoMetaLabel}>已完成</span>
-              <span className={styles.todoMetaValue}>{completedTodos}</span>
-            </div>
-            <div className={styles.todoMetaItem}>
-              <span className={styles.todoMetaLabel}>合计</span>
-              <span className={styles.todoMetaValue}>{todoTotal}</span>
-            </div>
-          </div>
-        </div>
-      </section>
 
     </div>
   )

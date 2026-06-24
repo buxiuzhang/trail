@@ -13,14 +13,14 @@
 }
 
 .sectionTitle {
-  font-family: var(--mono);
-  font-size: 10px;
+  font-family: var(--serif-sc);
+  font-size: 14px;
   font-weight: 500;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--ink-ghost);
-  padding-bottom: var(--space-sm);
-  border-bottom: 0.5px solid var(--rule-soft);
+  letter-spacing: 0.06em;
+  color: var(--ink);
+  padding-left: 10px;
+  border-left: 2.5px solid var(--green);
+  line-height: 1.2;
 }
 
 .empty {
@@ -94,7 +94,7 @@
 
 .pieRow {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: var(--space-md);
 }
 
@@ -112,6 +112,37 @@
   text-transform: uppercase;
   color: var(--ink-ghost);
   margin-bottom: 4px;
+}
+
+/* —— 健康度标签页 —— */
+.healthTabs {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.healthTab {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  padding: 4px 12px;
+  background: transparent;
+  border: 0.5px solid var(--rule);
+  color: var(--ink-faded);
+  cursor: pointer;
+  transition: color 0.12s, border-color 0.12s, background 0.12s;
+}
+.healthTab:hover { color: var(--ink); border-color: var(--ink-ghost); }
+
+.healthTabActive { background: var(--card); color: var(--ink); border-color: var(--ink-soft); }
+
+.healthTab_active.healthTabActive { border-color: #3D5A3D; color: #3D5A3D; }
+.healthTab_cool.healthTabActive   { border-color: #8B6914; color: #8B6914; }
+.healthTab_warn.healthTabActive   { border-color: #9B3A3A; color: #9B3A3A; }
+
+.healthTabCount {
+  font-size: 10px;
+  opacity: 0.7;
+  margin-left: 4px;
 }
 
 /* —— 预警列表 —— */
@@ -156,7 +187,9 @@
 .gaugeRow {
   display: flex;
   align-items: center;
-  gap: var(--space-xl);
+  justify-content: center;
+  gap: var(--space-md);
+  flex: 1;
 }
 
 .todoMeta {

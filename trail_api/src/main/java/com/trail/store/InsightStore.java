@@ -110,6 +110,16 @@ public class InsightStore {
         out.put("by_tag", byTag);
         out.put("by_month", byMonth);
         out.put("total_logs", ((Number) logCountRow.get(0).get("n")).intValue());
+
+        List<Map<String, Object>> todoStats = db.query(
+            "SELECT" +
+            "  COUNT(CASE WHEN is_completed=0 AND is_abandoned=0 THEN 1 END) AS active," +
+            "  COUNT(CASE WHEN is_completed=1 THEN 1 END) AS completed" +
+            " FROM todos");
+        if (!todoStats.isEmpty()) {
+            out.put("todo_active_count",    ((Number) todoStats.get(0).getOrDefault("active",    0)).intValue());
+            out.put("todo_completed_count", ((Number) todoStats.get(0).getOrDefault("completed", 0)).intValue());
+        }
         return out;
     }
 }
