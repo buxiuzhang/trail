@@ -315,10 +315,8 @@ export function DashboardPage() {
       }
     })
 
-    const truncLabel = (name: string) => name.length > 10 ? name.slice(0, 10) + '…' : name
-
     const option = {
-      grid: { top: 10, right: 16, bottom: 40, left: 0 },
+      grid: { top: 10, right: 16, bottom: 56, left: 0 },
       tooltip: {
         formatter: (p: any) => {
           const [di, ti, cnt, hrs] = p.data.value
@@ -333,7 +331,7 @@ export function DashboardPage() {
         data: dates.map(d => d.slice(5)),
         axisLine: { lineStyle: { color: '#C7B999' } },
         axisTick: { show: false },
-        axisLabel: { color: '#B8AC95', fontSize: 9, interval: (i: number) => i % 3 === 0 },
+        axisLabel: { color: '#B8AC95', fontSize: 9, rotate: 45, interval: 0 },
         splitLine: { show: true, lineStyle: { color: '#EFE5D0', type: 'dashed' } },
       },
       yAxis: {
@@ -342,13 +340,20 @@ export function DashboardPage() {
         inverse: true,
         axisLine: { show: false },
         axisTick: { show: false },
-        axisLabel: { color: '#6B5E4D', fontSize: 11, formatter: truncLabel },
+        axisLabel: {
+          color: '#6B5E4D', fontSize: 11,
+          formatter: (name: string) => {
+            const s = name.length > 10 ? name.slice(0, 10) + '…' : name
+            return `{lbl|${s}}`
+          },
+          rich: { lbl: { width: 108, align: 'left', color: '#6B5E4D', fontSize: 11 } },
+        },
         splitLine: { show: true, lineStyle: { color: '#EFE5D0', type: 'dashed' } },
       },
       series,
     }
 
-    return { option, tasks, taskIdByTitle, chartHeight: tasks.length * 32 + 60 }
+    return { option, tasks, taskIdByTitle, chartHeight: tasks.length * 32 + 76 }
   }, [heatmapData, allTasks, heatmap30Start])
 
   return (
@@ -494,7 +499,7 @@ export function DashboardPage() {
               option={{ ...heatmapMemo.option, grid: { ...heatmapMemo.option.grid, left: 120 } }}
               style={{ height: heatmapMemo.chartHeight }}
               onEvents={{
-                click: (p: any) => {
+                dblclick: (p: any) => {
                   if (p.componentType === 'series' && p.data) {
                     const title = heatmapMemo.tasks[p.data.value[1]]
                     const id = heatmapMemo.taskIdByTitle.get(title)
