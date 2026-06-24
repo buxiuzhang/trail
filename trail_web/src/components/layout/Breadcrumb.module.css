@@ -1,0 +1,43 @@
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--ink-faded);
+  padding: 2px 0 10px;
+}
+
+.item {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.sep {
+  color: var(--ink-ghost);
+  padding: 0 4px;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.link {
+  color: var(--ink-faded);
+  text-decoration: none;
+  transition: color 150ms;
+}
+.link:hover {
+  color: var(--green-ink);
+}
+
+.current {
+  color: var(--ink);
+}
+
+@media (max-width: 920px) {
+  .breadcrumb {
+    padding: 6px 20px 10px;
+  }
+}

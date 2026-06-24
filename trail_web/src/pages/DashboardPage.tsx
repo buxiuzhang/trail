@@ -7,7 +7,7 @@ import {
   useStaleTasks,
   useLogsByDate,
   useLogsByDateRange,
-  useIncompleteTodos,
+  useTodoStats,
 } from '@/api/insights'
 import styles from './DashboardPage.module.css'
 
@@ -25,6 +25,57 @@ function weekStart(): string {
 }
 
 // ── 主页面 ────────────────────────────────────────────────────────
+
+const STATUS_COLORS: Record<string, string> = {
+  '未开始': '#B8AC95',
+  '进行中': '#3D5A3D',
+  '已完成': '#7A9E7A',
+  '已作废': '#C7B999',
+}
+const NATURE_COLORS: Record<string, string> = {
+  '长期': '#4A3728',
+  '临时': '#8B6914',
+  '维护': '#5A6E8A',
+}
+
+function pieOption(
+  dataMap: Record<string, number> | undefined,
+  colorMap: Record<string, string>,
+) {
+  const entries = Object.entries(dataMap ?? {}).filter(([, v]) => v > 0)
+  return {
+    tooltip: {
+      trigger: 'item',
+      backgroundColor: 'var(--card)',
+      borderColor: 'var(--rule)',
+      textStyle: { color: '#3A322A', fontSize: 12 },
+      formatter: '{b}: {c} ({d}%)',
+    },
+    legend: {
+      orient: 'vertical',
+      right: 0,
+      top: 'middle',
+      itemWidth: 10,
+      itemHeight: 10,
+      textStyle: { color: '#6B5E4D', fontSize: 11, fontFamily: 'JetBrains Mono, monospace' },
+      formatter: (name: string) => `${name}  ${dataMap?.[name] ?? 0}`,
+    },
+    series: [{
+      type: 'pie',
+      radius: ['40%', '68%'],
+      center: ['38%', '50%'],
+      avoidLabelOverlap: false,
+      label: { show: false },
+      emphasis: { label: { show: false } },
+      data: entries.map(([name, value]) => ({
+        name,
+        value,
+        itemStyle: { color: colorMap[name] ?? '#C7B999' },
+      })),
+    }],
+  }
+}
+
 export function DashboardPage() {
   const today = localDate()
   const wStart = weekStart()
@@ -35,7 +86,7 @@ export function DashboardPage() {
   const { data: weekRange = [] } = useLogsByDateRange(wStart, today)
   const { data: trend14 = [] } = useLogsByDateRange(trend14Start, today)
   const { data: staleTasks = [] } = useStaleTasks(0)
-  const { data: incompleteTodos = [] } = useIncompleteTodos()
+  const { data: todoStats } = useTodoStats()
   const navigate = useNavigate()
   const { setPanel } = useWorkbench()
 
@@ -58,7 +109,7 @@ export function DashboardPage() {
   const coolCount   = staleTasks.filter((t: any) => (t.days_idle ?? 0) > 3 && (t.days_idle ?? 0) <= 7).length
   const warnTasks   = staleTasks.filter((t: any) => (t.days_idle ?? 0) > 7 || t.days_idle == null)
 
-  const totalTodos     = (overview as any)?.todo_active_count ?? incompleteTodos.length
+  const totalTodos     = (overview as any)?.todo_active_count ?? 0
   const completedTodos = (overview as any)?.todo_completed_count ?? 0
   const todoTotal      = totalTodos + completedTodos
   const todoRate       = todoTotal > 0 ? Math.round((completedTodos / todoTotal) * 100) : 0
@@ -202,6 +253,15 @@ export function DashboardPage() {
     }],
   }), [todoRate])
 
+  const statusPieOption = useMemo(
+    () => pieOption(overview?.by_status as Record<string, number>, STATUS_COLORS),
+    [overview],
+  )
+  const naturePieOption = useMemo(
+    () => pieOption(overview?.by_nature as Record<string, number>, NATURE_COLORS),
+    [overview],
+  )
+
   return (
     <div className={styles.page}>
 
@@ -221,9 +281,31 @@ export function DashboardPage() {
             <span className={styles.statValue}>{inProgress}</span>
             <span className={styles.statLabel}>进行中任务</span>
           </div>
-          <div className={styles.statCard}>
-            <span className={styles.statValue}>{incompleteTodos.length}</span>
-            <span className={styles.statLabel}>待办未完成</span>
+          <div className={`${styles.statCard} ${styles.statCardSplit}`}>
+            <div className={styles.statSplitItem}>
+              <span className={styles.statValue}>{todoStats?.new_today ?? 0}</span>
+              <span className={styles.statLabel}>今日新增待办</span>
+            </div>
+            <div className={styles.statSplitDivider} />
+            <div className={styles.statSplitItem}>
+              <span className={styles.statValue}>{todoStats?.followed_today ?? 0}</span>
+              <span className={styles.statLabel}>今日跟进待办</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 任务概览 */}
+      <section className={styles.section}>
+        <div className={styles.sectionTitle}>任务概览</div>
+        <div className={styles.pieRow}>
+          <div className={styles.pieCard}>
+            <div className={styles.pieCardTitle}>按状态</div>
+            <ReactECharts option={statusPieOption} style={{ height: 160 }} />
+          </div>
+          <div className={styles.pieCard}>
+            <div className={styles.pieCardTitle}>按性质</div>
+            <ReactECharts option={naturePieOption} style={{ height: 160 }} />
           </div>
         </div>
       </section>

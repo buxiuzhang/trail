@@ -1,15 +1,14 @@
 import { useOverview } from '@/api/insights'
-import { useMotto } from '@/api/settings'
 import { useFilterContext } from '@/context/FilterContext'
 import { STATUS_LIST, NATURE_LIST } from '@/constants'
 import { FilterSection } from './FilterSection'
 import { WatchedSection } from './WatchedSection'
+import { MottoFooter } from './MottoFooter'
 import { monthLabel } from '@/constants'
 import styles from './Sidebar.module.css'
 
 export function Sidebar() {
   const { data: counts } = useOverview()
-  const { data: motto } = useMotto()
   const { filter, setStatus, setNature, setTag, setMonth } = useFilterContext()
 
   const totalCount = counts?.total_tasks || 0
@@ -76,16 +75,7 @@ export function Sidebar() {
         defaultExpanded={false}
       />
 
-      <div className={styles.foot}>
-        <div className={styles.footLine}>
-          <span className={styles.footTitle}>卷首语</span>
-          <div className={styles.footRule} />
-        </div>
-        <p className={styles.footNote} style={{ whiteSpace: 'pre-line' }}>
-          {motto}
-        </p>
-        <p className={styles.footSig}>— 自 2025</p>
-      </div>
+      <MottoFooter />
     </aside>
   )
 }

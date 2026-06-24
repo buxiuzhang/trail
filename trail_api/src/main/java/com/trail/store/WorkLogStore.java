@@ -292,7 +292,7 @@ public class WorkLogStore {
 
     /** 查询指定日期的所有日志（关联任务信息） */
     public List<Map<String, Object>> getByDate(LocalDate date) {
-        return db.query("""
+        List<Map<String, Object>> rows = db.query("""
             SELECT
                 w.id, w.task_id, w.log_date, w.phase, w.ordinal, w.hours, w.content, w.polished_content,
                 t.title AS task_title, t.alias AS task_alias, t.status, t.nature,
@@ -302,6 +302,7 @@ public class WorkLogStore {
             WHERE w.log_date = ? AND w.is_deleted = 0
             ORDER BY t.title, w.ordinal
             """, date);
+        return enrichLogs(rows);
     }
 
     /** 查询日期范围内的所有日志（关联任务信息） */
@@ -378,8 +379,9 @@ public class WorkLogStore {
             if (!todos.isEmpty()) {
                 enriched.put("related_todos", todos.stream()
                     .map(t -> Map.of(
+                        "id",    t.get("id"),
                         "title", t.get("title"),
-                        "done", Integer.valueOf(1).equals(t.get("is_completed"))
+                        "done",  Integer.valueOf(1).equals(t.get("is_completed"))
                     ))
                     .collect(Collectors.toList()));
             }

@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { useOverview } from '@/api/insights'
 import { TODAY } from '@/constants'
+import { Breadcrumb } from './Breadcrumb'
 import styles from './Masthead.module.css'
 
 /** 当前时间的时针 / 分针 / 秒针角度（从 12 点方向顺时针，单位度） */
@@ -95,6 +96,10 @@ export function Masthead() {
           <span className="btn-glyph">+</span>
           <span>新建条目</span>
         </button>
+      </div>
+
+      <div className={styles.breadcrumbRow}>
+        <Breadcrumb />
       </div>
 
       <div className={styles.ticker}>

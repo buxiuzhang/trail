@@ -1,5 +1,6 @@
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useWorkbench } from '@/context/WorkbenchContext'
+import { MottoFooter } from './MottoFooter'
 import styles from './WorkbenchSidebar.module.css'
 
 export function WorkbenchSidebar() {
@@ -49,6 +50,8 @@ export function WorkbenchSidebar() {
           <span>系统设置</span>
         </div>
       </nav>
+
+      <MottoFooter />
     </aside>
   )
 }

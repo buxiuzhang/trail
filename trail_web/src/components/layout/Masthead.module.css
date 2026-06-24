@@ -2,11 +2,17 @@
   position: relative;
   max-width: var(--max-w);
   margin: 0 auto;
-  padding: 36px 56px 28px;
+  padding: 36px 56px 0;
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-end;
   justify-content: space-between;
-  gap: 32px;
+  gap: 8px;
+}
+
+.breadcrumbRow {
+  width: 100%;
+  padding-bottom: 1px;
 }
 
 .left { display: flex; align-items: flex-end; gap: 22px; }

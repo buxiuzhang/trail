@@ -44,4 +44,10 @@ public class InsightController {
             @RequestParam(defaultValue = "7") int days) {
         return insights.recentTasks(days);
     }
+
+    @Operation(summary = "今日待办统计", description = "返回今日新增待办数和今日跟进待办数。")
+    @GetMapping("/todo-stats")
+    public Map<String, Object> todoStats() {
+        return insights.todayTodoStats();
+    }
 }

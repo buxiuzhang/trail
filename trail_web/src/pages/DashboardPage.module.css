@@ -70,6 +70,50 @@
   text-transform: uppercase;
 }
 
+.statCardSplit {
+  flex-direction: row;
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
+}
+
+.statSplitItem {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--space-md);
+}
+
+.statSplitDivider {
+  width: 0.5px;
+  background: var(--rule);
+  align-self: stretch;
+}
+
+
+.pieRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-md);
+}
+
+.pieCard {
+  background: var(--card);
+  border: 0.5px solid var(--rule);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-md) var(--space-md) var(--space-sm);
+}
+
+.pieCardTitle {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-ghost);
+  margin-bottom: 4px;
+}
+
 /* —— 预警列表 —— */
 .warnList {
   display: flex;

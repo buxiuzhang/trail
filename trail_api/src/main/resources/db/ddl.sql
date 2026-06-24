@@ -199,6 +199,6 @@ CREATE VIEW IF NOT EXISTS v_stale_tasks AS
 SELECT
     t.id, t.title, t.status, t.nature,
     (SELECT MAX(log_date) FROM work_logs w WHERE w.task_id = t.id AND w.is_deleted = 0) AS last_log_date,
-    CAST(julianday('now') - julianday((SELECT MAX(log_date) FROM work_logs w WHERE w.task_id = t.id AND w.is_deleted = 0)) AS INTEGER) AS days_idle
+    CAST(julianday(date('now','localtime')) - julianday((SELECT MAX(log_date) FROM work_logs w WHERE w.task_id = t.id AND w.is_deleted = 0)) AS INTEGER) AS days_idle
 FROM tasks t
 WHERE t.status = '进行中';

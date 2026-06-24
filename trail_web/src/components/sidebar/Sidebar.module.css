@@ -10,33 +10,6 @@
   background: linear-gradient(to bottom, transparent, var(--rule) 8%, var(--rule) 92%, transparent);
 }
 
-.foot { margin-top: 56px; padding-left: 14px; }
-.footLine { display: flex; align-items: center; margin-bottom: 18px; }
-.footTitle {
-  font-family: var(--mono);
-  font-size: 9px;
-  font-weight: 500;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--ink-ghost);
-}
-.footRule { height: 0.5px; background: var(--rule); width: 40px; }
-.footNote {
-  font-family: var(--serif-sc);
-  font-size: 12.5px;
-  color: var(--ink-faded);
-  line-height: 1.9;
-  letter-spacing: 0.04em;
-}
-.footSig {
-  margin-top: 10px;
-  font-family: var(--body);
-  font-style: italic;
-  font-size: 11.5px;
-  color: var(--ink-ghost);
-  letter-spacing: 0.04em;
-}
-
 @media (max-width: 920px) {
   .sidebar { display: none; }
 }

@@ -17,6 +17,29 @@ public class InsightStore {
         this.db = db;
     }
 
+    public Map<String, Object> todayTodoStats() {
+        String today = java.time.LocalDate.now().toString();
+        List<Map<String, Object>> newRows = db.query("""
+            SELECT COUNT(*) AS new_today
+            FROM todos
+            WHERE is_completed = 0 AND is_abandoned = 0
+              AND date(created_at, 'localtime') = ?
+            """, today);
+        List<Map<String, Object>> followRows = db.query("""
+            SELECT COUNT(DISTINCT er.ref_id) AS followed_today
+            FROM entity_refs er
+            JOIN work_logs wl ON wl.id = er.src_id
+            WHERE er.src_type = 'log'
+              AND er.ref_type = 'todo'
+              AND wl.log_date = ?
+              AND wl.is_deleted = 0
+            """, today);
+        Map<String, Object> result = new java.util.HashMap<>();
+        result.put("new_today",      newRows.isEmpty()    ? 0 : newRows.get(0).getOrDefault("new_today", 0));
+        result.put("followed_today", followRows.isEmpty() ? 0 : followRows.get(0).getOrDefault("followed_today", 0));
+        return result;
+    }
+
     public List<Map<String, Object>> staleTasks(int idleDays) {
         return db.query(
             "SELECT * FROM v_stale_tasks WHERE days_idle IS NULL OR days_idle >= ? ORDER BY days_idle DESC",

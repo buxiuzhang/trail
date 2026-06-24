@@ -27,9 +27,10 @@ interface LogComposeProps {
   saveDisabled?: boolean
   saveLabel?: string
   defaultLogDate?: string
+  confirmBeforeSave?: boolean
 }
 
-export function LogCompose({ task, todos, tasks = [], editing, onSave, onCancel, saveDisabled, saveLabel, defaultLogDate }: LogComposeProps) {
+export function LogCompose({ task, todos, tasks = [], editing, onSave, onCancel, saveDisabled, saveLabel, defaultLogDate, confirmBeforeSave }: LogComposeProps) {
   // 封版（已完成+非维护 或 已作废）→ 不渲染日志表单
   if (task.status === '已作废' || (task.status === '已完成' && task.nature !== '维护')) return null
   const isEdit = !!editing
@@ -105,6 +106,25 @@ export function LogCompose({ task, todos, tasks = [], editing, onSave, onCancel,
             action: async () => {
               await doSave(trimmed)
             },
+          },
+        ],
+      })
+      return
+    }
+
+    // 新建模式且需要二次确认
+    if (!isEdit && confirmBeforeSave) {
+      openModal({
+        eyebrow: '确认',
+        title: '落档此条日志？',
+        titleMode: 'zh',
+        body: <p>日志将写入「{task.title}」，落档后可在任务详情中修改或软删。</p>,
+        buttons: [
+          { label: '取消', className: 'btn btn--ghost', action: () => {} },
+          {
+            label: '确认落档',
+            className: 'btn btn--primary',
+            action: async () => { await doSave(trimmed) },
           },
         ],
       })
@@ -199,8 +219,8 @@ export function LogCompose({ task, todos, tasks = [], editing, onSave, onCancel,
         placeholder={placeholders?.log || DEFAULT_PLACEHOLDERS.log}
         value={content}
         onChange={setContent}
-        rows={5}
         minHeight={150}
+        autoGrow
         textareaClassName=""
         todos={todos}
         tasks={tasks}

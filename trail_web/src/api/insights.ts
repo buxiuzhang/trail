@@ -38,10 +38,13 @@ export function useLogsByDateRange(start: string, end: string) {
   })
 }
 
-export function useIncompleteTodos() {
+export interface TodoStatsOut { new_today: number; followed_today: number }
+
+export function useTodoStats() {
   return useQuery({
-    queryKey: ['todos', 'incomplete'],
-    queryFn: () => api.get<Record<string, unknown>[]>('/api/todos/incomplete'),
-    staleTime: 60_000,
+    queryKey: ['insights', 'todo-stats'],
+    queryFn: () => api.get<TodoStatsOut>('/api/insights/todo-stats'),
+    staleTime: 30_000,
   })
 }
+

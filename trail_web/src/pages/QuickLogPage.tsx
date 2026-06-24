@@ -11,6 +11,7 @@ function localToday(): string {
   return `${y}-${m}-${day}`
 }
 import { useTasks, useTask } from '@/api/tasks'
+import { useTodos } from '@/api/todos'
 import { useToastContext } from '@/context/ToastContext'
 import { useConfirm } from '@/utils/confirm'
 import { useModalContext } from '@/context/ModalContext'
@@ -20,7 +21,7 @@ import { TODAY } from '@/constants'
 import type { TaskOut } from '@/types'
 import type { LogOut } from '@/types/log'
 import { api } from '@/api/client'
-import { useUpdateLog } from '@/api/logs'
+import { useUpdateLog, useCreateLog } from '@/api/logs'
 import ExportIcon from '@/icons/export.svg'
 import EditIcon from '@/icons/edit.svg'
 import DeleteIcon from '@/icons/delete.svg'
@@ -58,9 +59,8 @@ function makePlaceholderTask(): TaskOut {
 
 // ── 浮动填报卡片 ─────────────────────────────────────────────────
 function FloatingCard({
-  onAdd, onClose, editingLog, defaultDate,
+  onClose, editingLog, defaultDate,
 }: {
-  onAdd: (draft: DraftLog) => void
   onClose: () => void
   editingLog?: any
   defaultDate?: string
@@ -71,7 +71,9 @@ function FloatingCard({
   const [search, setSearch] = useState(isEdit ? editingLog.task_title : '')
   const [focused, setFocused] = useState(false)
   const { data: selectedTask } = useTask(taskId ?? 0)
+  const { data: todos = [] } = useTodos(taskId ?? 0)
   const updateLog = useUpdateLog(taskId ?? 0)
+  const createLog = useCreateLog(taskId ?? 0)
   const { showToast } = useToastContext()
   const qc = useQueryClient()
 
@@ -125,49 +127,53 @@ function FloatingCard({
         </div>
 
         <LogCompose
-          task={taskForCompose}
-          todos={[]}
-          editing={isEdit ? (editingLog as LogOut) : null}
-          saveDisabled={!taskId}
-          saveLabel={isEdit ? '保存' : undefined}
-          defaultLogDate={defaultDate}
-          onSave={async (data) => {
-            if (!taskId) return
-            if (isEdit) {
-              await updateLog.mutateAsync({ logId: editingLog.id, data })
-              qc.invalidateQueries({ queryKey: ['logs', 'by-date', TODAY] })
-              showToast('日志已更新')
-              onClose()
-            } else {
-              if (!selectedTask) return
-              onAdd({
-                localId: localIdSeq++,
-                taskId,
-                taskTitle: selectedTask.title,
-                logDate: data.log_date,
-                phase: data.phase,
-                hours: data.hours,
-                content: data.content,
-                todo_ids: data.todo_ids,
-                task_ids: data.task_ids,
-              })
-              onClose()
-            }
-          }}
-          onCancel={onClose}
-        />
+            key={taskId ?? 'none'}
+            task={taskForCompose}
+            todos={todos}
+            tasks={tasks}
+            editing={isEdit ? (editingLog as LogOut) : null}
+            saveDisabled={!taskId}
+            saveLabel={isEdit ? '保存' : undefined}
+            defaultLogDate={defaultDate}
+            confirmBeforeSave={!isEdit}
+            onSave={async (data) => {
+              if (!taskId) return
+              if (isEdit) {
+                await updateLog.mutateAsync({ logId: editingLog.id, data })
+                qc.invalidateQueries({ queryKey: ['logs', 'by-date', TODAY] })
+                showToast('日志已更新')
+                onClose()
+              } else {
+                await createLog.mutateAsync(data)
+                qc.invalidateQueries({ queryKey: ['logs', 'by-date', TODAY] })
+                showToast('日志已落档')
+                onClose()
+              }
+            }}
+            onCancel={onClose}
+          />
       </div>
     </>
   )
 }
 
 // ── 日志行（支持内容展开）────────────────────────────────────────
+function resolveMentions(content: string, relatedTodos?: { id?: number; title: string }[]): string {
+  if (!relatedTodos?.length) return content
+  const map = new Map(relatedTodos.map(t => [t.id, t.title]))
+  return content.replace(/@todo:(\d+)/g, (_match, idStr) => {
+    const title = map.get(Number(idStr))
+    return title ? `「${title}」` : `@todo:${idStr}`
+  })
+}
+
 function LogRow({ log, idx, onEdit }: { log: any; idx: number; onEdit: (log: any) => void }) {
   const confirm = useConfirm()
   const { showToast } = useToastContext()
   const qc = useQueryClient()
   const navigate = useNavigate()
   const content: string = log.polished_content || log.content || ''
+  const displayContent = resolveMentions(content, log.related_todos)
 
   async function handleDelete() {
     const ok = await confirm({
@@ -216,7 +222,7 @@ function LogRow({ log, idx, onEdit }: { log: any; idx: number; onEdit: (log: any
       </td>
       <td className={styles.td} style={{ maxWidth: 0, overflow: 'hidden' }}>
         <span className={styles.logContent}>
-          {content}
+          {displayContent}
         </span>
       </td>
       <td className={styles.tdActions}>
@@ -338,13 +344,13 @@ function ExportModalBody({ defaultDate, onClose }: { defaultDate: string; onClos
 export function QuickLogPage() {
   const [date, setDate] = useState(() => localToday())
   const { data: submitted = [], isLoading } = useLogsByDate(date)
-  const [drafts, setDrafts] = useState<DraftLog[]>([])
-  const [showCard, setShowCard] = useState(false)
-  const [editingLog, setEditingLog] = useState<any>(null)
-  const [submitting, setSubmitting] = useState(false)
+  // 预加载任务列表，确保 FloatingCard 打开时缓存已命中
+  useTasks()
   const { showToast } = useToastContext()
   const { openModal, closeModal } = useModalContext()
   const qc = useQueryClient()
+  const [showCard, setShowCard] = useState(false)
+  const [editingLog, setEditingLog] = useState<any>(null)
 
   const { targetDate, clearTargetDate } = useWorkbench()
 
@@ -372,36 +378,11 @@ export function QuickLogPage() {
     })
   }
 
-  function removeDraft(localId: number) {
-    setDrafts(ds => ds.filter(d => d.localId !== localId))
+  async function handleSubmitAll() {
+    // 已废弃，直接提交逻辑移至 FloatingCard
   }
 
-  async function handleSubmitAll() {
-    if (drafts.length === 0) return
-    setSubmitting(true)
-    let ok = 0
-    for (const d of drafts) {
-      try {
-        await api.post(`/api/tasks/${d.taskId}/logs`, {
-          log_date: d.logDate,
-          content: d.content,
-          phase: d.phase,
-          hours: d.hours,
-          todo_ids: d.todo_ids,
-          task_ids: d.task_ids,
-        })
-        ok++
-      } catch {
-        showToast(`「${d.taskTitle}」提交失败`, 'error')
-      }
-    }
-    setSubmitting(false)
-    if (ok > 0) {
-      setDrafts([])
-      qc.invalidateQueries({ queryKey: ['logs', 'by-date', TODAY] })
-      showToast(`${ok} 条日志已提交`)
-    }
-  }
+  function removeDraft(_localId: number) {}
 
   return (
     <div className={styles.page}>
@@ -416,57 +397,24 @@ export function QuickLogPage() {
             onChange={e => setDate(e.target.value)}
           />
         </div>
-        <button type="button" className={styles.addBtn} onClick={() => setShowCard(true)}>
-          ＋ 添加日志
-        </button>
       </div>
-
-      {/* 待提交草稿 */}
-      {drafts.length > 0 && (
-        <div className={styles.draftSection}>
-          <div className={styles.sectionLabel}>
-            待提交 <span className={styles.sectionCount}>{drafts.length} 条</span>
-          </div>
-          <div className={styles.draftList}>
-            {drafts.map(d => (
-              <div key={d.localId} className={styles.draftItem}>
-                <div className={styles.draftItemLeft}>
-                  <span className={styles.logTaskName}>{d.taskTitle}</span>
-                  <span className={styles.logPhase}>{d.phase === 'main' ? '主体' : '维护'}</span>
-                  <span className={styles.logHours}>{d.hours}h</span>
-                </div>
-                <p className={styles.logContent}>{d.content.slice(0, 80)}{d.content.length > 80 ? '…' : ''}</p>
-                <button
-                  type="button"
-                  className={styles.draftRemove}
-                  onClick={() => removeDraft(d.localId)}
-                  title="移除"
-                >×</button>
-              </div>
-            ))}
-          </div>
-          <div className={styles.submitRow}>
-            <button
-              type="button"
-              className={styles.submitBtn}
-              onClick={handleSubmitAll}
-              disabled={submitting}
-            >
-              {submitting ? '提交中…' : `提交全部（${drafts.length} 条）`}
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* 已提交 */}
       <div>
         <div className={styles.sectionLabel}>
           <span>已提交 <span className={styles.sectionCount}>{submitted.length} 条</span>
-          {submitted.length > 0 && (
-            <span className={styles.sectionCount}>
-              · {parseFloat(submitted.reduce((sum: number, log: any) => sum + (log.hours || 0), 0).toFixed(1))} 小时
-            </span>
-          )}</span>
+          {submitted.length > 0 && (() => {
+            const hours = parseFloat(submitted.reduce((sum: number, log: any) => sum + (log.hours || 0), 0).toFixed(1))
+            const followedTodos = new Set(
+              submitted.flatMap((log: any) => (log.related_todos ?? []).map((t: any) => t.id))
+            ).size
+            return <>
+              <span className={styles.sectionCount}>· {hours} 小时</span>
+              {followedTodos > 0 && (
+                <span className={styles.sectionCount}>· 跟进 {followedTodos} 个待办</span>
+              )}
+            </>
+          })()}</span>
           <button type="button" className={styles.exportBtn} title="导出" onClick={handleExportClick}>
             <img src={ExportIcon} width={14} height={14} alt="导出" />
           </button>
@@ -497,12 +445,14 @@ export function QuickLogPage() {
             </table>
           </div>
         )}
+        <button type="button" className={styles.addBtn} onClick={() => setShowCard(true)}>
+          ＋ 添加日志
+        </button>
       </div>
 
       {/* 浮动填报卡片 */}
       {(showCard || editingLog) && (
         <FloatingCard
-          onAdd={d => setDrafts(ds => [...ds, d])}
           editingLog={editingLog}
           defaultDate={date}
           onClose={() => { setShowCard(false); setEditingLog(null) }}
