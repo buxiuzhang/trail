@@ -280,6 +280,29 @@ public class SqliteDb {
                     log.info("skills.scope 列已添加");
                 }
             }
+            // M17: v_stale_tasks 视图升级——旧版只查 status='进行中'，新版覆盖所有未完成任务
+            try (Statement s = c.createStatement();
+                 ResultSet rs = s.executeQuery(
+                     "SELECT sql FROM sqlite_master WHERE type='view' AND name='v_stale_tasks'")) {
+                if (rs.next()) {
+                    String viewSql = rs.getString(1);
+                    if (viewSql != null && viewSql.contains("'进行中'") && !viewSql.contains("NOT IN")) {
+                        try (Statement s2 = c.createStatement()) {
+                            s2.execute("DROP VIEW IF EXISTS v_stale_tasks");
+                            s2.execute("""
+                                CREATE VIEW v_stale_tasks AS
+                                SELECT
+                                    t.id, t.title, t.status, t.nature,
+                                    (SELECT MAX(log_date) FROM work_logs w WHERE w.task_id = t.id AND w.is_deleted = 0) AS last_log_date,
+                                    CAST(julianday(date('now','localtime')) - julianday((SELECT MAX(log_date) FROM work_logs w WHERE w.task_id = t.id AND w.is_deleted = 0)) AS INTEGER) AS days_idle
+                                FROM tasks t
+                                WHERE t.status NOT IN ('已完成', '已作废')
+                                """);
+                            log.info("M17 迁移: v_stale_tasks 视图已升级（覆盖所有未完成任务）");
+                        }
+                    }
+                }
+            }
             log.info("ensureSchema 完成");
         } catch (Exception e) {
             throw new RuntimeException("ensureSchema 失败: " + e.getMessage(), e);

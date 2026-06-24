@@ -14,7 +14,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/insights")
-@Tag(name = "统计洞察", description = "任务统计、闲置任务、近期活跃等数据概览")
+@Tag(name = "统计洞察", description = "任务统计、闲置任务、待办等数据概览")
 public class InsightController {
 
     private final InsightStore insights;
@@ -35,14 +35,6 @@ public class InsightController {
             @Parameter(description = "闲置天数阈值，默认 7 天")
             @RequestParam(defaultValue = "7") int days) {
         return insights.staleTasks(days);
-    }
-
-    @Operation(summary = "近期活跃任务", description = "返回最近 N 天内有日志更新的任务，按活跃度排序。")
-    @GetMapping("/recent")
-    public List<Map<String, Object>> recent(
-            @Parameter(description = "最近 N 天，默认 7 天")
-            @RequestParam(defaultValue = "7") int days) {
-        return insights.recentTasks(days);
     }
 
     @Operation(summary = "今日待办统计", description = "返回今日新增待办数和今日跟进待办数。")

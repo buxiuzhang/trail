@@ -5,7 +5,6 @@ import { useWorkbench } from '@/context/WorkbenchContext'
 import {
   useOverview,
   useStaleTasks,
-  useLogsByDate,
   useLogsByDateRange,
   useTodoStats,
 } from '@/api/insights'
@@ -82,8 +81,6 @@ export function DashboardPage() {
   const trend14Start = localDate(-13)
 
   const { data: overview } = useOverview()
-  const { data: todayLogs = [] } = useLogsByDate(today)
-  const { data: weekRange = [] } = useLogsByDateRange(wStart, today)
   const { data: trend14 = [] } = useLogsByDateRange(trend14Start, today)
   const { data: staleTasks = [] } = useStaleTasks(0)
   const { data: todoStats } = useTodoStats()
@@ -96,12 +93,12 @@ export function DashboardPage() {
   setPanelRef.current = setPanel
 
   const todayHours = useMemo(() =>
-    parseFloat(todayLogs.reduce((s: number, l: any) => s + (l.hours || 0), 0).toFixed(1)),
-    [todayLogs])
+    parseFloat((trend14.find(d => d.date === today)?.hours ?? 0).toFixed(1)),
+    [trend14, today])
 
   const weekHours = useMemo(() =>
-    parseFloat(weekRange.reduce((s, d) => s + d.hours, 0).toFixed(1)),
-    [weekRange])
+    parseFloat(trend14.filter(d => d.date >= wStart).reduce((s, d) => s + d.hours, 0).toFixed(1)),
+    [trend14, wStart])
 
   const inProgress = overview?.by_status?.['进行中'] ?? 0
 

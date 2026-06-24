@@ -4,11 +4,9 @@ import com.trail.config.DataDirService;
 import com.trail.web.dto.DbSettingsDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Map;
 
@@ -38,10 +36,4 @@ public class DbSettingsController {
         );
     }
 
-    @Operation(summary = "切换数据库（已废弃）", description = "M8 起固定使用 SQLite，请用 /api/settings/data-dir 切换路径")
-    @org.springframework.web.bind.annotation.PutMapping
-    public Map<String, Object> save(@org.springframework.web.bind.annotation.RequestBody Map<String, Object> body) {
-        throw new ResponseStatusException(HttpStatus.GONE,
-                "M8 起 backend 固定为 sqlite；切数据目录请用 PUT /api/settings/data-dir");
-    }
 }

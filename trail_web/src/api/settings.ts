@@ -155,17 +155,6 @@ export function useDbSettings() {
   })
 }
 
-export function useSaveDbSettings() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (data: { backend: string; duckdb?: { path: string }; mysql?: Record<string, unknown> }) =>
-      api.put('/api/settings/db', data),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['settings', 'db'] })
-    },
-  })
-}
-
 // ============================================================
 // 数据目录（M8：Java + SQLite + 运行时切换）
 // ============================================================

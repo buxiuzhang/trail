@@ -82,7 +82,7 @@ function FloatingCard({
     .filter(t => !search
       || t.title.toLowerCase().includes(search.toLowerCase())
       || (t.alias || '').toLowerCase().includes(search.toLowerCase()))
-    .slice(0, 8)
+    .slice(0, search ? 50 : 20)
 
   const taskForCompose: TaskOut = selectedTask ?? makePlaceholderTask()
 
@@ -344,8 +344,6 @@ function ExportModalBody({ defaultDate, onClose }: { defaultDate: string; onClos
 export function QuickLogPage() {
   const [date, setDate] = useState(() => localToday())
   const { data: submitted = [], isLoading } = useLogsByDate(date)
-  // 预加载任务列表，确保 FloatingCard 打开时缓存已命中
-  useTasks()
   const { showToast } = useToastContext()
   const { openModal, closeModal } = useModalContext()
   const qc = useQueryClient()

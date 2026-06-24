@@ -14,7 +14,7 @@ export function useStaleTasks(idleDays: number = 30) {
   return useQuery({
     queryKey: ['stale', idleDays],
     queryFn: () => api.get<StaleOut[]>(`/api/insights/stale?days=${idleDays}`),
-    staleTime: 0,
+    staleTime: 30_000,
   })
 }
 
