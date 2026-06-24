@@ -67,4 +67,47 @@ public class LogQueryController {
         });
         return result;
     }
+
+    @Operation(summary = "任务日报热力图数据", description = "返回日期范围内每个任务每天的日报数量，用于热力图展示")
+    @GetMapping("/heatmap")
+    public List<Map<String, Object>> heatmap(
+            @RequestParam(required = false) String start,
+            @RequestParam(required = false) String end) {
+        LocalDate endDate   = (end   != null && !end.isBlank())   ? LocalDate.parse(end)   : LocalDate.now();
+        LocalDate startDate = (start != null && !start.isBlank()) ? LocalDate.parse(start) : endDate.minusDays(13);
+
+        List<Map<String, Object>> rows = workLogStore.getByDateRange(startDate, endDate);
+
+        record Key(long taskId, String date) {}
+        Map<Key, int[]> countMap = new LinkedHashMap<>();
+        Map<Long, String> titleMap = new LinkedHashMap<>();
+
+        for (Map<String, Object> row : rows) {
+            long taskId  = ((Number) row.get("task_id")).longValue();
+            String date  = row.get("log_date").toString();
+            String title = row.get("task_title") != null ? row.get("task_title").toString() : ("任务" + taskId);
+            double h     = row.get("hours") != null ? ((Number) row.get("hours")).doubleValue() : 1.0;
+            titleMap.putIfAbsent(taskId, title);
+            Key k = new Key(taskId, date);
+            countMap.computeIfAbsent(k, x -> new int[]{0, 0});
+            countMap.get(k)[0]++;
+            countMap.get(k)[1] += (int) Math.round(h * 10);
+        }
+
+        List<Map<String, Object>> result = new ArrayList<>();
+        countMap.forEach((k, v) -> {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("task_id",    k.taskId());
+            m.put("task_title", titleMap.get(k.taskId()));
+            m.put("date",       k.date());
+            m.put("count",      v[0]);
+            m.put("hours",      Math.round(v[1]) / 10.0);
+            result.add(m);
+        });
+        result.sort((a, b) -> {
+            int t = ((String) a.get("task_title")).compareTo((String) b.get("task_title"));
+            return t != 0 ? t : ((String) a.get("date")).compareTo((String) b.get("date"));
+        });
+        return result;
+    }
 }

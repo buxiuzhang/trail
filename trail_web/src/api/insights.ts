@@ -48,3 +48,30 @@ export function useTodoStats() {
   })
 }
 
+export interface HeatmapCell {
+  task_id: number
+  task_title: string
+  date: string
+  count: number
+  hours: number
+}
+
+export interface TaskItem { id: number; title: string }
+
+export function useAllTasks() {
+  return useQuery({
+    queryKey: ['all-tasks-heatmap'],
+    queryFn: () => api.get<{ items: TaskItem[] }>('/api/tasks?limit=9999').then(r => r.items),
+    staleTime: 60_000,
+  })
+}
+
+export function useLogHeatmap(start: string, end: string) {
+  return useQuery({
+    queryKey: ['logs', 'heatmap', start, end],
+    queryFn: () => api.get<HeatmapCell[]>(`/api/logs/heatmap?start=${start}&end=${end}`),
+    staleTime: 60_000,
+    enabled: !!start && !!end,
+  })
+}
+

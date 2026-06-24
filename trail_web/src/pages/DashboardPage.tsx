@@ -7,6 +7,8 @@ import {
   useStaleTasks,
   useLogsByDateRange,
   useTodoStats,
+  useLogHeatmap,
+  useAllTasks,
 } from '@/api/insights'
 import styles from './DashboardPage.module.css'
 
@@ -79,11 +81,14 @@ export function DashboardPage() {
   const today = localDate()
   const wStart = weekStart()
   const trend14Start = localDate(-13)
+  const heatmap30Start = localDate(-29)
 
   const { data: overview } = useOverview()
   const { data: trend14 = [] } = useLogsByDateRange(trend14Start, today)
   const { data: staleTasks = [] } = useStaleTasks(0)
+  const { data: allTasks = [] } = useAllTasks()
   const { data: todoStats } = useTodoStats()
+  const { data: heatmapData = [] } = useLogHeatmap(heatmap30Start, today)
   const navigate = useNavigate()
   const { setPanel } = useWorkbench()
 
@@ -257,6 +262,95 @@ export function DashboardPage() {
     [overview],
   )
 
+  const heatmapMemo = useMemo(() => {
+    const dates = Array.from({ length: 30 }, (_, i) => localDate(i - 29))
+
+    const taskLastDate = new Map<string, string>()
+    const taskIdByTitle = new Map<string, number>()
+    const cellsByTask = new Map<string, typeof heatmapData>()
+    for (const cell of heatmapData) {
+      const prev = taskLastDate.get(cell.task_title) ?? ''
+      if (cell.date > prev) taskLastDate.set(cell.task_title, cell.date)
+      taskIdByTitle.set(cell.task_title, cell.task_id)
+      const bucket = cellsByTask.get(cell.task_title) ?? []
+      bucket.push(cell)
+      cellsByTask.set(cell.task_title, bucket)
+    }
+
+    for (const t of allTasks) {
+      taskIdByTitle.set(t.title, t.id)
+      if (!taskLastDate.has(t.title)) taskLastDate.set(t.title, '')
+    }
+
+    const tasks = [...taskLastDate.keys()].sort((a, b) => {
+      const da = taskLastDate.get(a) ?? ''
+      const db = taskLastDate.get(b) ?? ''
+      if (!da && !db) return a.localeCompare(b)
+      if (!da) return 1
+      if (!db) return -1
+      return da > db ? -1 : da < db ? 1 : a.localeCompare(b)
+    })
+
+    const dateIdx = new Map(dates.map((d, i) => [d, i]))
+    const maxCount = Math.max(1, ...heatmapData.map(c => c.count))
+
+    const PALETTE = [
+      '#5B8A6B', '#8A5B5B', '#5B6E8A', '#8A7A5B', '#7A5B8A',
+      '#5B8A80', '#8A6B5B', '#6B8A5B', '#8A5B72', '#5B7A8A',
+      '#8A845B', '#6B5B8A', '#5B8A65', '#8A5F5B', '#5B7F8A',
+    ]
+
+    const series = tasks.map((taskName, ti) => {
+      const color = PALETTE[ti % PALETTE.length]
+      const pts = (cellsByTask.get(taskName) ?? []).map(cell => ({
+        value: [dateIdx.get(cell.date) ?? 0, ti, cell.count, cell.hours],
+        symbolSize: 6 + Math.round((cell.count / maxCount) * 12),
+        itemStyle: { color },
+      }))
+      return {
+        type: 'scatter',
+        data: pts,
+        encode: { x: 0, y: 1, tooltip: [0, 1, 2, 3] },
+        emphasis: { itemStyle: { shadowBlur: 6, shadowColor: color + '66' } },
+      }
+    })
+
+    const truncLabel = (name: string) => name.length > 10 ? name.slice(0, 10) + '…' : name
+
+    const option = {
+      grid: { top: 10, right: 16, bottom: 40, left: 0 },
+      tooltip: {
+        formatter: (p: any) => {
+          const [di, ti, cnt, hrs] = p.data.value
+          return `${tasks[ti]}<br/>${dates[di]}<br/>日报 ${cnt} 条 · ${hrs}h`
+        },
+        backgroundColor: 'var(--card)',
+        borderColor: 'var(--rule)',
+        textStyle: { color: '#3A322A', fontSize: 12 },
+      },
+      xAxis: {
+        type: 'category',
+        data: dates.map(d => d.slice(5)),
+        axisLine: { lineStyle: { color: '#C7B999' } },
+        axisTick: { show: false },
+        axisLabel: { color: '#B8AC95', fontSize: 9, interval: (i: number) => i % 3 === 0 },
+        splitLine: { show: true, lineStyle: { color: '#EFE5D0', type: 'dashed' } },
+      },
+      yAxis: {
+        type: 'category',
+        data: tasks,
+        inverse: true,
+        axisLine: { show: false },
+        axisTick: { show: false },
+        axisLabel: { color: '#6B5E4D', fontSize: 11, formatter: truncLabel },
+        splitLine: { show: true, lineStyle: { color: '#EFE5D0', type: 'dashed' } },
+      },
+      series,
+    }
+
+    return { option, tasks, taskIdByTitle, chartHeight: tasks.length * 32 + 60 }
+  }, [heatmapData, allTasks, heatmap30Start])
+
   return (
     <div className={styles.page}>
 
@@ -358,7 +452,7 @@ export function DashboardPage() {
         </div>
         {selectedTasks.length > 0 ? (
           <div className={styles.warnList}>
-            {selectedTasks.slice(0, 8).map((t: any) => (
+            {selectedTasks.map((t: any) => (
               <div key={t.id} className={styles.warnItem} onClick={() => navigate(`/task/${t.id}`)}>
                 <span className={styles.warnTitle}>{t.title}</span>
                 <span className={styles.warnDays}>{healthDayLabel(t)}</span>
@@ -391,6 +485,27 @@ export function DashboardPage() {
         />
       </section>
 
+      {/* 任务日报热力图 */}
+      {allTasks.length > 0 && (
+        <section className={styles.section}>
+          <div className={styles.sectionTitle}>任务日报热力图</div>
+          <div className={styles.heatmapWrap}>
+            <ReactECharts
+              option={{ ...heatmapMemo.option, grid: { ...heatmapMemo.option.grid, left: 120 } }}
+              style={{ height: heatmapMemo.chartHeight }}
+              onEvents={{
+                click: (p: any) => {
+                  if (p.componentType === 'series' && p.data) {
+                    const title = heatmapMemo.tasks[p.data.value[1]]
+                    const id = heatmapMemo.taskIdByTitle.get(title)
+                    if (id) navigate(`/task/${id}`)
+                  }
+                },
+              }}
+            />
+          </div>
+        </section>
+      )}
 
     </div>
   )
