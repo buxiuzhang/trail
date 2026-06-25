@@ -2,8 +2,10 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useTasks } from '@/api/tasks'
 import { useCreateLog } from '@/api/logs'
+import { useTodos } from '@/api/todos'
 import { useAttachmentsByIds } from '@/api/attachments'
 import { useToastContext } from '@/context/ToastContext'
+import { useConfirm } from '@/utils/confirm'
 import { usePolishContent } from '@/hooks/usePolishContent'
 import { useDraftLog, LLM_AVAILABLE } from '@/api/llm'
 import { usePlaceholders, DEFAULT_PLACEHOLDERS } from '@/api/settings'
@@ -50,6 +52,7 @@ function EntryCard({ index, entry, tasks, mode, placeholder, onUpdate, onRemove,
   const { showToast } = useToastContext()
   const polishLog = usePolishContent({ task_id: entry.taskId ?? undefined })
   const draftMutation = useDraftLog(entry.taskId ?? 0)
+  const { data: todos = [] } = useTodos(entry.taskId ?? 0)
 
   const fileIds = useMemo(() => {
     const ids: number[] = []
@@ -147,6 +150,7 @@ function EntryCard({ index, entry, tasks, mode, placeholder, onUpdate, onRemove,
         minHeight={60}
         autoGrow
         textareaClassName={styles.entryContent}
+        todos={todos}
         tasks={tasks}
         attachments={attachments}
       />
@@ -244,6 +248,7 @@ function EntryCard({ index, entry, tasks, mode, placeholder, onUpdate, onRemove,
 export function BatchLogPanel({ defaultDate, onClose, onSubmitted }: Props) {
   const { data: tasks = [] } = useTasks()
   const { showToast } = useToastContext()
+  const confirm = useConfirm()
 
   const STORAGE_KEY = 'batch_log_draft'
 
@@ -347,8 +352,14 @@ export function BatchLogPanel({ defaultDate, onClose, onSubmitted }: Props) {
   async function handleSubmitAll() {
     const valid = entries.filter(e => e.taskId)
     if (!valid.length) { showToast('没有可提交的条目', 'error'); return }
+    const ok = await confirm({
+      title: `落档 ${valid.length} 条日志？`,
+      body: <p>将向 {new Set(valid.map(e => e.taskId)).size} 个任务写入日志，落档后可在任务详情中修改或软删。</p>,
+      confirmLabel: '确认落档',
+    })
+    if (!ok) return
     setSubmitting(true)
-    let ok = 0
+    let done = 0
     for (const e of valid) {
       try {
         await api.post(`/api/tasks/${e.taskId}/logs`, {
@@ -357,14 +368,14 @@ export function BatchLogPanel({ defaultDate, onClose, onSubmitted }: Props) {
           hours: e.hours,
           phase: e.phase,
         })
-        ok++
+        done++
       } catch {
         showToast(`「${e.task_title}」提交失败`, 'error')
       }
     }
     setSubmitting(false)
-    if (ok > 0) {
-      showToast(`已提交 ${ok} 条日志`)
+    if (done > 0) {
+      showToast(`已提交 ${done} 条日志`)
       clearDraft()
       onSubmitted()
       onClose()
