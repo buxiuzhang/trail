@@ -1,5 +1,12 @@
 import { createContext, useContext, useCallback, useState, useRef, useEffect, type ReactNode } from 'react'
 
+function getApiBase(): string {
+  if (typeof window !== 'undefined' && window.location.protocol === 'file:') {
+    return 'http://localhost:8765'
+  }
+  return ''
+}
+
 export interface UploadTask {
   id: string
   fileName: string
@@ -13,6 +20,7 @@ export interface UploadTask {
 interface UploadQueueContextValue {
   tasks: UploadTask[]
   uploadFile: (file: File, onDone: (url: string, name: string, mime: string, id: number) => void) => void
+  dismissTask: (id: string) => void
 }
 
 const UploadQueueContext = createContext<UploadQueueContextValue | null>(null)
@@ -25,14 +33,16 @@ export function useUploadQueue() {
 
 export function UploadQueueProvider({ children }: { children: ReactNode }) {
   const [tasks, setTasks] = useState<UploadTask[]>([])
-  // 防重：记录「文件名+大小」正在上传的 key
   const inFlightRef = useRef(new Set<string>())
 
   const updateTask = useCallback((id: string, patch: Partial<UploadTask>) => {
     setTasks(prev => prev.map(t => t.id === id ? { ...t, ...patch } : t))
   }, [])
 
-  // 有文件上传中时拦截刷新/关闭
+  const dismissTask = useCallback((id: string) => {
+    setTasks(prev => prev.filter(t => t.id !== id))
+  }, [])
+
   useEffect(() => {
     const hasUploading = tasks.some(t => t.status === 'uploading')
     if (!hasUploading) return
@@ -46,7 +56,7 @@ export function UploadQueueProvider({ children }: { children: ReactNode }) {
 
   const uploadFile = useCallback((file: File, onDone: (url: string, name: string, mime: string, id: number) => void) => {
     const dedupeKey = `${file.name}__${file.size}`
-    if (inFlightRef.current.has(dedupeKey)) return   // 正在上传，跳过
+    if (inFlightRef.current.has(dedupeKey)) return
 
     const id = crypto.randomUUID()
     const task: UploadTask = { id, fileName: file.name, progress: 0, status: 'uploading' }
@@ -72,7 +82,6 @@ export function UploadQueueProvider({ children }: { children: ReactNode }) {
             const url = res.url || `/api/attachments/${res.id}`
             updateTask(id, { status: 'done', progress: 100, url })
             onDone(url, res.original_name || file.name, res.mime || file.type, res.id as number)
-            // 3 秒后自动移除已完成项
             setTimeout(() => setTasks(prev => prev.filter(t => t.id !== id)), 3000)
           } catch {
             updateTask(id, { status: 'error', error: '解析响应失败' })
@@ -87,7 +96,7 @@ export function UploadQueueProvider({ children }: { children: ReactNode }) {
         updateTask(id, { status: 'error', error: '网络错误', retryFn: doUpload })
       }
 
-      xhr.open('POST', '/api/attachments')
+      xhr.open('POST', getApiBase() + '/api/attachments')
       xhr.send(form)
       updateTask(id, { status: 'uploading', progress: 0, error: undefined, retryFn: undefined })
     }
@@ -96,7 +105,7 @@ export function UploadQueueProvider({ children }: { children: ReactNode }) {
   }, [updateTask])
 
   return (
-    <UploadQueueContext.Provider value={{ tasks, uploadFile }}>
+    <UploadQueueContext.Provider value={{ tasks, uploadFile, dismissTask }}>
       {children}
     </UploadQueueContext.Provider>
   )

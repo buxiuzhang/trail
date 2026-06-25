@@ -643,6 +643,71 @@ public class LlmService {
         "请综合提炼为一段完整的任务进展总结，精炼准确，去除重复。" +
         "只描述工作职责和任务方向，不要出现具体的故障名称、系统参数、错误信息、数据量等技术细节。";
 
+    private static final String BATCH_PARSE_SYSTEM = """
+        你是工作日志拆分助手。用户会粘贴一段包含多项工作内容的文字，你需要将其拆分为独立的工作日志条目。
+
+        规则：
+        1. 根据内容判断每段文字属于哪个任务（从给定任务列表中选择最匹配的）
+        2. 如果某段内容无法匹配任何任务，task_title 填 null
+        3. hours 根据内容估算工时（0.5~8，没有明确说明时填 1.0）
+        4. content 保留原文，不要润色，不要删减
+        5. 必须返回合法 JSON 数组，不要包含任何其他文字
+
+        返回格式（JSON 数组）：
+        [
+          {"task_title": "任务名称", "content": "日志内容", "hours": 1.5},
+          ...
+        ]
+        """;
+
+    private static final String BATCH_TAG_SYSTEM = """
+        你是工作日志标注助手。用户会粘贴一段包含多项工作内容的文字，请在每段内容的**开头**插入对应任务的引用标记，格式为 `@task:ID`。
+
+        规则：
+        1. 任务列表由用户提供，格式为 "ID: 任务名称"
+        2. 在每段属于某个任务的内容的**正前方**插入 `@task:ID`（ID 替换为实际数字），后跟一个换行
+        3. 如果某段内容无法匹配任何任务，不加标记，原样保留
+        4. 不要修改原文任何内容，不要润色，不要删减，不要添加任何解释
+        5. 只输出打标后的完整文本，不要包含任何其他文字
+        """;
+
+    public String batchTagLogs(String rawText, List<Map<String, Object>> tasks) {
+        LlmConfig cfg = getConfig();
+        String taskListText = tasks.isEmpty() ? "（无）"
+            : tasks.stream()
+                .map(t -> t.get("id") + ": " + t.get("title"))
+                .collect(java.util.stream.Collectors.joining("\n"));
+        String user = "当前进行中的任务列表（格式：ID: 名称）：\n" + taskListText
+            + "\n\n以下是需要标注的工作内容：\n\n" + rawText;
+        AnthropicResponse resp = callAnthropic(cfg, BATCH_TAG_SYSTEM, List.of(userMessage(user)));
+        aiRecordStore.addRecord(null, null, "batch_tag", user, resp.raw(), false);
+        return resp.text();
+    }
+
+    public List<Map<String, Object>> parseBatchLogs(String rawText, List<String> taskTitles) {
+        LlmConfig cfg = getConfig();
+        String titlesText = taskTitles.isEmpty() ? "（无）" : String.join("\n", taskTitles.stream().map(t -> "- " + t).toList());
+        String user = "当前进行中的任务列表：\n" + titlesText + "\n\n以下是需要拆分的工作内容：\n\n" + rawText;
+        AnthropicResponse resp = callAnthropic(cfg, BATCH_PARSE_SYSTEM, List.of(userMessage(user)));
+        aiRecordStore.addRecord(null, null, "batch_parse", user, resp.raw(), false);
+        try {
+            String json = stripCodeBlocks(resp.text());
+            JsonNode arr = mapper.readTree(json);
+            List<Map<String, Object>> result = new ArrayList<>();
+            for (JsonNode node : arr) {
+                java.util.LinkedHashMap<String, Object> item = new java.util.LinkedHashMap<>();
+                item.put("task_title", node.path("task_title").isNull() ? null : node.path("task_title").asText());
+                item.put("content",    node.path("content").asText(""));
+                item.put("hours",      node.path("hours").asDouble(1.0));
+                result.add(item);
+            }
+            return result;
+        } catch (Exception e) {
+            log.warn("parseBatchLogs JSON parse failed, raw: {}", resp.text(), e);
+            throw new LlmApiException("LLM 返回格式异常，请重试");
+        }
+    }
+
     /** 过滤 Markdown 代码块（``` ... ```） */
     private String stripCodeBlocks(String text) {
         if (text == null) return "";

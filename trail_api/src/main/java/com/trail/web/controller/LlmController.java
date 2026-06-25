@@ -2,6 +2,7 @@ package com.trail.web.controller;
 
 import com.trail.service.ChatWithToolsService;
 import com.trail.service.LlmService;
+import com.trail.store.TaskStore;
 import com.trail.store.WorkLogStore;
 import com.trail.web.dto.*;
 import io.swagger.v3.oas.annotations.Operation;
@@ -24,11 +25,14 @@ public class LlmController {
     private final LlmService llmService;
     private final ChatWithToolsService chatWithToolsService;
     private final WorkLogStore workLogStore;
+    private final TaskStore taskStore;
 
-    public LlmController(LlmService llmService, ChatWithToolsService chatWithToolsService, WorkLogStore workLogStore) {
+    public LlmController(LlmService llmService, ChatWithToolsService chatWithToolsService,
+                         WorkLogStore workLogStore, TaskStore taskStore) {
         this.llmService = llmService;
         this.chatWithToolsService = chatWithToolsService;
         this.workLogStore = workLogStore;
+        this.taskStore = taskStore;
     }
 
     @Operation(summary = "润色文本", description = "将口语化文本润色为书面化表达")
@@ -78,6 +82,35 @@ public class LlmController {
     public LlmAskMaintenanceResponse askMaintenance(@PathVariable Long taskId) {
         String suggestion = llmService.askMaintenance(taskId);
         return new LlmAskMaintenanceResponse(suggestion);
+    }
+
+    @Operation(summary = "批量日志打标", description = "AI 在原文中插入 @task:ID 标记，原文内容不变")
+    @PostMapping("/llm/batch-tag")
+    public Map<String, String> batchTag(@RequestBody Map<String, Object> body) {
+        String text = (String) body.getOrDefault("text", "");
+        if (text.isBlank()) throw new IllegalArgumentException("text 不能为空");
+        @SuppressWarnings("unchecked")
+        List<Long> taskIds = ((List<Number>) body.getOrDefault("task_ids", List.of()))
+            .stream().map(Number::longValue).toList();
+        List<Map<String, Object>> tasks = taskIds.stream()
+            .map(id -> {
+                try { return taskStore.getTask(id); }
+                catch (Exception e) { return null; }
+            })
+            .filter(t -> t != null)
+            .toList();
+        String tagged = llmService.batchTagLogs(text, tasks);
+        return Map.of("text", tagged);
+    }
+
+    @Operation(summary = "批量日志解析", description = "将一段包含多项工作内容的文字，通过 LLM 拆分为按任务归类的日志条目列表")
+    @PostMapping("/llm/batch-parse")
+    public List<Map<String, Object>> batchParse(@RequestBody Map<String, Object> body) {
+        String text = (String) body.getOrDefault("text", "");
+        if (text.isBlank()) throw new IllegalArgumentException("text 不能为空");
+        @SuppressWarnings("unchecked")
+        List<String> taskTitles = (List<String>) body.getOrDefault("task_titles", List.of());
+        return llmService.parseBatchLogs(text, taskTitles);
     }
 
     @Operation(summary = "基础聊天（SSE）", description = "流式聊天，无工具调用")

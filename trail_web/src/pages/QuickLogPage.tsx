@@ -17,6 +17,8 @@ import { useConfirm } from '@/utils/confirm'
 import { useModalContext } from '@/context/ModalContext'
 import { useWorkbench } from '@/context/WorkbenchContext'
 import { LogCompose } from '@/components/detail/LogCompose'
+import { BatchLogPanel } from '@/components/detail/BatchLogPanel'
+import { TaskSelectorRow } from '@/components/shared/TaskSelectorRow'
 import { TODAY } from '@/constants'
 import type { TaskOut } from '@/types'
 import type { LogOut } from '@/types/log'
@@ -68,8 +70,6 @@ function FloatingCard({
   const isEdit = !!editingLog
   const { data: tasks = [] } = useTasks()
   const [taskId, setTaskId] = useState<number | null>(isEdit ? editingLog.task_id : null)
-  const [search, setSearch] = useState(isEdit ? editingLog.task_title : '')
-  const [focused, setFocused] = useState(false)
   const { data: selectedTask } = useTask(taskId ?? 0)
   const { data: todos = [] } = useTodos(taskId ?? 0)
   const updateLog = useUpdateLog(taskId ?? 0)
@@ -77,54 +77,18 @@ function FloatingCard({
   const { showToast } = useToastContext()
   const qc = useQueryClient()
 
-  const filtered = tasks
-    .filter(t => t.status === '进行中')
-    .filter(t => !search
-      || t.title.toLowerCase().includes(search.toLowerCase())
-      || (t.alias || '').toLowerCase().includes(search.toLowerCase()))
-    .slice(0, search ? 50 : 20)
-
+  const activeTasks = tasks.filter(t => t.status === '进行中')
   const taskForCompose: TaskOut = selectedTask ?? makePlaceholderTask()
 
   return (
     <>
       <div className={styles.overlay} onClick={onClose} />
       <div className={styles.floatCard}>
-        <div className={styles.taskRow}>
-          <span className={styles.taskLabel}>所属任务</span>
-          <div className={styles.taskSelectWrap}>
-            <input
-              className={styles.taskInput}
-              value={taskId && !focused ? (selectedTask?.title ?? '') : search}
-              onChange={e => { setSearch(e.target.value); setTaskId(null) }}
-              onFocus={() => setFocused(true)}
-              onBlur={() => setTimeout(() => setFocused(false), 150)}
-              placeholder="搜索并选择任务…"
-              autoFocus
-            />
-            <span
-              className={styles.taskArrow}
-              onClick={() => { setSearch(''); setFocused(true) }}
-            >▼</span>
-            {focused && (
-              <div className={styles.dropdown}>
-                {filtered.map(t => (
-                  <div
-                    key={t.id}
-                    className={styles.dropdownItem}
-                    onMouseDown={e => e.preventDefault()}
-                    onClick={() => { setTaskId(t.id); setSearch(t.title); setFocused(false) }}
-                  >
-                    {t.title}
-                  </div>
-                ))}
-                {filtered.length === 0 && (
-                  <div className={styles.dropdownEmpty}>无匹配进行中任务</div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
+        <TaskSelectorRow
+          tasks={activeTasks}
+          taskId={taskId}
+          onChange={(id) => setTaskId(id)}
+        />
 
         <LogCompose
             key={taskId ?? 'none'}
@@ -349,6 +313,7 @@ export function QuickLogPage() {
   const qc = useQueryClient()
   const [showCard, setShowCard] = useState(false)
   const [editingLog, setEditingLog] = useState<any>(null)
+  const [showBatchPanel, setShowBatchPanel] = useState(false)
 
   const { targetDate, clearTargetDate } = useWorkbench()
 
@@ -394,6 +359,15 @@ export function QuickLogPage() {
             value={date}
             onChange={e => setDate(e.target.value)}
           />
+        </div>
+        <div className={styles.headerRight}>
+          <button
+            type="button"
+            className={styles.batchBtn}
+            onClick={() => setShowBatchPanel(true)}
+          >
+            批量填报
+          </button>
         </div>
       </div>
 
@@ -454,6 +428,15 @@ export function QuickLogPage() {
           editingLog={editingLog}
           defaultDate={date}
           onClose={() => { setShowCard(false); setEditingLog(null) }}
+        />
+      )}
+
+      {/* 批量填报抽屉 */}
+      {showBatchPanel && (
+        <BatchLogPanel
+          defaultDate={date}
+          onClose={() => setShowBatchPanel(false)}
+          onSubmitted={() => qc.invalidateQueries({ queryKey: ['logs', 'by-date', date] })}
         />
       )}
     </div>

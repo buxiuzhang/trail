@@ -37,6 +37,12 @@ public class InsightController {
         return insights.staleTasks(days);
     }
 
+    @Operation(summary = "任务健康评分", description = "对所有进行中任务从活跃度、待办完成率、工时趋势三个维度打分（0-100），返回结果按分数升序排列（最差的任务在前）。")
+    @GetMapping("/health-scores")
+    public List<Map<String, Object>> healthScores() {
+        return insights.healthScores();
+    }
+
     @Operation(summary = "今日待办统计", description = "返回今日新增待办数和今日跟进待办数。")
     @GetMapping("/todo-stats")
     public Map<String, Object> todoStats() {
