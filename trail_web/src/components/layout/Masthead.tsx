@@ -37,7 +37,7 @@ export function Masthead() {
 
   const { data: weather } = useWeather(
     geoLocation === 'pending' ? null : geoLocation,
-    geoLocation !== 'pending'
+    true
   )
 
   // 定位成功且天气返回后，自动回写 default_city（城市名），方便下次定位被拒时回退

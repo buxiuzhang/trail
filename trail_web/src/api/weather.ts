@@ -50,6 +50,7 @@ export function useWeather(location: string | null, enabled = true) {
       return res.json()
     },
     staleTime: 60 * 60 * 1000,
+    gcTime: 0,
     enabled,
     retry: false,
   })

@@ -27,6 +27,12 @@ function weekStart(): string {
 
 // ── 主页面 ────────────────────────────────────────────────────────
 
+const PALETTE = [
+  '#5B8A6B', '#8A5B5B', '#5B6E8A', '#8A7A5B', '#7A5B8A',
+  '#5B8A80', '#8A6B5B', '#6B8A5B', '#8A5B72', '#5B7A8A',
+  '#8A845B', '#6B5B8A', '#5B8A65', '#8A5F5B', '#5B7F8A',
+]
+
 const STATUS_COLORS: Record<string, string> = {
   '未开始': '#B8AC95',
   '进行中': '#3D5A3D',
@@ -267,6 +273,7 @@ export function DashboardPage() {
 
     const taskLastDate = new Map<string, string>()
     const taskIdByTitle = new Map<string, number>()
+    const taskStatusByTitle = new Map<string, string>()
     const cellsByTask = new Map<string, typeof heatmapData>()
     for (const cell of heatmapData) {
       const prev = taskLastDate.get(cell.task_title) ?? ''
@@ -279,10 +286,30 @@ export function DashboardPage() {
 
     for (const t of allTasks) {
       taskIdByTitle.set(t.title, t.id)
-      if (!taskLastDate.has(t.title)) taskLastDate.set(t.title, '')
+      taskStatusByTitle.set(t.title, t.status)
+      if (!taskLastDate.has(t.title)) {
+        if (t.status === '已完成') continue
+        taskLastDate.set(t.title, '')
+      }
+    }
+
+    const STATUS_LABEL_COLOR: Record<string, string> = {
+      '进行中': '#2D6A4F',
+      '未开始': '#4A6FA5',
+      '已完成': '#9E9E9E',
+      '已作废': '#C8C8C8',
+    }
+    const STATUS_RICH_KEY: Record<string, string> = {
+      '进行中': 's_ing',
+      '未开始': 's_new',
+      '已完成': 's_done',
+      '已作废': 's_void',
     }
 
     const tasks = [...taskLastDate.keys()].sort((a, b) => {
+      const sa = taskStatusByTitle.get(a) === '已完成'
+      const sb = taskStatusByTitle.get(b) === '已完成'
+      if (sa !== sb) return sa ? 1 : -1
       const da = taskLastDate.get(a) ?? ''
       const db = taskLastDate.get(b) ?? ''
       if (!da && !db) return a.localeCompare(b)
@@ -293,12 +320,6 @@ export function DashboardPage() {
 
     const dateIdx = new Map(dates.map((d, i) => [d, i]))
     const maxCount = Math.max(1, ...heatmapData.map(c => c.count))
-
-    const PALETTE = [
-      '#5B8A6B', '#8A5B5B', '#5B6E8A', '#8A7A5B', '#7A5B8A',
-      '#5B8A80', '#8A6B5B', '#6B8A5B', '#8A5B72', '#5B7A8A',
-      '#8A845B', '#6B5B8A', '#5B8A65', '#8A5F5B', '#5B7F8A',
-    ]
 
     const series = tasks.map((taskName, ti) => {
       const color = PALETTE[ti % PALETTE.length]
@@ -341,12 +362,18 @@ export function DashboardPage() {
         axisLine: { show: false },
         axisTick: { show: false },
         axisLabel: {
-          color: '#6B5E4D', fontSize: 11,
+          fontSize: 11,
           formatter: (name: string) => {
             const s = name.length > 10 ? name.slice(0, 10) + '…' : name
-            return `{lbl|${s}}`
+            const key = STATUS_RICH_KEY[taskStatusByTitle.get(name) ?? ''] ?? 's_new'
+            return `{${key}|${s}}`
           },
-          rich: { lbl: { width: 108, align: 'left', color: '#6B5E4D', fontSize: 11 } },
+          rich: Object.fromEntries(
+            Object.entries(STATUS_LABEL_COLOR).map(([status, color]) => [
+              STATUS_RICH_KEY[status],
+              { width: 108, align: 'left', color, fontSize: 11 },
+            ])
+          ),
         },
         splitLine: { show: true, lineStyle: { color: '#EFE5D0', type: 'dashed' } },
       },
@@ -355,6 +382,99 @@ export function DashboardPage() {
 
     return { option, tasks, taskIdByTitle, chartHeight: tasks.length * 32 + 76 }
   }, [heatmapData, allTasks, heatmap30Start])
+
+  const taskStatsMemo = useMemo(() => {
+    const countMap = new Map<string, number>()
+    const hoursMap = new Map<string, number>()
+    for (const cell of heatmapData) {
+      countMap.set(cell.task_title, (countMap.get(cell.task_title) ?? 0) + cell.count)
+      hoursMap.set(cell.task_title, (hoursMap.get(cell.task_title) ?? 0) + cell.hours)
+    }
+    const tasks = [...countMap.keys()].sort((a, b) => (hoursMap.get(b) ?? 0) - (hoursMap.get(a) ?? 0))
+    const counts = tasks.map(t => countMap.get(t) ?? 0)
+    const hours  = tasks.map(t => parseFloat((hoursMap.get(t) ?? 0).toFixed(1)))
+    const SHOW = 12
+    const option = {
+      grid: { top: 48, right: 64, bottom: 40, left: 16, containLabel: true },
+      legend: {
+        top: 8,
+        right: 8,
+        itemWidth: 12,
+        itemHeight: 12,
+        textStyle: { color: '#6B5E4D', fontSize: 11, fontFamily: 'JetBrains Mono, monospace' },
+      },
+      tooltip: {
+        trigger: 'axis',
+        backgroundColor: 'var(--card)',
+        borderColor: 'var(--rule)',
+        textStyle: { color: '#3A322A', fontSize: 12 },
+        formatter: (params: any[]) => {
+          const name = tasks[params[0].dataIndex]
+          const c = params.find((p: any) => p.seriesName === '日志条数')
+          const h = params.find((p: any) => p.seriesName === '总时长')
+          return `${name}<br/>日志 ${c?.value ?? 0} 条 · ${h?.value ?? 0}h`
+        },
+      },
+      dataZoom: tasks.length > SHOW ? [
+        { type: 'inside', xAxisIndex: 0, start: 0, end: Math.round(SHOW / tasks.length * 100) },
+      ] : [],
+      xAxis: {
+        type: 'category',
+        data: tasks.map(t => t.length > 8 ? t.slice(0, 8) + '…' : t),
+        axisLine: { lineStyle: { color: '#C7B999' } },
+        axisTick: { show: false },
+        axisLabel: { color: '#8A7A6A', fontSize: 10, rotate: 30, interval: 0 },
+        splitLine: { show: false },
+      },
+      yAxis: [
+        {
+          type: 'value',
+          name: '条',
+          nameTextStyle: { color: '#B8AC95', fontSize: 10 },
+          axisLine: { show: false },
+          axisTick: { show: false },
+          axisLabel: { color: '#B8AC95', fontSize: 10 },
+          splitLine: { lineStyle: { color: '#EFE5D0', type: 'dashed' } },
+          minInterval: 1,
+        },
+        {
+          type: 'value',
+          name: 'h',
+          nameTextStyle: { color: '#B8AC95', fontSize: 10 },
+          axisLine: { show: false },
+          axisTick: { show: false },
+          axisLabel: { color: '#B8AC95', fontSize: 10 },
+          splitLine: { show: false },
+        },
+      ],
+      series: [
+        {
+          name: '日志条数',
+          type: 'bar',
+          yAxisIndex: 0,
+          data: counts.map((v, i) => ({
+            value: v,
+            itemStyle: { color: PALETTE[i % PALETTE.length], borderRadius: [3, 3, 0, 0] },
+          })),
+          barMaxWidth: 16,
+          label: { show: true, position: 'top', fontSize: 10, color: '#4A3F32', formatter: '{c}' },
+        },
+        {
+          name: '总时长',
+          type: 'line',
+          yAxisIndex: 1,
+          data: hours,
+          smooth: true,
+          symbol: 'circle',
+          symbolSize: 6,
+          lineStyle: { color: '#5C6BC0', width: 2 },
+          itemStyle: { color: '#5C6BC0', borderWidth: 2, borderColor: '#fff' },
+          label: { show: true, position: 'top', fontSize: 11, fontWeight: 'bold', color: '#5C6BC0', formatter: '{c}h' },
+        },
+      ],
+    }
+    return { option, hasData: tasks.length > 0 }
+  }, [heatmapData])
 
   return (
     <div className={styles.page}>
@@ -509,6 +629,14 @@ export function DashboardPage() {
               }}
             />
           </div>
+        </section>
+      )}
+
+      {/* 任务日志统计 */}
+      {taskStatsMemo.hasData && (
+        <section className={styles.section}>
+          <div className={styles.sectionTitle}>任务日志统计（近 30 天）</div>
+          <ReactECharts option={taskStatsMemo.option} style={{ height: 320 }} />
         </section>
       )}
 

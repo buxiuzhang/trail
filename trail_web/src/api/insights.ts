@@ -56,7 +56,7 @@ export interface HeatmapCell {
   hours: number
 }
 
-export interface TaskItem { id: number; title: string }
+export interface TaskItem { id: number; title: string; status: string }
 
 export function useAllTasks() {
   return useQuery({
