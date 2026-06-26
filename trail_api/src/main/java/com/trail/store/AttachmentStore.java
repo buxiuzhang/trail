@@ -73,17 +73,43 @@ public class AttachmentStore {
             Map.entry("application/x-7z-compressed", ".7z")
     );
     private static final int DEFAULT_DISPLAY_SIZE = 100;
+    private static final String KEY_ALLOWED_MIMES = "attachment_allowed_mimes";
+    private static final String KEY_MAX_BYTES = "attachment_max_bytes";
 
     private final SqliteDb db;
     private final DataDirService dataDir;
     private final AppProperties props;
     private final EntityRefStore entityRefStore;
+    private final LLMSettingsStore settingsStore;
 
-    public AttachmentStore(SqliteDb db, DataDirService dataDir, AppProperties props, EntityRefStore entityRefStore) {
+    public AttachmentStore(SqliteDb db, DataDirService dataDir, AppProperties props,
+                           EntityRefStore entityRefStore, LLMSettingsStore settingsStore) {
         this.db = db;
         this.dataDir = dataDir;
         this.props = props;
         this.entityRefStore = entityRefStore;
+        this.settingsStore = settingsStore;
+    }
+
+    /** 获取当前生效的 MIME 白名单（DB 优先，否则默认全集） */
+    public Set<String> getAllowedMimes() {
+        String raw = settingsStore.get(KEY_ALLOWED_MIMES);
+        if (raw == null || raw.isBlank()) return ALLOWED_MIMES;
+        Set<String> result = new java.util.HashSet<>();
+        for (String m : raw.split(",")) {
+            String trimmed = m.strip().toLowerCase();
+            if (!trimmed.isEmpty()) result.add(trimmed);
+        }
+        return result.isEmpty() ? ALLOWED_MIMES : result;
+    }
+
+    /** 获取当前生效的最大文件大小（DB 优先，否则 AppProperties，否则 50MB） */
+    public long getMaxBytesEffective() {
+        String raw = settingsStore.get(KEY_MAX_BYTES);
+        if (raw != null && !raw.isBlank()) {
+            try { return Long.parseLong(raw.strip()); } catch (NumberFormatException ignored) {}
+        }
+        return getMaxBytes();
     }
 
     /** 获取配置的最大文件大小 */
@@ -100,12 +126,12 @@ public class AttachmentStore {
         String mime = file.getContentType();
         if (mime == null) mime = "";
         mime = mime.toLowerCase().trim();
-        if (!ALLOWED_MIMES.contains(mime)) {
+        if (!getAllowedMimes().contains(mime)) {
             throw new ResponseStatusException(HttpStatus.UNSUPPORTED_MEDIA_TYPE,
-                    "仅支持 png / jpeg / gif / webp，当前：" + mime);
+                    "不支持的文件类型：" + mime);
         }
         long size = file.getSize();
-        long maxBytes = getMaxBytes();
+        long maxBytes = getMaxBytesEffective();
         if (size > maxBytes) {
             throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE,
                     "单图上限 " + (maxBytes / 1024 / 1024) + "MB，当前 " + size + " 字节");

@@ -21,6 +21,7 @@ const SECTIONS = [
 const LLM_SUB = [
   { id: 'llm-record', label: '工作记录' },
   { id: 'llm-dialog', label: '对话与报表' },
+  { id: 'llm-vector', label: '向量模型' },
   { id: 'llm-mcp', label: 'MCP 工具服务' },
   { id: 'llm-skills', label: 'Skills 扩展' },
   { id: 'llm-disabled', label: '暂不可用' },
@@ -32,6 +33,10 @@ const INTERFACE_SUB = [
   { id: 'interface-watch', label: '特别关注推送配置' },
   { id: 'interface-todo-alert', label: '待办事项推送配置' },
   { id: 'interface-placeholders', label: '占位提示语' },
+]
+
+const FILES_SUB = [
+  { id: 'files-upload-limits', label: '附件设置' },
 ]
 
 export function SettingsSidebar({ activeSection, onSectionChange }: SettingsSidebarProps) {
@@ -60,10 +65,20 @@ export function SettingsSidebar({ activeSection, onSectionChange }: SettingsSide
             <li key={item.key}>
               <div
                 className={`${styles.item} ${activeSection === item.key ? styles.isActive : ''}`}
-                onClick={() => { onSectionChange(item.key); setActiveSubId(null) }}
+                onClick={() => {
+                  onSectionChange(item.key)
+                  setActiveSubId(null)
+                  document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' })
+                }}
                 role="button"
                 tabIndex={0}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { onSectionChange(item.key); setActiveSubId(null) } }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    onSectionChange(item.key)
+                    setActiveSubId(null)
+                    document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' })
+                  }
+                }}
               >
                 <span>{item.label}</span>
               </div>
@@ -93,6 +108,22 @@ export function SettingsSidebar({ activeSection, onSectionChange }: SettingsSide
                       role="button"
                       tabIndex={0}
                       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleSubClick(sub.id, 'llm') }}
+                    >
+                      <span>{sub.label}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {item.key === 'files' && activeSection === 'files' && (
+                <ul className={styles.subList} role="list">
+                  {FILES_SUB.map(sub => (
+                    <li
+                      key={sub.id}
+                      className={`${styles.subItem} ${activeSubId === sub.id ? styles.subItemActive : ''}`}
+                      onClick={() => handleSubClick(sub.id, 'files')}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleSubClick(sub.id, 'files') }}
                     >
                       <span>{sub.label}</span>
                     </li>

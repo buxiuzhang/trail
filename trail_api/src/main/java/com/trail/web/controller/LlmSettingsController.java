@@ -57,6 +57,7 @@ public class LlmSettingsController {
                 all.getOrDefault("draft_log_system_prompt", ""),
                 all.getOrDefault("daily_report_template", ""),
                 all.getOrDefault("weekly_report_template", ""),
+                all.getOrDefault("batch_tag_system_prompt", ""),
                 all.getOrDefault("speech_duration", "10"),
                 all.getOrDefault("max_tool_iterations", "30"),
                 all.getOrDefault("watch_idle_hot_days", "3"),
@@ -101,6 +102,7 @@ public class LlmSettingsController {
 
         saveIfPresent(data, "daily_report_template");
         saveIfPresent(data, "weekly_report_template");
+        saveIfPresent(data, "batch_tag_system_prompt");
 
         saveIfPresent(data, "speech_duration");
         saveIfPresent(data, "max_tool_iterations");

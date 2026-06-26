@@ -24,6 +24,7 @@
   display: flex;
   flex-direction: column;
   animation: slideIn 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+  user-select: text;
 }
 
 @keyframes slideIn {

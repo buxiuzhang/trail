@@ -89,16 +89,7 @@ public class LlmController {
     public Map<String, String> batchTag(@RequestBody Map<String, Object> body) {
         String text = (String) body.getOrDefault("text", "");
         if (text.isBlank()) throw new IllegalArgumentException("text 不能为空");
-        @SuppressWarnings("unchecked")
-        List<Long> taskIds = ((List<Number>) body.getOrDefault("task_ids", List.of()))
-            .stream().map(Number::longValue).toList();
-        List<Map<String, Object>> tasks = taskIds.stream()
-            .map(id -> {
-                try { return taskStore.getTask(id); }
-                catch (Exception e) { return null; }
-            })
-            .filter(t -> t != null)
-            .toList();
+        List<Map<String, Object>> tasks = taskStore.listTasks(null, null, null);
         String tagged = llmService.batchTagLogs(text, tasks);
         return Map.of("text", tagged);
     }

@@ -454,6 +454,8 @@ export const DescriptionEditor = forwardRef<HTMLTextAreaElement, DescriptionEdit
     onUpdate: ({ editor }) => {
       // 使用 @tiptap/markdown 提供的 getMarkdown() 方法
       const md = editor.getMarkdown()
+      // 防止序列化丢失代码块等内容：若输出长度远小于上次 emit 的值，说明序列化不完整，跳过
+      if (lastEmittedRef.current.length > 20 && md.length < lastEmittedRef.current.length / 2) return
       lastEmittedRef.current = md
       if (hiddenTaRef.current) hiddenTaRef.current.value = md
       // 只在初始化完成后才通知父组件，避免在渲染期间更新状态
@@ -530,6 +532,8 @@ export const DescriptionEditor = forwardRef<HTMLTextAreaElement, DescriptionEdit
   // 更新编辑器内容（当外部 value 变化时）
   useEffect(() => {
     if (!editor) return
+    // 初始化未完成时不强制 setContent，内容已由 useEditor 的 content 属性初始化
+    if (!isInitializedRef.current) return
     // 防止循环：如果当前内容与 value 相同，跳过
     const currentMd = editor.getMarkdown()
     if (value === currentMd) return

@@ -276,6 +276,8 @@ export function BatchLogPanel({ defaultDate, onClose, onSubmitted }: Props) {
   const [rawText, setRawTextRaw] = useState(draft?.rawText ?? '')
   const [rawMode, setRawMode] = useState<EditorMode>('preview')
   const [tagging, setTagging] = useState(false)
+  const [taggedFrom, setTaggedFrom] = useState<string | null>(null)
+  const isProgrammaticRef = useRef(false)
   const [entries, setEntriesRaw] = useState<ParsedEntry[]>(draft?.entries ?? [])
   const [entryModes, setEntryModes] = useState<EditorMode[]>((draft?.entries ?? []).map(() => 'preview' as EditorMode))
   const [submitting, setSubmitting] = useState(false)
@@ -292,8 +294,14 @@ export function BatchLogPanel({ defaultDate, onClose, onSubmitted }: Props) {
   }
   function setDate(d: string) { setDateRaw(d); saveDraft({ date: d }) }
 
-  const activeTasks = tasks.filter(t => t.status === '进行中')
   const { data: placeholders } = usePlaceholders()
+  const rawEditorRef = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    if (step === 'input') {
+      setTimeout(() => rawEditorRef.current?.focus(), 50)
+    }
+  }, [step])
 
   const rawFileIds = useMemo(() => {
     const ids: number[] = []
@@ -316,13 +324,20 @@ export function BatchLogPanel({ defaultDate, onClose, onSubmitted }: Props) {
   }, [date])
 
   async function handleTag() {
-    if (!rawText.trim()) return
+    // 已标注时点击撤回
+    if (taggedFrom !== null) {
+      isProgrammaticRef.current = true
+      setRawText(taggedFrom)
+      setTaggedFrom(null)
+      return
+    }
+    const text = rawText.trim()
+    if (!text) return
     setTagging(true)
     try {
-      const result = await api.post<{ text: string }>('/api/llm/batch-tag', {
-        text: rawText,
-        task_ids: activeTasks.map(t => t.id),
-      })
+      const result = await api.post<{ text: string }>('/api/llm/batch-tag', { text })
+      setTaggedFrom(rawText)
+      isProgrammaticRef.current = true
       setRawText(result.text)
     } catch {
       showToast('AI 标注失败，请重试', 'error')
@@ -332,13 +347,15 @@ export function BatchLogPanel({ defaultDate, onClose, onSubmitted }: Props) {
   }
 
   function handleSplit() {
-    const segments = rawText.split(/(?=@task:\d+)/g).map(s => s.trim()).filter(Boolean)
+    const currentText = rawText.trim()
+    if (!currentText) { showToast('内容为空', 'error'); return }
+    const segments = currentText.split(/(?=@task:\d+)/g).map(s => s.trim()).filter(Boolean)
     const parsed: ParsedEntry[] = segments.map(seg => {
       const match = seg.match(/^@task:(\d+)\s*\n?([\s\S]*)/)
       if (match) {
         const taskId = Number(match[1])
         const content = match[2].trim()
-        const task = activeTasks.find(t => t.id === taskId) ?? null
+        const task = tasks.find(t => t.id === taskId) ?? null
         return { task_title: task?.title ?? null, content, hours: 1, phase: 'main', log_date: date, taskId: task ? taskId : null }
       }
       return { task_title: null, content: seg, hours: 1, phase: 'main', log_date: date, taskId: null }
@@ -396,7 +413,7 @@ export function BatchLogPanel({ defaultDate, onClose, onSubmitted }: Props) {
       <div className={styles.backdrop} onClick={onClose} />
       <div className={styles.drawer}>
         <div className={styles.drawerHeader}>
-          <span className={styles.drawerTitle}>批量填报</span>
+          <span className={styles.drawerTitle}>今日填报</span>
           <input
             type="date"
             className={styles.dateInput}
@@ -415,18 +432,26 @@ export function BatchLogPanel({ defaultDate, onClose, onSubmitted }: Props) {
               <button
                 className={styles.btnTag}
                 onClick={handleTag}
-                disabled={tagging || !rawText.trim()}
+                disabled={tagging || (taggedFrom === null && !rawText.trim())}
               >
-                {tagging ? '标注中…' : 'AI 标注'}
+                {tagging ? '标注中…' : taggedFrom !== null ? '撤回标注' : 'AI 标注'}
               </button>
             </div>
             <div className={styles.editorWrap}>
               <DescriptionEditorWithMode
+                ref={rawEditorRef}
                 value={rawText}
-                onChange={setRawText}
+                onChange={v => {
+                  setRawText(v)
+                  if (isProgrammaticRef.current) {
+                    isProgrammaticRef.current = false
+                  } else if (taggedFrom !== null) {
+                    setTaggedFrom(null)
+                  }
+                }}
                 mode={rawMode}
                 onModeChange={setRawMode}
-                placeholder="粘贴今日工作内容…"
+                placeholder={placeholders?.log ?? DEFAULT_PLACEHOLDERS.log}
                 minHeight={200}
                 autoGrow
                 textareaClassName=""
@@ -455,7 +480,7 @@ export function BatchLogPanel({ defaultDate, onClose, onSubmitted }: Props) {
                   key={idx}
                   index={idx + 1}
                   entry={entry}
-                  tasks={activeTasks}
+                  tasks={tasks}
                   mode={entryModes[idx] ?? 'preview'}
                   placeholder={placeholders?.log ?? DEFAULT_PLACEHOLDERS.log}
                   onUpdate={patch => updateEntry(idx, patch)}

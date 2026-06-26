@@ -6,6 +6,7 @@ import {
   usePlaceholders, useSavePlaceholders, DEFAULT_PLACEHOLDERS,
   DEFAULT_WATCH_SETTINGS,
   DEFAULT_TODO_SETTINGS,
+  useVectorSettings, useSaveVectorSettings,
 } from '@/api/settings'
 import { rsaDecrypt } from '@/api/crypto'
 import { useToastContext } from '@/context/ToastContext'
@@ -13,6 +14,7 @@ import { useSettingsContext } from '@/App'
 import { Crumbs } from '@/components/shared/Crumbs'
 import { DescriptionEditorWithMode, type EditorMode } from '@/components/shared/DescriptionEditorWithMode'
 import { CronEditor } from '@/components/shared/CronEditor'
+import { UploadLimitsSection } from '@/components/settings/UploadLimitsSection'
 import { FileManagerSection } from '@/components/settings/FileManagerSection'
 import { McpSection } from '@/components/settings/McpSection'
 import { SkillsSection } from '@/components/settings/SkillsSection'
@@ -77,6 +79,7 @@ export function SettingsPage() {
 
   // Prompt 模板
   const [chatPrompt, setChatPrompt] = useState('')
+  const [batchTagPrompt, setBatchTagPrompt] = useState('')
   const [polishPrompt, setPolishPrompt] = useState('')
   const [polishTodoPrompt, setPolishTodoPrompt] = useState('')
   const [polishTaskDescPrompt, setPolishTaskDescPrompt] = useState('')
@@ -88,6 +91,7 @@ export function SettingsPage() {
 
   // Prompt 模板编辑器模式（默认源码模式）
   const [chatPromptMode, setChatPromptMode] = useState<EditorMode>('preview')
+  const [batchTagPromptMode, setBatchTagPromptMode] = useState<EditorMode>('source')
   const [polishPromptMode, setPolishPromptMode] = useState<EditorMode>('preview')
   const [polishTodoPromptMode, setPolishTodoPromptMode] = useState<EditorMode>('preview')
   const [polishTaskDescPromptMode, setPolishTaskDescPromptMode] = useState<EditorMode>('preview')
@@ -153,6 +157,7 @@ export function SettingsPage() {
       setMinTokens(settings.min_tokens || '100')
       // Prompt 模板
       setChatPrompt(settings.chat_system_prompt || '')
+      setBatchTagPrompt(settings.batch_tag_system_prompt || '')
       setPolishPrompt(settings.polish_system_prompt || '')
       setPolishTodoPrompt(settings.polish_todo_system_prompt || '')
       setPolishTaskDescPrompt(settings.polish_task_desc_system_prompt || '')
@@ -201,6 +206,40 @@ export function SettingsPage() {
     if (dataDir?.dataDir) setDirDraft(dataDir.dataDir)
   }, [dataDir])
 
+  // 向量模型
+  const { data: vectorSettings } = useVectorSettings({ enabled: activeSection === 'llm' })
+  const saveVector = useSaveVectorSettings()
+  const [vectorApiKey, setVectorApiKey] = useState('')
+  const [vectorBaseUrl, setVectorBaseUrl] = useState('')
+  const [vectorModel, setVectorModel] = useState('')
+  const [vectorDimensions, setVectorDimensions] = useState('')
+  const [vectorApiKeyPlaceholder, setVectorApiKeyPlaceholder] = useState('')
+
+  useEffect(() => {
+    if (!vectorSettings) return
+    setVectorApiKeyPlaceholder(vectorSettings.api_key_masked || '')
+    setVectorApiKey('')
+    setVectorBaseUrl(vectorSettings.base_url || '')
+    setVectorModel(vectorSettings.model || '')
+    setVectorDimensions(vectorSettings.dimensions || '')
+  }, [vectorSettings])
+
+  async function handleSaveVector(e: React.FormEvent) {
+    e.preventDefault()
+    try {
+      await saveVector.mutateAsync({
+        ...(vectorApiKey.trim() ? { api_key: vectorApiKey.trim() } : {}),
+        base_url: vectorBaseUrl.trim(),
+        model: vectorModel.trim(),
+        dimensions: vectorDimensions.trim(),
+      })
+      setVectorApiKey('')
+      showToast('向量模型配置已保存')
+    } catch {
+      showToast('保存失败', 'error')
+    }
+  }
+
   async function handleSaveLLM(e: React.SyntheticEvent) {
     e.preventDefault()
     const ok = await confirm({
@@ -246,6 +285,7 @@ export function SettingsPage() {
     try {
       await saveLLM.mutateAsync({
         chat_system_prompt: chatPrompt.trim(),
+        batch_tag_system_prompt: batchTagPrompt.trim(),
         daily_report_template: dailyReportTemplate.trim(),
         weekly_report_template: weeklyReportTemplate.trim(),
       })
@@ -411,13 +451,17 @@ export function SettingsPage() {
         <span className={styles.sub}>偏好与配置</span>
       </header>
 
+
       {/* 文件管理 */}
       {activeSection === 'files' && (
-        <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>文件管理</h2>
-          <p className={styles.sectionHint}>管理任务描述、日志、待办中上传的附件，支持按文件类型和任务筛选。</p>
-          <FileManagerSection />
-        </section>
+        <>
+          <UploadLimitsSection />
+          <section className={styles.section}>
+            <h2 className={styles.sectionTitle}>文件管理</h2>
+            <p className={styles.sectionHint}>管理任务描述、日志、待办中上传的附件，支持按文件类型和任务筛选。</p>
+            <FileManagerSection />
+          </section>
+        </>
       )}
 
       {/* 大模型配置 */}
@@ -549,6 +593,65 @@ export function SettingsPage() {
           </form>
         )}
       </section>
+      <section id="llm-vector" className={styles.section}>
+        <h2 className={styles.sectionTitle}>向量模型</h2>
+        <p className={styles.sectionHint}>配置 Embedding 模型，用于 LanceDB 向量检索。</p>
+        <form onSubmit={handleSaveVector}>
+          <div className="field">
+            <div className="field__label">
+              <span>API Key</span>
+              <span className="field__hint">加密保存</span>
+            </div>
+            <input
+              className="field__input"
+              type="password"
+              value={vectorApiKey}
+              onChange={e => setVectorApiKey(e.target.value)}
+              placeholder={vectorApiKeyPlaceholder || '留空则保持不变'}
+              autoComplete="off"
+            />
+          </div>
+          <div className="field">
+            <div className="field__label"><span>Base URL</span></div>
+            <input
+              className="field__input"
+              type="text"
+              value={vectorBaseUrl}
+              onChange={e => setVectorBaseUrl(e.target.value)}
+              placeholder="https://api.openai.com"
+            />
+          </div>
+          <div className="field">
+            <div className="field__label"><span>模型</span></div>
+            <input
+              className="field__input"
+              type="text"
+              value={vectorModel}
+              onChange={e => setVectorModel(e.target.value)}
+              placeholder="text-embedding-3-small"
+            />
+          </div>
+          <div className="field">
+            <div className="field__label">
+              <span>维度</span>
+              <span className="field__hint">向量维度数，留空则使用模型默认值</span>
+            </div>
+            <input
+              className="field__input"
+              type="number"
+              value={vectorDimensions}
+              onChange={e => setVectorDimensions(e.target.value)}
+              placeholder="1536"
+              min={1}
+            />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
+            <button type="submit" className="btn btn--primary" disabled={saveVector.isPending}>
+              {saveVector.isPending ? '保存中…' : '保存'}
+            </button>
+          </div>
+        </form>
+      </section>
 
       {/* 卡片 2：工作记录 Prompt */}
       <section id="llm-record" className={styles.section}>
@@ -631,6 +734,18 @@ export function SettingsPage() {
               <p className={styles.promptDesc}>聊天窗口的系统提示，定义 AI 的角色和行为</p>
               <div style={{ marginTop: '8px' }}>
                 <DescriptionEditorWithMode value={chatPrompt || ''} onChange={setChatPrompt} mode={chatPromptMode} onModeChange={setChatPromptMode} minHeight={120} textareaClassName="field__textarea" hideInlineToggle autoGrow maxHeight={300} />
+              </div>
+            </PromptGroup>
+            <PromptGroup name="AI 标注提示词" desc="今日填报">
+              <div className={styles.promptLabel}>
+                <span className={styles.promptName}>
+                  <button type="button" onClick={async () => { if (await confirm({ level: 'moderate', title: '重置 AI 标注提示词？', body: <p>将恢复为系统默认值。</p>, confirmLabel: '重置' })) setBatchTagPrompt('') }} className={styles.resetBtn}>重置</button>
+                </span>
+                <button type="button" className={styles.modeToggle} onClick={() => setBatchTagPromptMode(batchTagPromptMode === 'source' ? 'preview' : 'source')}>{batchTagPromptMode === 'source' ? '预览模式' : '源码模式'}</button>
+              </div>
+              <p className={styles.promptDesc}>今日填报「AI 标注」按钮的系统提示，控制如何在文本中插入 @task:ID 标记</p>
+              <div style={{ marginTop: '8px' }}>
+                <DescriptionEditorWithMode value={batchTagPrompt || ''} onChange={setBatchTagPrompt} mode={batchTagPromptMode} onModeChange={setBatchTagPromptMode} minHeight={180} textareaClassName="field__textarea" hideInlineToggle autoGrow maxHeight={400} />
               </div>
             </PromptGroup>
             <PromptGroup name="今日工作模板" desc="日报">

@@ -201,4 +201,4 @@ SELECT
     (SELECT MAX(log_date) FROM work_logs w WHERE w.task_id = t.id AND w.is_deleted = 0) AS last_log_date,
     CAST(julianday(date('now','localtime')) - julianday((SELECT MAX(log_date) FROM work_logs w WHERE w.task_id = t.id AND w.is_deleted = 0)) AS INTEGER) AS days_idle
 FROM tasks t
-WHERE t.status = '进行中';
+WHERE t.status NOT IN ('已完成', '已作废');

@@ -26,6 +26,8 @@ public record LlmSettingsDto(
         // 日报/周报模板
         String dailyReportTemplate,
         String weeklyReportTemplate,
+        // AI 标注提示词
+        String batchTagSystemPrompt,
         // 语音输入时长（秒）
         String speechDuration,
         // 工具调用最大迭代次数

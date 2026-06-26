@@ -1,6 +1,7 @@
 package com.trail.config;
 
 import com.trail.db.SqliteDb;
+import com.trail.store.VectorStore;
 import com.trail.store.exception.DataDirNotConfiguredException;
 import com.trail.util.PathUtils;
 import org.slf4j.Logger;
@@ -35,12 +36,14 @@ public class DataDirService {
 
     private final Path userConfigPath;
     private final SqliteDb db;
+    private final VectorStore vectorStore;
     private volatile Path currentDataDir;
     private volatile boolean configured;
 
-    public DataDirService(SqliteDb db) {
+    public DataDirService(SqliteDb db, VectorStore vectorStore) {
         this.userConfigPath = PathUtils.userConfigPath();
         this.db = db;
+        this.vectorStore = vectorStore;
     }
 
     /** 启动期初始化（不主动开 conn，留给 StartupChecks 调 openAndInitialize） */
@@ -115,7 +118,8 @@ public class DataDirService {
             Files.createDirectories(dataDir.resolve("exports"));
             Files.createDirectories(dataDir.resolve("attachments"));
             Files.createDirectories(dataDir.resolve("logs"));
-            log.info("子目录已就绪：exports/ attachments/ logs/");
+            Files.createDirectories(dataDir.resolve("vectors"));
+            log.info("子目录已就绪：exports/ attachments/ logs/ vectors/");
         } catch (IOException e) {
             log.warn("创建子目录失败: {}", e.getMessage());
         }
@@ -131,6 +135,7 @@ public class DataDirService {
         if (openConn) {
             db.openConnection(dir);
             db.ensureSchema();
+            vectorStore.open(dir);
         }
     }
 
@@ -177,6 +182,7 @@ public class DataDirService {
         // 3) 关旧 conn（如有）
         if (configured) {
             try { db.closeConnection(); } catch (Exception ignored) {}
+            try { vectorStore.close(); } catch (Exception ignored) {}
         }
 
         // 4) 写 user config yaml
@@ -187,6 +193,7 @@ public class DataDirService {
         this.configured = true;
         db.openConnection(newDir);
         db.ensureSchema();
+        vectorStore.open(newDir);
         ensureSubdirectories(newDir);
         LogSetup.configureFileAppender(newDir.resolve("logs"));
 

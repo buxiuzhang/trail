@@ -86,6 +86,7 @@ public class LlmService {
     private volatile String cachedAskMaintenancePrompt;
     private volatile String cachedChatPrompt;
     private volatile String cachedDraftLogPrompt;
+    private volatile String cachedBatchTagPrompt;
 
     public LlmService(AppProperties props, LLMSettingsStore settingsStore, TaskStore taskStore,
                       TodoStore todoStore, WorkLogStore workLogStore, AiRecordStore aiRecordStore,
@@ -114,6 +115,7 @@ public class LlmService {
         cachedAskMaintenancePrompt = settings.get("ask_maintenance_prompt");
         cachedChatPrompt = settings.get("chat_system_prompt");
         cachedDraftLogPrompt = settings.get("draft_log_system_prompt");
+        cachedBatchTagPrompt = settings.get("batch_tag_system_prompt");
         log.info("Prompt 模板已加载到内存");
     }
 
@@ -661,25 +663,42 @@ public class LlmService {
         """;
 
     private static final String BATCH_TAG_SYSTEM = """
-        你是工作日志标注助手。用户会粘贴一段包含多项工作内容的文字，请在每段内容的**开头**插入对应任务的引用标记，格式为 `@task:ID`。
+        你是工作日志标注助手。用户会粘贴一段包含多项工作内容的文字，请按任务对内容分组，在每个任务内容块的**最开头**插入一次 `@task:ID` 标记。
 
         规则：
         1. 任务列表由用户提供，格式为 "ID: 任务名称"
-        2. 在每段属于某个任务的内容的**正前方**插入 `@task:ID`（ID 替换为实际数字），后跟一个换行
-        3. 如果某段内容无法匹配任何任务，不加标记，原样保留
-        4. 不要修改原文任何内容，不要润色，不要删减，不要添加任何解释
-        5. 只输出打标后的完整文本，不要包含任何其他文字
+        2. 阅读全文，判断哪些连续的行/句子属于同一个任务，将它们视为一个内容块
+        3. 每个内容块只在**最开头**插入一次 `@task:ID`（ID 替换为实际数字），后跟换行，块内其余行不重复插入
+        4. 如果某段内容无法匹配任何任务，不加任何标记，原样保留
+        5. 不要修改原文任何内容，不要润色，不要删减，不要添加任何解释
+        6. 只输出打标后的完整文本，不要包含任何其他文字
+
+        示例输入：
+        修复了登录页面的 bug
+        调整了按钮样式
+        完成了数据库迁移脚本
+        测试了迁移结果
+
+        示例输出（假设任务1=前端优化，任务2=数据库迁移）：
+        @task:1
+        修复了登录页面的 bug
+        调整了按钮样式
+        @task:2
+        完成了数据库迁移脚本
+        测试了迁移结果
         """;
 
     public String batchTagLogs(String rawText, List<Map<String, Object>> tasks) {
+        ensurePromptsLoaded();
         LlmConfig cfg = getConfig();
+        String system = cachedBatchTagPrompt != null ? cachedBatchTagPrompt : BATCH_TAG_SYSTEM;
         String taskListText = tasks.isEmpty() ? "（无）"
             : tasks.stream()
                 .map(t -> t.get("id") + ": " + t.get("title"))
                 .collect(java.util.stream.Collectors.joining("\n"));
-        String user = "当前进行中的任务列表（格式：ID: 名称）：\n" + taskListText
+        String user = "当前任务列表（格式：ID: 名称）：\n" + taskListText
             + "\n\n以下是需要标注的工作内容：\n\n" + rawText;
-        AnthropicResponse resp = callAnthropic(cfg, BATCH_TAG_SYSTEM, List.of(userMessage(user)));
+        AnthropicResponse resp = callAnthropic(cfg, system, List.of(userMessage(user)));
         aiRecordStore.addRecord(null, null, "batch_tag", user, resp.raw(), false);
         return resp.text();
     }

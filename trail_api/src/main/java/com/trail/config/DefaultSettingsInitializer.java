@@ -77,6 +77,7 @@ public class DefaultSettingsInitializer {
         putIfPresent(defaults, "chat_system_prompt", d.chatSystemPrompt());
         putIfPresent(defaults, "daily_report_template", d.dailyReportTemplate());
         putIfPresent(defaults, "weekly_report_template", d.weeklyReportTemplate());
+        putIfPresent(defaults, "batch_tag_system_prompt", d.batchTagSystemPrompt());
 
         int initialized = 0;
         for (Map.Entry<String, String> e : defaults.entrySet()) {

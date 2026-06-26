@@ -366,7 +366,7 @@ export function QuickLogPage() {
             className={styles.batchBtn}
             onClick={() => setShowBatchPanel(true)}
           >
-            批量填报
+            今日填报
           </button>
         </div>
       </div>

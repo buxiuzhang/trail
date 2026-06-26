@@ -33,6 +33,8 @@ export interface LLMSettings {
   // 日报/周报模板
   daily_report_template: string
   weekly_report_template: string
+  // AI 标注提示词
+  batch_tag_system_prompt: string
   // 语音输入时长（秒）
   speech_duration: string
   // 工具调用最大迭代次数
@@ -68,11 +70,8 @@ export function useSaveLLMSettings() {
       }
       return api.put('/api/settings/llm', data)
     },
-    onSuccess: (_, data: LLMSettingsSaveRequest) => {
-      // 乐观更新：合并现有数据，避免不必要的 GET refetch
-      qc.setQueryData(['settings', 'llm'], (old: LLMSettings | undefined) =>
-        old ? { ...old, ...data } : data
-      )
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['settings', 'llm'] })
     },
   })
 }
@@ -228,3 +227,59 @@ export function useSavePlaceholders() {
     },
   })
 }
+
+export interface AttachmentSettings {
+  allowed_mimes: string
+  effective_mimes: string
+  max_bytes: number
+}
+
+export const DEFAULT_ATTACHMENT_MAX_MB = 50
+
+export function useAttachmentSettings(options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: ['settings', 'attachment'],
+    queryFn: () => api.get<AttachmentSettings>('/api/settings/attachment'),
+    staleTime: 60_000,
+    enabled: options?.enabled ?? true,
+  })
+}
+
+export function useSaveAttachmentSettings() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: { allowed_mimes: string; max_bytes: number }) =>
+      api.put('/api/settings/attachment', data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['settings', 'attachment'] })
+    },
+  })
+}
+
+export interface VectorSettings {
+  api_key_masked: string
+  base_url: string
+  model: string
+  dimensions: string
+}
+
+export function useVectorSettings(options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: ['settings', 'vector'],
+    queryFn: () => api.get<VectorSettings>('/api/settings/vector'),
+    staleTime: 60_000,
+    enabled: options?.enabled ?? true,
+  })
+}
+
+export function useSaveVectorSettings() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: { api_key?: string; base_url?: string; model?: string; dimensions?: string }) =>
+      api.put('/api/settings/vector', data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['settings', 'vector'] })
+    },
+  })
+}
+
