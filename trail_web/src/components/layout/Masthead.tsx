@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { useOverview } from '@/api/insights'
+import { useWeather, WEATHER_EMOJI } from '@/api/weather'
 import { TODAY } from '@/constants'
 import { Breadcrumb } from './Breadcrumb'
 import styles from './Masthead.module.css'
@@ -23,6 +24,31 @@ export function Masthead() {
   const navigate = useNavigate()
   const { data: overview } = useOverview()
   const [now, setNow] = useState(() => new Date())
+  const [geoLocation, setGeoLocation] = useState<string | null | 'pending'>('pending')
+
+  useEffect(() => {
+    if (!navigator.geolocation) { setGeoLocation(null); return }
+    navigator.geolocation.getCurrentPosition(
+      pos => setGeoLocation(`${pos.coords.latitude.toFixed(4)},${pos.coords.longitude.toFixed(4)}`),
+      () => setGeoLocation(null),
+      { timeout: 5000 }
+    )
+  }, [])
+
+  const { data: weather } = useWeather(
+    geoLocation === 'pending' ? null : geoLocation,
+    geoLocation !== 'pending'
+  )
+
+  // 定位成功且天气返回后，自动回写 default_city（城市名），方便下次定位被拒时回退
+  useEffect(() => {
+    if (!weather?.districtName || typeof geoLocation !== 'string') return
+    fetch('/api/settings/weather', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ default_city: weather.districtName }),
+    }).catch(() => {})
+  }, [weather?.districtName, geoLocation])
 
   // 每秒更新指针（秒针实时走）
   useEffect(() => {
@@ -68,9 +94,25 @@ export function Masthead() {
           </svg>
         </div>
         <div className={styles.text}>
-          <h1 className={styles.title} onClick={() => navigate('/settings')} title="大模型设置">
-            Trail
-          </h1>
+          <div className={styles.titleRow}>
+            <h1 className={styles.title} onClick={() => navigate('/settings')} title="大模型设置">
+              Trail
+            </h1>
+            {weather && (
+              <span className={styles.weatherChipWrap}>
+                <span className={styles.weatherChip}>
+                  {weather.districtName && (
+                    <span className={styles.weatherDistrict}>{weather.districtName}</span>
+                  )}
+                  {WEATHER_EMOJI[weather.icon] ?? '🌡'} {weather.temp}°
+                </span>
+                <span className={styles.weatherTooltip}>
+                  <span className={styles.weatherTooltipRow}>{weather.text} · 体感 {weather.feelsLike}°</span>
+                  <span className={styles.weatherTooltipRow}>湿度 {weather.humidity}% · {weather.windDir} {weather.windScale}级</span>
+                </span>
+              </span>
+            )}
+          </div>
           <p className={styles.subtitle}>
             <span className={styles.zh}>个人编年</span>
             <span className={styles.dot}>·</span>

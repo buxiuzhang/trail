@@ -33,6 +33,7 @@ const INTERFACE_SUB = [
   { id: 'interface-watch', label: '特别关注推送配置' },
   { id: 'interface-todo-alert', label: '待办事项推送配置' },
   { id: 'interface-placeholders', label: '占位提示语' },
+  { id: 'interface-weather', label: '天气配置' },
 ]
 
 const FILES_SUB = [

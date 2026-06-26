@@ -74,6 +74,13 @@
       <version>0.39.0</version>
     </dependency>
 
+    <!-- Ed25519 JWT 签发（和风天气认证） -->
+    <dependency>
+      <groupId>com.nimbusds</groupId>
+      <artifactId>nimbus-jose-jwt</artifactId>
+      <version>9.37.3</version>
+    </dependency>
+
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-test</artifactId>
