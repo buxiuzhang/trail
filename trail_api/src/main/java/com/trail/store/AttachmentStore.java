@@ -54,6 +54,26 @@ public class AttachmentStore {
             "application/x-7z-compressed"
     );
     private static final long DEFAULT_MAX_BYTES = 50L * 1024 * 1024; // 50MB
+
+    /** 浏览器常将这些扩展名上传为 application/octet-stream，需按扩展名推断真实 MIME */
+    private static final Map<String, String> EXT_TO_MIME = Map.ofEntries(
+            Map.entry(".sql",  "application/sql"),
+            Map.entry(".json", "application/json"),
+            Map.entry(".xml",  "application/xml"),
+            Map.entry(".js",   "text/javascript"),
+            Map.entry(".ts",   "text/typescript"),
+            Map.entry(".html", "text/html"),
+            Map.entry(".py",   "text/x-python"),
+            Map.entry(".java", "text/x-java-source"),
+            Map.entry(".c",    "text/x-csrc"),
+            Map.entry(".sh",   "text/x-sh"),
+            Map.entry(".yaml", "text/yaml"),
+            Map.entry(".yml",  "text/yaml"),
+            Map.entry(".md",   "text/markdown"),
+            Map.entry(".log",  "text/plain"),
+            Map.entry(".ini",  "text/plain"),
+            Map.entry(".conf", "text/plain")
+    );
     private static final Map<String, String> EXT_BY_MIME = Map.ofEntries(
             Map.entry("image/png", ".png"),
             Map.entry("image/jpeg", ".jpg"),
@@ -126,6 +146,18 @@ public class AttachmentStore {
         String mime = file.getContentType();
         if (mime == null) mime = "";
         mime = mime.toLowerCase().trim();
+        // 浏览器上传部分文件（如 .sql/.json）时 Content-Type 为 octet-stream，按扩展名推断
+        if (mime.isEmpty() || mime.equals("application/octet-stream")) {
+            String originalName = file.getOriginalFilename();
+            if (originalName != null) {
+                int dot = originalName.lastIndexOf('.');
+                if (dot >= 0) {
+                    String ext = originalName.substring(dot).toLowerCase();
+                    String inferred = EXT_TO_MIME.get(ext);
+                    if (inferred != null) mime = inferred;
+                }
+            }
+        }
         if (!getAllowedMimes().contains(mime)) {
             throw new ResponseStatusException(HttpStatus.UNSUPPORTED_MEDIA_TYPE,
                     "不支持的文件类型：" + mime);

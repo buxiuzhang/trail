@@ -219,6 +219,7 @@ export const DescriptionEditor = forwardRef<HTMLTextAreaElement, DescriptionEdit
   const lastEmittedRef = useRef<string>(value)
   const onChangeRef = useRef(onChange)
   const isInitializedRef = useRef(false)
+  const isSettingContentRef = useRef(false)
   // 使用 ref 存储 todos 和 tasks 的最新值，供 Mention 扩展的 items 函数使用
   const todosRef = useRef(todos)
   const tasksRef = useRef(tasks)
@@ -452,17 +453,17 @@ export const DescriptionEditor = forwardRef<HTMLTextAreaElement, DescriptionEdit
     content: normalizeMentions(value),
     contentType: 'markdown',
     onUpdate: ({ editor }) => {
-      // 使用 @tiptap/markdown 提供的 getMarkdown() 方法
-      const md = editor.getMarkdown()
-      // 防止序列化丢失代码块等内容：若输出长度远小于上次 emit 的值，说明序列化不完整，跳过
-      if (lastEmittedRef.current.length > 20 && md.length < lastEmittedRef.current.length / 2) return
+      // 程序性 setContent 触发的 onUpdate，不回调父组件，避免循环覆盖
+      if (isSettingContentRef.current) return
+      let md = editor.getMarkdown()
+      // @tiptap/markdown 会将 @task:ID 中的冒号转义为 \:，归一化回来
+      md = md.replace(/@(task|todo)\\:/g, '@$1:')
+      // 防序列化完全丢失：仅当文档无任何节点时跳过
+      if (lastEmittedRef.current.length > 20 && md.trim().length === 0 && editor.state.doc.childCount === 0) return
       lastEmittedRef.current = md
       if (hiddenTaRef.current) hiddenTaRef.current.value = md
-      // 只在初始化完成后才通知父组件，避免在渲染期间更新状态
       if (isInitializedRef.current) {
-        queueMicrotask(() => {
-          onChangeRef.current(md)
-        })
+        onChangeRef.current(md)
       }
     },
     editorProps: {
@@ -532,15 +533,14 @@ export const DescriptionEditor = forwardRef<HTMLTextAreaElement, DescriptionEdit
   // 更新编辑器内容（当外部 value 变化时）
   useEffect(() => {
     if (!editor) return
-    // 初始化未完成时不强制 setContent，内容已由 useEditor 的 content 属性初始化
     if (!isInitializedRef.current) return
-    // 防止循环：如果当前内容与 value 相同，跳过
     const currentMd = editor.getMarkdown()
     if (value === currentMd) return
     if (value === lastEmittedRef.current) return
 
-    // 使用 setContent 更新内容，指定 contentType 为 markdown
+    isSettingContentRef.current = true
     editor.commands.setContent(value, { contentType: 'markdown' })
+    isSettingContentRef.current = false
     lastEmittedRef.current = value
     if (hiddenTaRef.current) hiddenTaRef.current.value = value
   }, [editor, value])

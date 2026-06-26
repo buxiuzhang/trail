@@ -21,7 +21,7 @@ export const HighlightedCodeBlock = CodeBlockLowlight.extend({
   // 注册为 marked 的 'code' token 类型，让 @tiptap/markdown 能解析代码块
   markdownTokenName: 'code',
 
-  parseMarkdown(token) {
+  parseMarkdown(token: any) {
     return {
       type: 'codeBlock',
       attrs: { language: token.lang || null },
@@ -29,9 +29,9 @@ export const HighlightedCodeBlock = CodeBlockLowlight.extend({
     }
   },
 
-  renderMarkdown(node) {
-    const lang = node.attrs.language || ''
-    const code = node.textContent || ''
+  renderMarkdown(node: any, helpers: any) {
+    const lang = node.attrs?.language || ''
+    const code = helpers.renderChildren(node)
     const fence = '```' + lang + '\n'
     return fence + code + (code.endsWith('\n') ? '' : '\n') + '```\n'
   },

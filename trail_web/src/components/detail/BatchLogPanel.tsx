@@ -347,7 +347,7 @@ export function BatchLogPanel({ defaultDate, onClose, onSubmitted }: Props) {
   }
 
   function handleSplit() {
-    const currentText = rawText.trim().replace(/@(task|todo)\\:/g, '@$1:')
+    const currentText = rawText.trim()
     if (!currentText) { showToast('内容为空', 'error'); return }
     const segments = currentText.split(/(?=@task:\d+)/g).map(s => s.trim()).filter(Boolean)
     const parsed: ParsedEntry[] = segments.map(seg => {
