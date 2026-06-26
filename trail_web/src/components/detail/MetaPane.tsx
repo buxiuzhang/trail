@@ -11,7 +11,6 @@ interface MetaPaneProps {
   lastLogDate: string | null
   collapsed: boolean
   onToggleCollapse: () => void
-  onAddLog: () => void
   onChangeStatus: () => void
   onCancel: () => void
 }
@@ -27,7 +26,7 @@ function MetaRow({ label, value, mono = false }: { label: string; value: string 
   )
 }
 
-export function MetaPane({ task, lastLogDate, collapsed, onToggleCollapse, onAddLog, onChangeStatus, onCancel }: MetaPaneProps) {
+export function MetaPane({ task, lastLogDate, collapsed, onToggleCollapse, onChangeStatus, onCancel }: MetaPaneProps) {
   const navigate = useNavigate()
 
   return (
@@ -67,12 +66,9 @@ export function MetaPane({ task, lastLogDate, collapsed, onToggleCollapse, onAdd
           {task.maintenance_summary && <SummaryBox label="维护期总结" content={task.maintenance_summary} variant="maintenance" />}
 
           <div className={styles.actions}>
-            {/* 封版不显示"编辑条目""作废此条"——已完成+维护仍可编辑以修改维护配置 */}
+            {/* 封版不显示"编辑任务""作废此条"——已完成+维护仍可编辑以修改维护配置 */}
             {!isSealed(task) && (
-              <Button glyph="✎" variant="default" onClick={() => navigate(`/edit/${task.id}`)}>编辑条目</Button>
-            )}
-            {!isSealed(task) && (
-              <Button glyph="＋" variant="default" onClick={onAddLog}>记录今日</Button>
+              <Button glyph="✎" variant="default" onClick={() => navigate(`/edit/${task.id}`)}>编辑任务</Button>
             )}
             {/* 进行中可完成；已完成+维护可结束维护期 */}
             {(task.status === '进行中' || (task.status === '已完成' && task.nature === '维护')) && (

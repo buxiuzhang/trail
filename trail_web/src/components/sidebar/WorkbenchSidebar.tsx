@@ -29,7 +29,7 @@ export function WorkbenchSidebar() {
           onClick={() => navigate('/archive')}
           onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') navigate('/archive') }}
         >
-          <span>工作档案</span>
+          <span>工作任务</span>
         </div>
         <div
           className={`${styles.item} ${isWorkbench && panel === 'dashboard' ? styles.isActive : ''}`}

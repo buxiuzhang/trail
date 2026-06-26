@@ -409,7 +409,7 @@ export function SettingsPage() {
     const ok = await confirm({
       level: 'moderate',
       title: '保存占位提示语？',
-      body: <p>将保存任务描述、编年日志、补充说明的占位提示。</p>,
+      body: <p>将保存任务描述、工作日报、补充说明的占位提示。</p>,
       confirmLabel: '保存',
     })
     if (!ok) return
@@ -463,7 +463,7 @@ export function SettingsPage() {
 
   return (
     <article className={styles.page}>
-      <Crumbs items={[{ label: '编年档', href: '/archive' }, { label: '设置' }]} />
+      <Crumbs items={[{ label: '任务清单', href: '/archive' }, { label: '设置' }]} />
 
       <header className={styles.header}>
         <h1 className={styles.title}>设置</h1>
@@ -1207,13 +1207,13 @@ export function SettingsPage() {
             </div>
             <div className="field">
               <div className="field__label">
-                <span>编年日志</span>
+                <span>工作日报</span>
                 <button
                   type="button"
                   onClick={async () => {
                     const ok = await confirm({
                       level: 'moderate',
-                      title: '重置编年日志提示语？',
+                      title: '重置工作日报提示语？',
                       body: <p>将恢复为系统默认值。</p>,
                       confirmLabel: '重置',
                     })
@@ -1279,7 +1279,7 @@ export function SettingsPage() {
                   const ok = await confirm({
                     level: 'dangerous',
                     title: '重置所有占位提示语？',
-                    body: <p>任务描述、编年日志、补充说明的提示语将全部恢复为默认值。</p>,
+                    body: <p>任务描述、工作日报、补充说明的提示语将全部恢复为默认值。</p>,
                     confirmLabel: '全部重置',
                   })
                   if (ok) {

@@ -473,6 +473,7 @@ export function BatchLogPanel({ defaultDate, onClose, onSubmitted }: Props) {
           <div className={styles.reviewStep}>
             <div className={styles.reviewHint}>
               共识别 <strong>{entries.length}</strong> 条，请确认任务归属和工时后提交。
+              <a href="#/new" className={styles.reviewNewTask} target="_self">+ 新建任务</a>
             </div>
             <div className={styles.entryList}>
               {entries.map((entry, idx) => (

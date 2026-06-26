@@ -153,17 +153,14 @@ public class QWeatherService {
         boolean isLatLon = location.matches("-?\\d+\\.\\d+,-?\\d+\\.\\d+");
         boolean isCityId = location.matches("\\d{6,12}");
 
-        String geoLookup = null;
+        String geoLookup;
         if (isLatLon) {
             // lat,lon → lon,lat（和风 GEO 接口要求经度在前）
             String[] parts = location.split(",");
             geoLookup = parts[1].trim() + "," + parts[0].trim();
-        } else if (isCityId) {
+        } else {
+            // 城市名或城市 ID 统一走 GEO lookup，确保拿到数字城市 ID
             geoLookup = location;
-        }
-
-        if (geoLookup == null) {
-            return new GeoResult(location, ""); // 城市名，直接用
         }
 
         String geoUrl = "https://" + apiHost + "/geo/v2/city/lookup?location="

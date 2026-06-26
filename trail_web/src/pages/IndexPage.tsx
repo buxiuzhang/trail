@@ -3,10 +3,23 @@ import { useInfiniteTasks } from '@/api/tasks'
 import { useFilterContext } from '@/context/FilterContext'
 import { monthLabel } from '@/constants'
 import { TaskCardList } from '@/components/task/TaskCardList'
+import { TaskListTable } from '@/components/task/TaskListTable'
 import { Crumbs } from '@/components/shared/Crumbs'
 import { EmptyState } from '@/components/detail/EmptyState'
 import { useInfiniteScroll } from '@/hooks/useInfiniteScroll'
 import type { TaskOut } from '@/types'
+import viewListIcon from '@/icons/view-list.svg'
+import viewCardIcon from '@/icons/view-card.svg'
+
+type ViewMode = 'card' | 'list'
+
+function getInitialViewMode(): ViewMode {
+  try {
+    const saved = localStorage.getItem('taskListViewMode')
+    if (saved === 'list' || saved === 'card') return saved
+  } catch {}
+  return 'card'
+}
 
 /** 用于排序和分组的日期：processing_date || start_date */
 function groupDate(t: TaskOut): string {
@@ -24,6 +37,12 @@ export function IndexPage() {
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc')
   const [searchText, setSearchText] = useState('')
   const [backendSearch, setBackendSearch] = useState('')
+  const [viewMode, setViewMode] = useState<ViewMode>(getInitialViewMode)
+
+  function switchViewMode(mode: ViewMode) {
+    setViewMode(mode)
+    try { localStorage.setItem('taskListViewMode', mode) } catch {}
+  }
 
   // 无限滚动：分页 + 筛选后端化（status/nature/month/tag 走 query param）
   const {
@@ -93,7 +112,7 @@ export function IndexPage() {
 
   return (
     <div>
-      <Crumbs items={[{ label: '编年档' }]} />
+      <Crumbs items={[{ label: '任务清单' }]} />
       <div className="archive-header">
         <h2 className="archive-title">
           <em>Catalogued</em> 全部 · {String(total).padStart(2, '0')} entries
@@ -130,40 +149,57 @@ export function IndexPage() {
               </svg>
             </button>
           </div>
-          <span
-            className="archive-count"
-            role="button"
-            tabIndex={0}
-            style={{ cursor: 'pointer', userSelect: 'none' }}
-            onClick={() => setSortOrder(o => o === 'desc' ? 'asc' : 'desc')}
-            onKeyDown={e => { if (e.key === 'Enter') setSortOrder(o => o === 'desc' ? 'asc' : 'desc') }}
-            title="点击切换排序方向"
-          >
-            Sorted · {sortOrder === 'desc' ? '倒序 · 最近处理在前' : '正序 · 最早处理在前'}
-          </span>
+          <div className="archive-controls-row">
+            <button
+              type="button"
+              className="archive-view-btn"
+              onClick={() => switchViewMode(viewMode === 'card' ? 'list' : 'card')}
+            >{viewMode === 'card'
+              ? <><img src={viewListIcon} className="archive-view-icon" alt="" />列表模式</>
+              : <><img src={viewCardIcon} className="archive-view-icon" alt="" />卡片模式</>
+            }</button>
+            <span
+              className="archive-count"
+              role="button"
+              tabIndex={0}
+              style={{ cursor: 'pointer', userSelect: 'none' }}
+              onClick={() => setSortOrder(o => o === 'desc' ? 'asc' : 'desc')}
+              onKeyDown={e => { if (e.key === 'Enter') setSortOrder(o => o === 'desc' ? 'asc' : 'desc') }}
+              title="点击切换排序方向"
+            >
+              Sorted · {sortOrder === 'desc' ? '倒序 · 最近处理在前' : '正序 · 最早处理在前'}
+            </span>
+          </div>
         </div>
       </div>
       {total === 0 ? (
-        <EmptyState glyph="¶" title="档案室空" subtitle="尚无任何任务条目。点击「新建条目」开始记录。" />
+        <EmptyState glyph="¶" title="档案室空" subtitle="尚无任何任务条目。点击「新建任务」开始记录。" />
       ) : sorted.length === 0 ? (
-        <EmptyState glyph="∅" title="此格暂无可录之事" subtitle="试着调整左侧筛选，或 新建条目。" />
+        <EmptyState glyph="∅" title="此格暂无可录之事" subtitle="试着调整左侧筛选，或 新建任务。" />
       ) : (
         <>
-          {grouped.map(([key, monthTasks]) => {
-            const lbl = monthLabel(key)
-            return (
-              <section className="month-block" key={key}>
-                <div className="month-header">
-                  <span className="month-title-zh">{lbl.zh}</span>
-                  <span className="month-title">{lbl.en}</span>
-                  <span className="month-count">{String(monthTasks.length).padStart(2, '0')} {monthTasks.length === 1 ? 'entry' : 'entries'}</span>
-                  <span className="month-rule" />
-                  <span className="month-year">{lbl.year}</span>
-                </div>
-                <TaskCardList tasks={monthTasks} />
-              </section>
-            )
-          })}
+          {viewMode === 'list' ? (
+            <TaskListTable tasks={sorted} />
+          ) : (
+            <>
+              <p className="archive-dblclick-hint">双击卡片进入任务详情</p>
+              {grouped.map(([key, monthTasks]) => {
+                const lbl = monthLabel(key)
+                return (
+                  <section className="month-block" key={key}>
+                    <div className="month-header">
+                      <span className="month-title-zh">{lbl.zh}</span>
+                      <span className="month-title">{lbl.en}</span>
+                      <span className="month-count">{String(monthTasks.length).padStart(2, '0')} {monthTasks.length === 1 ? 'entry' : 'entries'}</span>
+                      <span className="month-rule" />
+                      <span className="month-year">{lbl.year}</span>
+                    </div>
+                    <TaskCardList tasks={monthTasks} />
+                  </section>
+                )
+              })}
+            </>
+          )}
           {/* 哨兵：距底 200px 时触发 fetchNextPage */}
           <div ref={sentinelRef} style={{ height: 1 }} aria-hidden="true" />
           {isFetchingNextPage && (

@@ -520,7 +520,7 @@ export function DetailPage() {
 
   return (
     <article className="detail">
-      <Crumbs items={[{ label: '编年档', href: '/archive' }, { label: `CAT. № ${catalog}` }]} />
+      <Crumbs items={[{ label: '任务清单', href: '/archive' }, { label: `CAT. № ${catalog}` }]} />
 
       <DetailHeader
         task={task}
@@ -544,10 +544,6 @@ export function DetailPage() {
           lastLogDate={lastLogDate}
           collapsed={metaCollapsed}
           onToggleCollapse={() => setMetaCollapsed(!metaCollapsed)}
-          onAddLog={() => {
-            const ta = document.querySelector('.logbook textarea') as HTMLTextAreaElement
-            ta?.focus()
-          }}
           onChangeStatus={openStatusModal}
           onCancel={openCancelModal}
         />

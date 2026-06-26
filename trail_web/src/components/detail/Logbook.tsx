@@ -65,7 +65,7 @@ export function Logbook({ task, logs, todos, tasks = [], onSaveNew, onSaveEdit, 
   return (
     <section className={styles.logbook}>
       <header className={styles.head}>
-        <h2 className={`${styles.title} ${styles.titleZh}`}>编年日志</h2>
+        <h2 className={`${styles.title} ${styles.titleZh}`}>工作日报</h2>
         <span className={styles.count}>{logs.length} entries · 可改可软删</span>
       </header>
 

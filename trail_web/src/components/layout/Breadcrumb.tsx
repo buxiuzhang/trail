@@ -5,8 +5,8 @@ import styles from './Breadcrumb.module.css'
 const HOME_PATHS = new Set(['/', '/workbench'])
 
 const ROUTE_LABELS: Record<string, string> = {
-  '/archive':  '工作档案',
-  '/new':      '新建条目',
+  '/archive':  '工作任务',
+  '/new':      '新建任务',
   '/settings': '系统设置',
   '/quick-log': '快速填报',
 }
@@ -31,11 +31,11 @@ export function Breadcrumb() {
 
   if (taskMatch) {
     const id = Number(taskMatch.params.id)
-    crumbs.push({ label: '工作档案', to: '/archive' })
+    crumbs.push({ label: '工作任务', to: '/archive' })
     crumbs.push({ label: <TaskCrumb id={id} /> })
   } else if (editMatch) {
     const id = Number(editMatch.params.id)
-    crumbs.push({ label: '工作档案', to: '/archive' })
+    crumbs.push({ label: '工作任务', to: '/archive' })
     crumbs.push({ label: <TaskCrumb id={id} />, to: `/task/${id}` })
     crumbs.push({ label: '编辑' })
   } else {

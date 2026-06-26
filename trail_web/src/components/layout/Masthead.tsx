@@ -129,14 +129,14 @@ export function Masthead() {
           {overview && (
             <>
               <span className={styles.metaSep}>·</span>
-              <span className={styles.metaLabel}>共计</span>
+              <span className={styles.metaLabel}>任务总计</span>
               <span className={styles.metaValue}>{overview.total_tasks} 项</span>
             </>
           )}
         </div>
         <button className="btn btn--primary" type="button" onClick={() => navigate('/new')}>
           <span className="btn-glyph">+</span>
-          <span>新建条目</span>
+          <span>新建任务</span>
         </button>
       </div>
 
