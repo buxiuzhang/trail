@@ -477,7 +477,7 @@ export function SettingsPage() {
           <UploadLimitsSection />
           <section className={styles.section}>
             <h2 className={styles.sectionTitle}>文件管理</h2>
-            <p className={styles.sectionHint}>管理任务描述、日志、待办中上传的附件，支持按文件类型和任务筛选。</p>
+            <p className={styles.sectionHint}>管理任务描述、日报、待办中上传的附件，支持按文件类型和任务筛选。</p>
             <FileManagerSection />
           </section>
         </>
@@ -675,31 +675,31 @@ export function SettingsPage() {
       {/* 卡片 2：工作记录 Prompt */}
       <section id="llm-record" className={styles.section}>
         <h2 className={styles.sectionTitle}>工作记录</h2>
-        <p className={styles.sectionHint}>日志润色、草稿生成、待办润色、任务描述润色的提示词，留空则使用默认值。</p>
+        <p className={styles.sectionHint}>日报润色、草稿生成、待办润色、任务描述润色的提示词，留空则使用默认值。</p>
         {isLoading ? (
           <p className={styles.sectionHint}>载入中...</p>
         ) : (
           <form onSubmit={handleSaveRecord}>
-            <PromptGroup name="日志润色" desc="日志书面化">
+            <PromptGroup name="日报润色" desc="日报书面化">
               <div className={styles.promptLabel}>
                 <span className={styles.promptName}>
-                  <button type="button" onClick={async () => { if (await confirm({ level: 'moderate', title: '重置日志润色提示词？', body: <p>将恢复为系统默认值。</p>, confirmLabel: '重置' })) setPolishPrompt('') }} className={styles.resetBtn}>重置</button>
+                  <button type="button" onClick={async () => { if (await confirm({ level: 'moderate', title: '重置日报润色提示词？', body: <p>将恢复为系统默认值。</p>, confirmLabel: '重置' })) setPolishPrompt('') }} className={styles.resetBtn}>重置</button>
                 </span>
                 <button type="button" className={styles.modeToggle} onClick={() => setPolishPromptMode(polishPromptMode === 'source' ? 'preview' : 'source')}>{polishPromptMode === 'source' ? '预览模式' : '源码模式'}</button>
               </div>
-              <p className={styles.promptDesc}>润色工作日志，使其书面化、正式化。后端自动注入任务标题和描述。</p>
+              <p className={styles.promptDesc}>润色工作日报，使其书面化、正式化。后端自动注入任务标题和描述。</p>
               <div style={{ marginTop: '8px' }}>
                 <DescriptionEditorWithMode value={polishPrompt || ''} onChange={setPolishPrompt} mode={polishPromptMode} onModeChange={setPolishPromptMode} minHeight={150} textareaClassName="field__textarea" hideInlineToggle autoGrow maxHeight={300} />
               </div>
             </PromptGroup>
-            <PromptGroup name="草稿生成" desc="关键词→日志">
+            <PromptGroup name="草稿生成" desc="关键词→日报">
               <div className={styles.promptLabel}>
                 <span className={styles.promptName}>
                   <button type="button" onClick={async () => { if (await confirm({ level: 'moderate', title: '重置草稿生成提示词？', body: <p>将恢复为系统默认值。</p>, confirmLabel: '重置' })) setDraftLogPrompt('') }} className={styles.resetBtn}>重置</button>
                 </span>
                 <button type="button" className={styles.modeToggle} onClick={() => setDraftLogPromptMode(draftLogPromptMode === 'source' ? 'preview' : 'source')}>{draftLogPromptMode === 'source' ? '预览模式' : '源码模式'}</button>
               </div>
-              <p className={styles.promptDesc}>根据粗糙描述和任务背景生成日志草稿。后端自动注入任务标题、描述、最近日志和待办。</p>
+              <p className={styles.promptDesc}>根据粗糙描述和任务背景生成日报草稿。后端自动注入任务标题、描述、最近日报和待办。</p>
               <div style={{ marginTop: '8px' }}>
                 <DescriptionEditorWithMode value={draftLogPrompt || ''} onChange={setDraftLogPrompt} mode={draftLogPromptMode} onModeChange={setDraftLogPromptMode} minHeight={150} textareaClassName="field__textarea" hideInlineToggle autoGrow maxHeight={300} />
               </div>
@@ -723,7 +723,7 @@ export function SettingsPage() {
                 </span>
                 <button type="button" className={styles.modeToggle} onClick={() => setPolishTaskDescPromptMode(polishTaskDescPromptMode === 'source' ? 'preview' : 'source')}>{polishTaskDescPromptMode === 'source' ? '预览模式' : '源码模式'}</button>
               </div>
-              <p className={styles.promptDesc}>润色任务描述。后端自动注入任务标题、全部日志摘要（分段）和未完成待办。</p>
+              <p className={styles.promptDesc}>润色任务描述。后端自动注入任务标题、全部日报摘要（分段）和未完成待办。</p>
               <div style={{ marginTop: '8px' }}>
                 <DescriptionEditorWithMode value={polishTaskDescPrompt || ''} onChange={setPolishTaskDescPrompt} mode={polishTaskDescPromptMode} onModeChange={setPolishTaskDescPromptMode} minHeight={150} textareaClassName="field__textarea" hideInlineToggle autoGrow maxHeight={300} />
               </div>
@@ -825,7 +825,7 @@ export function SettingsPage() {
                 </span>
                 <button type="button" className={styles.modeToggle} onClick={() => setSummarizePromptMode(summarizePromptMode === 'source' ? 'preview' : 'source')}>{summarizePromptMode === 'source' ? '预览模式' : '源码模式'}</button>
               </div>
-              <p className={styles.promptDesc}>主体阶段结束时，基于日志提炼总结</p>
+              <p className={styles.promptDesc}>主体阶段结束时，基于日报提炼总结</p>
               <div style={{ marginTop: '8px' }}>
                 <DescriptionEditorWithMode value={summarizePrompt || ''} onChange={setSummarizePrompt} mode={summarizePromptMode} onModeChange={setSummarizePromptMode} minHeight={150} textareaClassName="field__textarea" hideInlineToggle autoGrow maxHeight={300} />
               </div>
@@ -1006,7 +1006,7 @@ export function SettingsPage() {
       {/* 特别关注推送配置 */}
       <section id="interface-watch" className={styles.section}>
           <h2 className={styles.sectionTitle}>特别关注推送配置</h2>
-          <p className={styles.sectionHint}>侧边栏「特别关注」区块用颜色区分任务活跃程度，根据最近一条日志距今天数判断。</p>
+          <p className={styles.sectionHint}>侧边栏「特别关注」区块用颜色区分任务活跃程度，根据最近一条日报距今天数判断。</p>
           {isLoading ? (
             <p className={styles.sectionHint}>载入中...</p>
           ) : (
@@ -1024,7 +1024,7 @@ export function SettingsPage() {
                   onChange={e => setWatchIdleHotDays(e.target.value)}
                   className={styles.slider}
                 />
-                <p className={styles.fieldHint}>最近一条日志在此天数内，闲置标签显示为绿色（近期活跃）。</p>
+                <p className={styles.fieldHint}>最近一条日报在此天数内，闲置标签显示为绿色（近期活跃）。</p>
               </div>
               <div className="field">
                 <div className="field__label">
@@ -1039,7 +1039,7 @@ export function SettingsPage() {
                   onChange={e => setWatchIdleWarnDays(e.target.value)}
                   className={styles.slider}
                 />
-                <p className={styles.fieldHint}>最近一条日志超过此天数，闲置标签显示为橙色（需要关注）。</p>
+                <p className={styles.fieldHint}>最近一条日报超过此天数，闲置标签显示为橙色（需要关注）。</p>
               </div>
               <div className="field">
                 <div className="field__label">

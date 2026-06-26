@@ -26,7 +26,7 @@ const RATING_OPTIONS: { value: NonNullable<Rating>; label: string; emoji: string
 // Mock：根据上次评价生成不同的优化 prompt
 function getMockOptimized(rating: Rating, comment: string): string {
   if (rating === 'bad') {
-    return `## 日志润色规范（调整版）
+    return `## 日报润色规范（调整版）
 
 根据反馈「${comment || '效果不佳'}」，本次调整如下：
 
@@ -45,7 +45,7 @@ function getMockOptimized(rating: Rating, comment: string): string {
 - 保留所有专有名词原样`
   }
   if (rating === 'ok') {
-    return `## 日志润色规范（优化版 v2）
+    return `## 日报润色规范（优化版 v2）
 
 在上一版基础上进一步精简：
 
@@ -62,7 +62,7 @@ function getMockOptimized(rating: Rating, comment: string): string {
 - 不补充原文未提及的原因
 - 不改变事实性内容`
   }
-  return `## 日志润色规范（个人定制版）
+  return `## 日报润色规范（个人定制版）
 
 润色时遵循以下规则：
 
@@ -332,7 +332,7 @@ export function SkillOptimizeDialog({ skill, onClose }: Props) {
             className={styles.debugInput}
             value={debugInput}
             onChange={e => setDebugInput(e.target.value)}
-            placeholder="输入真实内容（如一条日志、一段任务描述），运行后查看两个版本的处理效果…"
+            placeholder="输入真实内容（如一条日报、一段任务描述），运行后查看两个版本的处理效果…"
             disabled={busy}
           />
           <div className={styles.debugActions}>

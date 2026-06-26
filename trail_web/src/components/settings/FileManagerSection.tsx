@@ -96,7 +96,7 @@ export function FileManagerSection() {
         const tid = r.task_id
         if (!grouped[tid]) grouped[tid] = { task_id: tid, title: r.title, sources: [], allDeleted: true }
         const label = r.source_type === 'task' ? '任务描述'
-          : r.source_type === 'log' ? (r.log_date ? `日志 · ${r.log_date}` : '日志')
+          : r.source_type === 'log' ? (r.log_date ? `日报 · ${r.log_date}` : '日报')
           : '待办'
         if (!grouped[tid].sources.includes(label)) grouped[tid].sources.push(label)
         if (!r.deleted) grouped[tid].allDeleted = false
@@ -117,12 +117,12 @@ export function FileManagerSection() {
         body: (
           <div>
             <p style={{ marginBottom: 12, color: 'var(--ink-soft)', fontSize: 14 }}>
-              该文件被 <strong>{item.active_ref_count}</strong> 处有效引用，请先在对应的任务日志或描述中删除该附件引用，再回来删除此文件。
+              该文件被 <strong>{item.active_ref_count}</strong> 处有效引用，请先在对应的任务日报或描述中删除该附件引用，再回来删除此文件。
             </p>
             <ul style={{ paddingLeft: 16, fontSize: 13, color: 'var(--ink-faded)', lineHeight: 1.8 }}>
               {refs.filter((r: any) => !r.deleted).map((r: any, i: number) => (
                 <li key={i}>
-                  [{r.sourceType === 'task' ? '任务' : r.sourceType === 'log' ? '日志' : '待办'}]
+                  [{r.sourceType === 'task' ? '任务' : r.sourceType === 'log' ? '日报' : '待办'}]
                   {' '}{r.title || ''}{r.logDate ? ` · ${r.logDate}` : ''}
                 </li>
               ))}

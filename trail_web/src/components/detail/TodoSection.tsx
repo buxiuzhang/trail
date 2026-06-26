@@ -42,10 +42,10 @@ function TodoLogList({ taskId, todoId }: { taskId: number; todoId: number }) {
   return (
     <div className={styles.logsSection}>
       <span className={styles.logsSectionTitle}>
-        关联日志{!isLoading && total > 0 && <span className={styles.logsCount}>（{total}）</span>}
+        关联日报{!isLoading && total > 0 && <span className={styles.logsCount}>（{total}）</span>}
       </span>
       {isLoading && <p className={styles.logsLoading}>载入中…</p>}
-      {!isLoading && total === 0 && <p className={styles.logsEmpty}>暂无关联日志</p>}
+      {!isLoading && total === 0 && <p className={styles.logsEmpty}>暂无关联日报</p>}
       {visible.length > 0 && (
         <ul className={styles.logList}>
           {visible.map((log: TodoLogItem) => (

@@ -81,7 +81,7 @@ export function Logbook({ task, logs, todos, tasks = [], onSaveNew, onSaveEdit, 
       ) : (
         <div className={styles.emptyLog}>
           <span className={styles.emptyGlyph}>✕</span>
-          此任务已封版，不再接受新日志。
+          此任务已封版，不再接受新日报。
         </div>
       )}
 

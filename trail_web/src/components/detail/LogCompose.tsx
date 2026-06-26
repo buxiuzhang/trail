@@ -97,7 +97,7 @@ export function LogCompose({ task, todos, tasks = [], editing, onSave, onCancel,
         eyebrow: '确认',
         title: '保存此编辑？',
         titleMode: 'zh',
-        body: <p>日志 № {String(editing!.id).padStart(3, '0')} 的修改将被保存。</p>,
+        body: <p>日报 № {String(editing!.id).padStart(3, '0')} 的修改将被保存。</p>,
         buttons: [
           { label: '取消', className: 'btn btn--ghost', action: () => {} },
           {
@@ -116,9 +116,9 @@ export function LogCompose({ task, todos, tasks = [], editing, onSave, onCancel,
     if (!isEdit && confirmBeforeSave) {
       openModal({
         eyebrow: '确认',
-        title: '落档此条日志？',
+        title: '落档此条日报？',
         titleMode: 'zh',
-        body: <p>日志将写入「{task.title}」，落档后可在任务详情中修改或软删。</p>,
+        body: <p>日报将写入「{task.title}」，落档后可在任务详情中修改或软删。</p>,
         buttons: [
           { label: '取消', className: 'btn btn--ghost', action: () => {} },
           {
@@ -230,7 +230,7 @@ export function LogCompose({ task, todos, tasks = [], editing, onSave, onCancel,
         <div className={styles.draftSection}>
           <div className={styles.draftHeader}>
             <span className={styles.draftLabel}>草稿</span>
-            <span className={styles.draftHint}>简单描述今天做了什么，LLM 结合任务背景生成日志草稿</span>
+            <span className={styles.draftHint}>简单描述今天做了什么，LLM 结合任务背景生成日报草稿</span>
             <button
               type="button"
               className={styles.draftClose}
@@ -319,7 +319,7 @@ export function LogCompose({ task, todos, tasks = [], editing, onSave, onCancel,
                   !LLM_AVAILABLE ? 'LLM 暂未接入' :
                   draftMutation.isPending ? '生成中…' :
                   isGenMode ? '⌘Enter 生成草稿' :
-                  isDraftActive ? '草稿（已打开）' : '生成日志草稿'
+                  isDraftActive ? '草稿（已打开）' : '生成日报草稿'
                 }
                 onClick={() => {
                   if (!draftOpen) {

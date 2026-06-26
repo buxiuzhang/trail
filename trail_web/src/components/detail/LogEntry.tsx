@@ -51,7 +51,7 @@ export function LogEntry({ task, log, todos, tasks = [], isEditing, onEdit, onDe
     const ok = await confirm({
       level: 'critical',
       title: '删除附件？',
-      body: <p>将永久删除「{att.name}」，并从日志中移除引用，无法恢复。</p>,
+      body: <p>将永久删除「{att.name}」，并从日报中移除引用，无法恢复。</p>,
       confirmLabel: '删除',
     })
     if (!ok) return
@@ -287,8 +287,8 @@ export function LogEntry({ task, log, todos, tasks = [], isEditing, onEdit, onDe
             onClick={async () => {
               const ok = await confirm({
                 level: 'moderate',
-                title: '软删此条日志？',
-                body: <p>日志将被标记为已删除，可在任务详情中查看历史记录。</p>,
+                title: '软删此条日报？',
+                body: <p>日报将被标记为已删除，可在任务详情中查看历史记录。</p>,
                 confirmLabel: '软删',
               })
               if (ok) onDelete()

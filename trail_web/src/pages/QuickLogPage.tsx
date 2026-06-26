@@ -105,12 +105,12 @@ function FloatingCard({
               if (isEdit) {
                 await updateLog.mutateAsync({ logId: editingLog.id, data })
                 qc.invalidateQueries({ queryKey: ['logs', 'by-date', TODAY] })
-                showToast('日志已更新')
+                showToast('日报已更新')
                 onClose()
               } else {
                 await createLog.mutateAsync(data)
                 qc.invalidateQueries({ queryKey: ['logs', 'by-date', TODAY] })
-                showToast('日志已落档')
+                showToast('日报已落档')
                 onClose()
               }
             }}
@@ -142,8 +142,8 @@ function LogRow({ log, idx, onEdit }: { log: any; idx: number; onEdit: (log: any
   async function handleDelete() {
     const ok = await confirm({
       level: 'dangerous',
-      title: `删除此条日志？`,
-      body: <p>「{log.task_title}」的日志将被软删除，可在任务详情中恢复。</p>,
+      title: `删除此条日报？`,
+      body: <p>「{log.task_title}」的日报将被软删除，可在任务详情中恢复。</p>,
       confirmLabel: '删除',
     })
     if (!ok) return
@@ -315,7 +315,7 @@ function OnboardGuide({ onAddLog, onBatch }: { onAddLog: () => void; onBatch: ()
           <span className={styles.guideStepNo}>①</span>
           <div className={styles.guideStepBody}>
             <div className={styles.guideStepTitle}>新建任务</div>
-            <div className={styles.guideStepDesc}>在任务清单中创建正在进行的工作，每条日志需关联到具体任务。</div>
+            <div className={styles.guideStepDesc}>在任务清单中创建正在进行的工作，每条日报需关联到具体任务。</div>
             <button type="button" className={styles.guideBtn} onClick={() => navigate('/new')}>
               前往新建任务
             </button>
@@ -331,7 +331,7 @@ function OnboardGuide({ onAddLog, onBatch }: { onAddLog: () => void; onBatch: ()
                 今日填报
               </button>
               <button type="button" className={styles.guideBtn} onClick={onAddLog}>
-                ＋ 添加日志
+                ＋ 添加日报
               </button>
             </div>
           </div>
@@ -442,7 +442,7 @@ export function QuickLogPage() {
                   <th className={styles.th}>阶段</th>
                   <th className={styles.th}>工时</th>
                   <th className={styles.th} style={{ textAlign: 'center' }}>附件</th>
-                  <th className={styles.th} style={{ width: '100%' }}>日志内容</th>
+                  <th className={styles.th} style={{ width: '100%' }}>日报内容</th>
                   <th className={styles.th}>操作</th>
                 </tr>
               </thead>
@@ -455,7 +455,7 @@ export function QuickLogPage() {
           </div>
         )}
         <button type="button" className={styles.addBtn} onClick={() => setShowCard(true)} style={submitted.length === 0 ? { display: 'none' } : undefined}>
-          ＋ 添加日志
+          ＋ 添加日报
         </button>
       </div>
 

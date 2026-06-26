@@ -81,7 +81,7 @@ export const DEFAULT_WATCH_SETTINGS = {
   watch_idle_warn_days: 14,
   watch_snooze_minutes: 30,
   watch_cron: '0 9,14 * * 1-5',
-  watch_alert_template: '**${task_title}** 特别关注预警：\n\n该任务已 **${idle_days} 天**未记录日志，请关注进展。',
+  watch_alert_template: '**${task_title}** 特别关注预警：\n\n该任务已 **${idle_days} 天**未记录日报，请关注进展。',
 }
 
 export const DEFAULT_TODO_SETTINGS = {

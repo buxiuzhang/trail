@@ -241,7 +241,7 @@ export function TaskCard({ task, logCount = 0, logMainCount = 0 }: TaskCardProps
             <dt>最近记录</dt>
             <dd>{fmtDatePretty(task.last_log_date || task.processing_date) || '—'}</dd>
             <div className={styles.marginSep} />
-            <dt>日志</dt>
+            <dt>日报</dt>
             <dd>{logSummary}</dd>
             <dt>闲置</dt>
             <dd>{idleLabel}</dd>

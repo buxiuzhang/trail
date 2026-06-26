@@ -158,7 +158,7 @@ function EntryCard({ index, entry, tasks, mode, placeholder, onUpdate, onRemove,
         <div className={logStyles.draftSection}>
           <div className={logStyles.draftHeader}>
             <span className={logStyles.draftLabel}>草稿</span>
-            <span className={logStyles.draftHint}>简单描述今天做了什么，LLM 结合任务背景生成日志草稿</span>
+            <span className={logStyles.draftHint}>简单描述今天做了什么，LLM 结合任务背景生成日报草稿</span>
             <button type="button" className={logStyles.draftClose} onClick={() => setDraftOpen(false)}>
               <svg viewBox="0 0 16 16" fill="none" width="12" height="12">
                 <path d="M3 3l10 10M13 3L3 13" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
@@ -201,7 +201,7 @@ function EntryCard({ index, entry, tasks, mode, placeholder, onUpdate, onRemove,
                   !entry.taskId ? '请先选择任务' :
                   draftMutation.isPending ? '生成中…' :
                   isGenMode ? '⌘Enter 生成草稿' :
-                  isDraftActive ? '草稿（已打开）' : '生成日志草稿'
+                  isDraftActive ? '草稿（已打开）' : '生成日报草稿'
                 }
                 onClick={() => {
                   if (!draftOpen) { setDraftInput(entry.content.trim()); setDraftOpen(true) }
@@ -370,8 +370,8 @@ export function BatchLogPanel({ defaultDate, onClose, onSubmitted }: Props) {
     const valid = entries.filter(e => e.taskId)
     if (!valid.length) { showToast('没有可提交的条目', 'error'); return }
     const ok = await confirm({
-      title: `落档 ${valid.length} 条日志？`,
-      body: <p>将向 {new Set(valid.map(e => e.taskId)).size} 个任务写入日志，落档后可在任务详情中修改或软删。</p>,
+      title: `落档 ${valid.length} 条日报？`,
+      body: <p>将向 {new Set(valid.map(e => e.taskId)).size} 个任务写入日报，落档后可在任务详情中修改或软删。</p>,
       confirmLabel: '确认落档',
     })
     if (!ok) return
@@ -392,7 +392,7 @@ export function BatchLogPanel({ defaultDate, onClose, onSubmitted }: Props) {
     }
     setSubmitting(false)
     if (done > 0) {
-      showToast(`已提交 ${done} 条日志`)
+      showToast(`已提交 ${done} 条日报`)
       clearDraft()
       onSubmitted()
       onClose()

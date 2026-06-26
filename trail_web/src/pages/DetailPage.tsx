@@ -233,9 +233,9 @@ export function DetailPage() {
   function handleDelete(logId: number) {
     openModal({
       eyebrow: '确认',
-      title: '软删此条日志？',
+      title: '软删此条日报？',
       titleMode: 'zh',
-      body: <p>删除后可在后续版本中恢复。日志 № {String(logId).padStart(3, '0')}</p>,
+      body: <p>删除后可在后续版本中恢复。日报 № {String(logId).padStart(3, '0')}</p>,
       buttons: [
         { label: '取消', className: 'btn btn--ghost', action: () => {} },
         {
@@ -265,7 +265,7 @@ export function DetailPage() {
         body: (
           <div>
             <p>任务 <em>{task!.title}</em> 已完成，当前处于维护期。</p>
-            <p>结束后将<em style={{ color: 'var(--oxblood)' }}>封版</em>，不能再添加日志。</p>
+            <p>结束后将<em style={{ color: 'var(--oxblood)' }}>封版</em>，不能再添加日报。</p>
           </div>
         ),
         buttons: [

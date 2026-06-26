@@ -26,7 +26,7 @@ interface ChatContextValue {
 
 const ChatContext = createContext<ChatContextValue | null>(null)
 
-const GREETING = '你好，我是 Trail 工作日志助教。你可以问我今日工作进展、本周情况、任务状态等。有什么想了解的？'
+const GREETING = '你好，我是 Trail 工作日报助教。你可以问我今日工作进展、本周情况、任务状态等。有什么想了解的？'
 
 export function ChatProvider({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false)

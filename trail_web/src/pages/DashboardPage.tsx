@@ -410,9 +410,9 @@ export function DashboardPage() {
         textStyle: { color: '#3A322A', fontSize: 12 },
         formatter: (params: any[]) => {
           const name = tasks[params[0].dataIndex]
-          const c = params.find((p: any) => p.seriesName === '日志条数')
+          const c = params.find((p: any) => p.seriesName === '日报条数')
           const h = params.find((p: any) => p.seriesName === '总时长')
-          return `${name}<br/>日志 ${c?.value ?? 0} 条 · ${h?.value ?? 0}h`
+          return `${name}<br/>日报 ${c?.value ?? 0} 条 · ${h?.value ?? 0}h`
         },
       },
       dataZoom: tasks.length > SHOW ? [
@@ -449,7 +449,7 @@ export function DashboardPage() {
       ],
       series: [
         {
-          name: '日志条数',
+          name: '日报条数',
           type: 'bar',
           yAxisIndex: 0,
           data: counts.map((v, i) => ({
@@ -635,7 +635,7 @@ export function DashboardPage() {
       {/* 任务日志统计 */}
       {taskStatsMemo.hasData && (
         <section className={styles.section}>
-          <div className={styles.sectionTitle}>任务日志统计（近 30 天）</div>
+          <div className={styles.sectionTitle}>任务日报统计（近 30 天）</div>
           <ReactECharts option={taskStatsMemo.option} style={{ height: 320 }} />
         </section>
       )}

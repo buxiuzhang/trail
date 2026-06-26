@@ -29,7 +29,7 @@ export function DetailHeader({ task, catalog, logCount }: DetailHeaderProps) {
       <div className="detail__badges">
         <Stamp status={task.status} size="big" />
         <NatureBadge nature={task.nature} />
-        <span className="tag">{logCount} 条日志</span>
+        <span className="tag">{logCount} 条日报</span>
         {task.tags.map(t => <span key={t} className="tag">#{t}</span>)}
       </div>
     </header>
