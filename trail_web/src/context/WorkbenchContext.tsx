@@ -12,8 +12,16 @@ interface WorkbenchContextType {
 
 const WorkbenchContext = createContext<WorkbenchContextType | null>(null)
 
+function getInitialPanel(): WorkbenchPanel {
+  try {
+    const saved = localStorage.getItem('workbenchPanel')
+    if (saved === 'quick-log' || saved === 'dashboard') return saved
+  } catch {}
+  return 'quick-log'
+}
+
 export function WorkbenchProvider({ children }: { children: ReactNode }) {
-  const [panel, setPanelState] = useState<WorkbenchPanel>('dashboard')
+  const [panel, setPanelState] = useState<WorkbenchPanel>(getInitialPanel)
   const [switchCount, setSwitchCount] = useState(0)
   const [targetDate, setTargetDate] = useState<string | null>(null)
 
@@ -21,6 +29,7 @@ export function WorkbenchProvider({ children }: { children: ReactNode }) {
     setTargetDate(date ?? null)
     setPanelState(p)
     setSwitchCount(c => c + 1)
+    try { if (p) localStorage.setItem('workbenchPanel', p) } catch {}
   }
 
   function clearTargetDate() {

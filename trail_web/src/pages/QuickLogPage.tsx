@@ -304,6 +304,43 @@ function ExportModalBody({ defaultDate, onClose }: { defaultDate: string; onClos
   )
 }
 
+// ── 新手引导 ──────────────────────────────────────────────────────
+function OnboardGuide({ onAddLog, onBatch }: { onAddLog: () => void; onBatch: () => void }) {
+  const navigate = useNavigate()
+  return (
+    <div className={styles.guide}>
+      <div className={styles.guideEyebrow}>GETTING STARTED</div>
+      <div className={styles.guideSteps}>
+        <div className={styles.guideStep}>
+          <span className={styles.guideStepNo}>①</span>
+          <div className={styles.guideStepBody}>
+            <div className={styles.guideStepTitle}>新建任务</div>
+            <div className={styles.guideStepDesc}>在任务清单中创建正在进行的工作，每条日志需关联到具体任务。</div>
+            <button type="button" className={styles.guideBtn} onClick={() => navigate('/new')}>
+              前往新建任务
+            </button>
+          </div>
+        </div>
+        <div className={styles.guideStep}>
+          <span className={styles.guideStepNo}>②</span>
+          <div className={styles.guideStepBody}>
+            <div className={styles.guideStepTitle}>填写今日日报</div>
+            <div className={styles.guideStepDesc}>选择任务，填写今日工时与工作内容。支持 AI 智能识别快速录入。</div>
+            <div className={styles.guideBtnRow}>
+              <button type="button" className={`${styles.guideBtn} ${styles.guideBtnPrimary}`} onClick={onBatch}>
+                今日填报
+              </button>
+              <button type="button" className={styles.guideBtn} onClick={onAddLog}>
+                ＋ 添加日志
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── 主页面 ────────────────────────────────────────────────────────
 export function QuickLogPage() {
   const [date, setDate] = useState(() => localToday())
@@ -394,7 +431,7 @@ export function QuickLogPage() {
         {isLoading ? (
           <div className={styles.empty}>加载中…</div>
         ) : submitted.length === 0 ? (
-          <div className={styles.empty}>今日暂无已提交日志</div>
+          <OnboardGuide onAddLog={() => setShowCard(true)} onBatch={() => setShowBatchPanel(true)} />
         ) : (
           <div className={styles.tableWrap}>
             <table className={styles.table}>
@@ -417,7 +454,7 @@ export function QuickLogPage() {
             </table>
           </div>
         )}
-        <button type="button" className={styles.addBtn} onClick={() => setShowCard(true)}>
+        <button type="button" className={styles.addBtn} onClick={() => setShowCard(true)} style={submitted.length === 0 ? { display: 'none' } : undefined}>
           ＋ 添加日志
         </button>
       </div>
