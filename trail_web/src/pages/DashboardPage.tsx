@@ -288,7 +288,7 @@ export function DashboardPage() {
       taskIdByTitle.set(t.title, t.id)
       taskStatusByTitle.set(t.title, t.status)
       if (!taskLastDate.has(t.title)) {
-        if (t.status === '已完成') continue
+        if (t.status === '已完成' || t.status === '已作废') continue
         taskLastDate.set(t.title, '')
       }
     }
@@ -390,12 +390,34 @@ export function DashboardPage() {
       countMap.set(cell.task_title, (countMap.get(cell.task_title) ?? 0) + cell.count)
       hoursMap.set(cell.task_title, (hoursMap.get(cell.task_title) ?? 0) + cell.hours)
     }
-    const tasks = [...countMap.keys()].sort((a, b) => (hoursMap.get(b) ?? 0) - (hoursMap.get(a) ?? 0))
+
+    const taskStatusByTitle = new Map<string, string>()
+    for (const t of allTasks) taskStatusByTitle.set(t.title, t.status)
+
+    const tasks = [...countMap.keys()].sort((a, b) => {
+      const aDone = taskStatusByTitle.get(a) === '已完成'
+      const bDone = taskStatusByTitle.get(b) === '已完成'
+      if (aDone !== bDone) return aDone ? 1 : -1
+      return (hoursMap.get(b) ?? 0) - (hoursMap.get(a) ?? 0)
+    })
     const counts = tasks.map(t => countMap.get(t) ?? 0)
     const hours  = tasks.map(t => parseFloat((hoursMap.get(t) ?? 0).toFixed(1)))
-    const SHOW = 12
+
+    const STATUS_LABEL_COLOR: Record<string, string> = {
+      '进行中': '#2D6A4F',
+      '未开始': '#4A6FA5',
+      '已完成': '#9E9E9E',
+      '已作废': '#C8C8C8',
+    }
+    const STATUS_RICH_KEY: Record<string, string> = {
+      '进行中': 's_ing',
+      '未开始': 's_new',
+      '已完成': 's_done',
+      '已作废': 's_void',
+    }
+
     const option = {
-      grid: { top: 48, right: 64, bottom: 40, left: 16, containLabel: true },
+      grid: { top: 48, right: 64, bottom: 80, left: 16, containLabel: true },
       legend: {
         top: 8,
         right: 8,
@@ -415,15 +437,28 @@ export function DashboardPage() {
           return `${name}<br/>日报 ${c?.value ?? 0} 条 · ${h?.value ?? 0}h`
         },
       },
-      dataZoom: tasks.length > SHOW ? [
-        { type: 'inside', xAxisIndex: 0, start: 0, end: Math.round(SHOW / tasks.length * 100) },
-      ] : [],
       xAxis: {
         type: 'category',
         data: tasks.map(t => t.length > 8 ? t.slice(0, 8) + '…' : t),
         axisLine: { lineStyle: { color: '#C7B999' } },
         axisTick: { show: false },
-        axisLabel: { color: '#8A7A6A', fontSize: 10, rotate: 30, interval: 0 },
+        axisLabel: {
+          fontSize: 10,
+          rotate: 30,
+          interval: 0,
+          formatter: (_: string, i: number) => {
+            const name = tasks[i] ?? ''
+            const s = name.length > 8 ? name.slice(0, 8) + '…' : name
+            const key = STATUS_RICH_KEY[taskStatusByTitle.get(name) ?? ''] ?? 's_new'
+            return `{${key}|${s}}`
+          },
+          rich: Object.fromEntries(
+            Object.entries(STATUS_LABEL_COLOR).map(([status, color]) => [
+              STATUS_RICH_KEY[status],
+              { align: 'left', color, fontSize: 10 },
+            ])
+          ),
+        },
         splitLine: { show: false },
       },
       yAxis: [
@@ -456,7 +491,7 @@ export function DashboardPage() {
             value: v,
             itemStyle: { color: PALETTE[i % PALETTE.length], borderRadius: [3, 3, 0, 0] },
           })),
-          barMaxWidth: 16,
+          barMaxWidth: 20,
           label: { show: true, position: 'top', fontSize: 10, color: '#4A3F32', formatter: '{c}' },
         },
         {
@@ -467,14 +502,14 @@ export function DashboardPage() {
           smooth: true,
           symbol: 'circle',
           symbolSize: 6,
-          lineStyle: { color: '#5C6BC0', width: 2 },
-          itemStyle: { color: '#5C6BC0', borderWidth: 2, borderColor: '#fff' },
-          label: { show: true, position: 'top', fontSize: 11, fontWeight: 'bold', color: '#5C6BC0', formatter: '{c}h' },
+          lineStyle: { color: '#E8762B', width: 2 },
+          itemStyle: { color: '#E8762B', borderWidth: 2, borderColor: '#fff' },
+          label: { show: true, position: 'bottom', fontSize: 10, color: '#E8762B', formatter: '{c}h' },
         },
       ],
     }
     return { option, hasData: tasks.length > 0 }
-  }, [heatmapData])
+  }, [heatmapData, allTasks])
 
   return (
     <div className={styles.page}>
@@ -542,6 +577,12 @@ export function DashboardPage() {
             </div>
           </div>
         </div>
+        {taskStatsMemo.hasData && (
+          <div style={{ marginBottom: -56 }}>
+            <div className={styles.sectionSubtitle}>任务日报统计（近 30 天）</div>
+            <ReactECharts option={taskStatsMemo.option} style={{ height: 360 }} />
+          </div>
+        )}
       </section>
 
       {/* 任务健康度 */}
@@ -632,13 +673,6 @@ export function DashboardPage() {
         </section>
       )}
 
-      {/* 任务日志统计 */}
-      {taskStatsMemo.hasData && (
-        <section className={styles.section}>
-          <div className={styles.sectionTitle}>任务日报统计（近 30 天）</div>
-          <ReactECharts option={taskStatsMemo.option} style={{ height: 320 }} />
-        </section>
-      )}
 
     </div>
   )
