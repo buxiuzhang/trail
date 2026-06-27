@@ -925,7 +925,63 @@ public class LlmService {
             : tasks.stream()
                 .map(t -> t.get("id") + ": " + t.get("title"))
                 .collect(java.util.stream.Collectors.joining("\n"));
+
+        // 向量匹配提示：语义最近的任务优先推荐给 LLM
+        String vectorHint = "";
+        if (embeddingService.isEnabled() && !rawText.isBlank()) {
+            try {
+                float[] vec = embeddingService.embed(rawText);
+                List<com.trail.store.VectorStore.SearchResult> hits = vectorStore.search(vec, 30);
+
+                Map<Long, String> taskTitleMap = new java.util.HashMap<>();
+                for (Map<String, Object> t : tasks) {
+                    if (t.get("id") != null)
+                        taskTitleMap.put(((Number) t.get("id")).longValue(),
+                                         t.get("title") != null ? t.get("title").toString() : "");
+                }
+
+                // 按 task_id 聚合最高分（来自 log 和 task 两种 source）
+                Map<Long, Double> taskScores = new java.util.LinkedHashMap<>();
+                for (com.trail.store.VectorStore.SearchResult h : hits) {
+                    if (h.score() < 0.4f) break;
+                    String idPart = h.id().contains(":") ? h.id().split(":", 2)[1] : null;
+                    if (idPart == null) continue;
+                    try {
+                        long entityId = Long.parseLong(idPart);
+                        long taskId;
+                        if ("task".equals(h.source())) {
+                            taskId = entityId;
+                        } else if ("log".equals(h.source())) {
+                            Map<String, Object> logRow = workLogStore.getLog(entityId);
+                            Object tid = logRow.get("task_id");
+                            if (tid == null) continue;
+                            taskId = ((Number) tid).longValue();
+                        } else {
+                            continue;
+                        }
+                        if (!taskTitleMap.containsKey(taskId)) continue;
+                        taskScores.merge(taskId, (double) h.score(), Math::max);
+                    } catch (Exception ignored2) {}
+                }
+
+                if (!taskScores.isEmpty()) {
+                    String hints = taskScores.entrySet().stream()
+                        .sorted((a, b) -> Double.compare(b.getValue(), a.getValue()))
+                        .limit(5)
+                        .map(e -> "  task:" + e.getKey() + "「" + taskTitleMap.get(e.getKey())
+                                  + "」相似度:" + String.format("%.2f", e.getValue()))
+                        .collect(java.util.stream.Collectors.joining("\n"));
+                    if (!hints.isBlank()) {
+                        vectorHint = "\n\n【向量检索提示（语义最相关任务，供参考）】\n" + hints;
+                    }
+                }
+            } catch (Exception e) {
+                log.debug("batch-tag 向量检索跳过: {}", e.getMessage());
+            }
+        }
+
         String user = "当前任务列表（格式：ID: 名称）：\n" + taskListText
+            + vectorHint
             + "\n\n以下是需要标注的工作内容：\n\n" + rawText;
         AnthropicResponse resp = callAnthropic(cfg, system, List.of(userMessage(user)));
         aiRecordStore.addRecord(null, null, "batch_tag", user, resp.raw(), false);

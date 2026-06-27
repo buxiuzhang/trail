@@ -6,7 +6,7 @@ import { useCreateTask, useUpdateTask } from '@/api/tasks'
 import { LLM_AVAILABLE } from '@/api/llm'
 import { usePlaceholders, DEFAULT_PLACEHOLDERS } from '@/api/settings'
 import { useToastContext } from '@/context/ToastContext'
-import { useChatContext } from '@/context/ChatContext'
+import { usePolish } from '@/hooks/usePolish'
 import { FormField } from './FormField'
 import { ContactRow } from './ContactRow'
 import { DescriptionEditorWithMode as DescriptionEditor, type EditorMode } from '@/components/shared/DescriptionEditorWithMode'
@@ -121,7 +121,7 @@ export function TaskForm({ mode, task }: TaskFormProps) {
 
   const isEdit = mode === 'edit'
   const taskId = task?.id
-  const { openPolish } = useChatContext()
+  const polish = usePolish()
 
   // 表单状态
   const [title, setTitle] = useState(task?.title || '')
@@ -273,15 +273,12 @@ export function TaskForm({ mode, task }: TaskFormProps) {
               <ModeToggleButton mode={editorMode} onModeChange={setEditorMode} />
               <button
                 type="button"
-                onClick={() => {
-                  const ok = openPolish({
+                onClick={() => polish({
                     type: 'task_desc',
                     initialContent: description,
                     taskId,
                     onAdopt: (suggestion) => setDescription(suggestion),
-                  })
-                  if (!ok) showToast('工作对话已开启，请先关闭后再使用润色')
-                }}
+                  })}
                 disabled={!LLM_AVAILABLE || !description.trim()}
                 title={LLM_AVAILABLE ? 'AI 对话润色' : 'LLM 暂未接入'}
                 className={styles.polishBtn}

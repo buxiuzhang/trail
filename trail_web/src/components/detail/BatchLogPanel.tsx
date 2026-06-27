@@ -4,7 +4,7 @@ import { useTodos } from '@/api/todos'
 import { useAttachmentsByIds } from '@/api/attachments'
 import { useToastContext } from '@/context/ToastContext'
 import { useConfirm } from '@/utils/confirm'
-import { usePolishContent } from '@/hooks/usePolishContent'
+import { usePolish } from '@/hooks/usePolish'
 import { LLM_AVAILABLE } from '@/api/llm'
 import { usePlaceholders, DEFAULT_PLACEHOLDERS } from '@/api/settings'
 import polishIcon from '@/icons/polish.svg'
@@ -13,6 +13,8 @@ import type { TaskOut } from '@/types'
 import { DescriptionEditorWithMode, type EditorMode } from '@/components/shared/DescriptionEditorWithMode'
 import { Select } from '@/components/shared/Select'
 import { TaskSelectorRow } from '@/components/shared/TaskSelectorRow'
+import { ModeToggleButton } from '@/components/shared/ModeToggleButton'
+import CloseCircleIcon from '@/icons/close-circle.svg'
 import styles from './BatchLogPanel.module.css'
 import logStyles from './Logbook.module.css'
 
@@ -43,7 +45,7 @@ interface EntryCardProps {
 }
 
 function EntryCard({ index, entry, tasks, mode, placeholder, onUpdate, onRemove, onModeChange }: EntryCardProps) {
-  const polishLog = usePolishContent({ task_id: entry.taskId ?? undefined })
+  const polish = usePolish()
   const { data: todos = [] } = useTodos(entry.taskId ?? 0)
 
   const fileIds = useMemo(() => {
@@ -63,12 +65,19 @@ function EntryCard({ index, entry, tasks, mode, placeholder, onUpdate, onRemove,
   return (
     <div className={`${styles.entryCard} ${!entry.taskId ? styles.entryUnmatched : ''}`}>
       <span className={styles.entryIndex}>{index}</span>
-      <button className={styles.removeBtn} onMouseDown={e => e.preventDefault()} onClick={onRemove}>✕</button>
-      <TaskSelectorRow
-        tasks={tasks}
-        taskId={entry.taskId ?? null}
-        onChange={(id, task) => onUpdate({ taskId: id, task_title: task?.title ?? null })}
-      />
+      <button className={styles.removeBtn} onMouseDown={e => e.preventDefault()} onClick={onRemove}>
+        <img src={CloseCircleIcon} width={14} height={14} alt="移除" />
+      </button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ flex: 1 }}>
+          <TaskSelectorRow
+            tasks={tasks}
+            taskId={entry.taskId ?? null}
+            onChange={(id, task) => onUpdate({ taskId: id, task_title: task?.title ?? null })}
+          />
+        </div>
+        <ModeToggleButton mode={mode} onModeChange={onModeChange} />
+      </div>
       <div className={`${logStyles.composeRow} ${styles.entryComposeRow}`}>
         <label>日期</label>
         <input
@@ -117,6 +126,7 @@ function EntryCard({ index, entry, tasks, mode, placeholder, onUpdate, onRemove,
         onChange={v => onUpdate({ content: v })}
         mode={mode}
         onModeChange={onModeChange}
+        hideInlineToggle
         placeholder={placeholder}
         minHeight={60}
         autoGrow
@@ -131,19 +141,19 @@ function EntryCard({ index, entry, tasks, mode, placeholder, onUpdate, onRemove,
           <button
             type="button"
             className={logStyles.btnPolish}
-            onClick={() => polishLog.handlePolish(entry.content, v => onUpdate({ content: v }))}
-            disabled={!LLM_AVAILABLE || polishLog.isPending || !entry.taskId}
+            onClick={() => polish({
+              type: 'log',
+              initialContent: entry.content,
+              taskId: entry.taskId ?? undefined,
+              onAdopt: (suggestion) => onUpdate({ content: suggestion }),
+            })}
+            disabled={!LLM_AVAILABLE || !entry.taskId}
             data-tooltip={
               !LLM_AVAILABLE ? 'LLM 暂未接入' :
-              !entry.taskId ? '请先选择任务' :
-              polishLog.isPolished ? '撤销润色' : '润色'
+              !entry.taskId ? '请先选择任务' : 'AI 对话润色'
             }
           >
-            <img
-              src={polishIcon}
-              alt=""
-              className={`${logStyles.polishIcon} ${polishLog.isPolished ? logStyles.polishIconActive : ''}`}
-            />
+            <img src={polishIcon} alt="" className={logStyles.polishIcon} />
           </button>
         </div>
       </div>
@@ -343,6 +353,7 @@ export function BatchLogPanel({ defaultDate, onClose, onSubmitted }: Props) {
               >
                 {tagging ? '标注中…' : taggedFrom !== null ? '撤回标注' : 'AI 标注'}
               </button>
+              <ModeToggleButton mode={rawMode} onModeChange={setRawMode} />
             </div>
             <div className={styles.editorWrap}>
               <DescriptionEditorWithMode
@@ -358,6 +369,7 @@ export function BatchLogPanel({ defaultDate, onClose, onSubmitted }: Props) {
                 }}
                 mode={rawMode}
                 onModeChange={setRawMode}
+                hideInlineToggle
                 placeholder={placeholders?.log ?? DEFAULT_PLACEHOLDERS.log}
                 minHeight={200}
                 autoGrow

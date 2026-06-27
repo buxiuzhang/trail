@@ -5,7 +5,7 @@ import { LLM_AVAILABLE } from '@/api/llm'
 import { usePlaceholders, DEFAULT_PLACEHOLDERS } from '@/api/settings'
 import { useToastContext } from '@/context/ToastContext'
 import { useModalContext } from '@/context/ModalContext'
-import { useChatContext } from '@/context/ChatContext'
+import { usePolish } from '@/hooks/usePolish'
 import { useAttachmentsByIds } from '@/api/attachments'
 import { Select } from '@/components/shared/Select'
 import { DescriptionEditorWithMode as DescriptionEditor } from '@/components/shared/DescriptionEditorWithMode'
@@ -42,7 +42,7 @@ export function LogCompose({ task, todos, tasks = [], editing, onSave, onCancel,
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const { showToast } = useToastContext()
   const { openModal } = useModalContext()
-  const { openPolish } = useChatContext()
+  const polish = usePolish()
   const { data: placeholders } = usePlaceholders()
 
   const fileIds = useMemo(() => {
@@ -245,8 +245,7 @@ export function LogCompose({ task, todos, tasks = [], editing, onSave, onCancel,
           <button
             type="button"
             className={styles.btnPolish}
-            onClick={() => {
-              const ok = openPolish({
+            onClick={() => polish({
                 type: 'log',
                 initialContent: content,
                 contentForLLM: expandMentionsForLLM(
@@ -258,9 +257,7 @@ export function LogCompose({ task, todos, tasks = [], editing, onSave, onCancel,
                 todos,
                 tasks,
                 onAdopt: (suggestion) => setContent(suggestion),
-              })
-              if (!ok) showToast('工作对话已开启，请先关闭后再使用润色')
-            }}
+              })}
             disabled={!LLM_AVAILABLE || !content.trim()}
             data-tooltip={LLM_AVAILABLE ? 'AI 对话润色' : 'LLM 暂未接入'}
           >

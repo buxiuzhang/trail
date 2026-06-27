@@ -65,6 +65,9 @@ function FloatingCard({
   const qc = useQueryClient()
 
   const activeTasks = tasks.filter(t => t.status === '进行中')
+  const selectorTasks = isEdit
+    ? tasks.filter(t => t.status === '进行中' || t.id === editingLog.task_id)
+    : activeTasks
   const taskForCompose: TaskOut = selectedTask ?? makePlaceholderTask()
 
   return (
@@ -72,7 +75,7 @@ function FloatingCard({
       <div className={styles.overlay} onClick={onClose} />
       <div className={styles.floatCard}>
         <TaskSelectorRow
-          tasks={activeTasks}
+          tasks={selectorTasks}
           taskId={taskId}
           onChange={(id) => setTaskId(id)}
         />

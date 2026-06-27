@@ -505,12 +505,15 @@
   width: min(680px, 92vw);
   max-height: 88vh;
   overflow-y: auto;
+  scrollbar-width: none;
   background: var(--card);
   border: 0.5px solid var(--rule);
   box-shadow: var(--shadow-xl);
   padding: var(--space-xl);
   animation: slideUp 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
+
+.floatCard::-webkit-scrollbar { display: none; }
 
 @keyframes slideUp {
   from { opacity: 0; transform: translate(-50%, calc(-50% + 16px)); }

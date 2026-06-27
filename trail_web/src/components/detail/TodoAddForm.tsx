@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import { usePlaceholders, DEFAULT_PLACEHOLDERS } from '@/api/settings'
 import { LLM_AVAILABLE } from '@/api/llm'
-import { useChatContext } from '@/context/ChatContext'
-import { useToastContext } from '@/context/ToastContext'
+import { usePolish } from '@/hooks/usePolish'
 import { DescriptionEditorWithMode as DescriptionEditor, type EditorMode } from '@/components/shared/DescriptionEditorWithMode'
 import { ModeToggleButton } from '@/components/shared/ModeToggleButton'
 import polishIcon from '@/icons/polish.svg'
@@ -16,8 +15,7 @@ interface TodoAddFormProps {
 
 export function TodoAddForm({ onSubmit, onClose, initialTitle = '', initialDescription = '' }: TodoAddFormProps) {
   const { data: placeholders } = usePlaceholders()
-  const { openPolish } = useChatContext()
-  const { showToast } = useToastContext()
+  const polish = usePolish()
   const [title, setTitle] = useState(initialTitle)
   const [description, setDescription] = useState(initialDescription)
   const [submitting, setSubmitting] = useState(false)
@@ -63,19 +61,16 @@ export function TodoAddForm({ onSubmit, onClose, initialTitle = '', initialDescr
           <ModeToggleButton mode={editorMode} onModeChange={setEditorMode} style={{ marginLeft: 'auto' }} />
           <button
             type="button"
-            onClick={() => {
-              const ok = openPolish({
+            onClick={() => polish({
                 type: 'todo',
                 initialContent: description,
                 onAdopt: (suggestion) => setDescription(suggestion),
-              })
-              if (!ok) showToast('工作对话已开启，请先关闭后再使用润色')
-            }}
+              })}
             disabled={!LLM_AVAILABLE || !description.trim()}
             title={LLM_AVAILABLE ? 'AI 对话润色' : 'LLM 暂未接入'}
             style={{ background: 'none', border: 'none', padding: '0 0 0 8px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', opacity: LLM_AVAILABLE ? 1 : 0.3 }}
           >
-            <img src={polishIcon} alt="" style={{ width: 16, height: 16, opacity: 0.4 }} />
+            <img src={polishIcon} alt="" style={{ width: 16, height: 16, opacity: 0.65 }} />
           </button>
         </div>
         <DescriptionEditor
