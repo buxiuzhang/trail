@@ -11,7 +11,6 @@ export function ContactChip({ contact }: ContactChipProps) {
   const [expanded, setExpanded] = useState(false)
   const kindLabel = KIND_LABELS[contact.kind] || contact.kind
   const platformLabel = PLATFORM_LABELS[contact.channel] || contact.channel
-  const hasDetail = contact.target || contact.note
 
   return (
     <div className={`${styles.wrap} ${expanded ? styles.isExpanded : ''}`}>

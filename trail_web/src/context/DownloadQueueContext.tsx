@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useCallback, useState, type ReactNode } from 'react'
 
 export interface DownloadTask {
@@ -86,7 +87,7 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
           }
         }
 
-        const blob = new Blob(chunks)
+        const blob = new Blob(chunks as BlobPart[])
         const blobUrl = URL.createObjectURL(blob)
         const a = document.createElement('a')
         a.href = blobUrl
@@ -96,11 +97,11 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
 
         updateTask(id, { status: 'done', progress: 100, abortFn: undefined })
         setTimeout(() => setTasks(prev => prev.filter(t => t.id !== id)), 4000)
-      } catch (err: any) {
-        if (err?.name === 'AbortError') {
+      } catch (err: unknown) {
+        if ((err as Error)?.name === 'AbortError') {
           setTasks(prev => prev.filter(t => t.id !== id))
         } else {
-          updateTask(id, { status: 'error', error: err?.message || '下载失败', abortFn: undefined })
+          updateTask(id, { status: 'error', error: (err as Error)?.message || '下载失败', abortFn: undefined })
         }
       }
     })()

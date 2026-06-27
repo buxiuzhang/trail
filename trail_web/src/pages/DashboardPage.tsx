@@ -10,6 +10,7 @@ import {
   useLogHeatmap,
   useAllTasks,
 } from '@/api/insights'
+import type { StaleOut } from '@/types'
 import styles from './DashboardPage.module.css'
 
 function localDate(offsetDays = 0): string {
@@ -83,6 +84,8 @@ function pieOption(
   }
 }
 
+const WEEK_DAY_NAMES = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+
 export function DashboardPage() {
   const today = localDate()
   const wStart = weekStart()
@@ -113,21 +116,20 @@ export function DashboardPage() {
 
   const inProgress = overview?.by_status?.['进行中'] ?? 0
 
-  const activeCount = staleTasks.filter((t: any) => t.days_idle != null && t.days_idle <= 3).length
-  const coolCount   = staleTasks.filter((t: any) => t.days_idle != null && t.days_idle >= 4 && t.days_idle <= 7).length
-  const warnTasks   = staleTasks.filter((t: any) => t.days_idle == null || t.days_idle > 7)
+  const activeCount = staleTasks.filter((t: StaleOut) => t.days_idle != null && t.days_idle <= 3).length
+  const coolCount   = staleTasks.filter((t: StaleOut) => t.days_idle != null && t.days_idle >= 4 && t.days_idle <= 7).length
+  const warnTasks   = staleTasks.filter((t: StaleOut) => t.days_idle == null || t.days_idle > 7)
 
-  const totalTodos     = (overview as any)?.todo_active_count ?? 0
-  const completedTodos = (overview as any)?.todo_completed_count ?? 0
+  const totalTodos     = overview?.todo_active_count ?? 0
+  const completedTodos = overview?.todo_completed_count ?? 0
   const todoTotal      = totalTodos + completedTodos
   const todoRate       = todoTotal > 0 ? Math.round((completedTodos / todoTotal) * 100) : 0
 
   const logCounts = useMemo(() => trend14.map(d => d.count ?? 0), [trend14])
 
-  const weekDayNames = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
   const trendDates = useMemo(() => trend14.map(d => {
     const wd = new Date(d.date).getDay()
-    return `${d.date.slice(5)} ${weekDayNames[wd]}`
+    return `${d.date.slice(5)} ${WEEK_DAY_NAMES[wd]}`
   }), [trend14])
 
   // ECharts：工时趋势（双线：工时 + 日报数量）
@@ -250,13 +252,13 @@ export function DashboardPage() {
 
   const [selectedHealth, setSelectedHealth] = useState<'active' | 'cool' | 'warn'>('warn')
 
-  const activeTasks = staleTasks.filter((t: any) => t.days_idle != null && t.days_idle <= 3)
-  const coolTasksList = staleTasks.filter((t: any) => t.days_idle != null && t.days_idle >= 4 && t.days_idle <= 7)
+  const activeTasks = staleTasks.filter((t: StaleOut) => t.days_idle != null && t.days_idle <= 3)
+  const coolTasksList = staleTasks.filter((t: StaleOut) => t.days_idle != null && t.days_idle >= 4 && t.days_idle <= 7)
 
   const healthBuckets = { active: activeTasks, cool: coolTasksList, warn: warnTasks }
   const selectedTasks = healthBuckets[selectedHealth]
 
-  const healthDayLabel = (t: any) =>
+  const healthDayLabel = (t: StaleOut) =>
     t.days_idle != null ? `${t.days_idle} 天未记录` : '从未记录'
 
   const statusPieOption = useMemo(
@@ -339,7 +341,7 @@ export function DashboardPage() {
     const option = {
       grid: { top: 10, right: 16, bottom: 56, left: 0 },
       tooltip: {
-        formatter: (p: any) => {
+        formatter: (p: { data: { value: number[] } }) => {
           const [di, ti, cnt, hrs] = p.data.value
           return `${tasks[ti]}<br/>${dates[di]}<br/>日报 ${cnt} 条 · ${hrs}h`
         },
@@ -381,7 +383,7 @@ export function DashboardPage() {
     }
 
     return { option, tasks, taskIdByTitle, chartHeight: tasks.length * 32 + 76 }
-  }, [heatmapData, allTasks, heatmap30Start])
+  }, [heatmapData, allTasks])
 
   const taskStatsMemo = useMemo(() => {
     const countMap = new Map<string, number>()
@@ -430,10 +432,10 @@ export function DashboardPage() {
         backgroundColor: 'var(--card)',
         borderColor: 'var(--rule)',
         textStyle: { color: '#3A322A', fontSize: 12 },
-        formatter: (params: any[]) => {
+        formatter: (params: { dataIndex: number; seriesName: string; value: number }[]) => {
           const name = tasks[params[0].dataIndex]
-          const c = params.find((p: any) => p.seriesName === '日报条数')
-          const h = params.find((p: any) => p.seriesName === '总时长')
+          const c = params.find((p) => p.seriesName === '日报条数')
+          const h = params.find((p) => p.seriesName === '总时长')
           return `${name}<br/>日报 ${c?.value ?? 0} 条 · ${h?.value ?? 0}h`
         },
       },
@@ -592,7 +594,7 @@ export function DashboardPage() {
           option={healthOption}
           style={{ height: 120 }}
           onEvents={{
-            click: (p: any) => {
+            click: (p: { componentType: string; dataIndex: number | null }) => {
               const map = ['warn', 'cool', 'active'] as const
               if (p.componentType === 'series' && p.dataIndex != null) {
                 setSelectedHealth(map[p.dataIndex])
@@ -618,7 +620,7 @@ export function DashboardPage() {
         </div>
         {selectedTasks.length > 0 ? (
           <div className={styles.warnList}>
-            {selectedTasks.map((t: any) => (
+            {selectedTasks.map((t: StaleOut) => (
               <div key={t.id} className={styles.warnItem} onClick={() => navigate(`/task/${t.id}`)}>
                 <span className={styles.warnTitle}>{t.title}</span>
                 <span className={styles.warnDays}>{healthDayLabel(t)}</span>
@@ -637,7 +639,7 @@ export function DashboardPage() {
           option={trendOption}
           style={{ height: 220 }}
           onChartReady={(chart) => {
-            chart.getZr().on('dblclick', (e: any) => {
+            chart.getZr().on('dblclick', (e: { offsetX: number; offsetY: number }) => {
               const pt = [e.offsetX, e.offsetY]
               const idx = chart.convertFromPixel({ seriesIndex: 0 }, pt)
               if (idx == null) return
@@ -660,7 +662,7 @@ export function DashboardPage() {
               option={{ ...heatmapMemo.option, grid: { ...heatmapMemo.option.grid, left: 120 } }}
               style={{ height: heatmapMemo.chartHeight }}
               onEvents={{
-                dblclick: (p: any) => {
+                dblclick: (p: { componentType: string; data: { value: number[] } | null }) => {
                   if (p.componentType === 'series' && p.data) {
                     const title = heatmapMemo.tasks[p.data.value[1]]
                     const id = heatmapMemo.taskIdByTitle.get(title)

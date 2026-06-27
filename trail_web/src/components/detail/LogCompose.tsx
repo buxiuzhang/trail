@@ -31,8 +31,6 @@ interface LogComposeProps {
 }
 
 export function LogCompose({ task, todos, tasks = [], editing, onSave, onCancel, saveDisabled, saveLabel, defaultLogDate, confirmBeforeSave }: LogComposeProps) {
-  // 封版（已完成+非维护 或 已作废）→ 不渲染日志表单
-  if (task.status === '已作废' || (task.status === '已完成' && task.nature !== '维护')) return null
   const isEdit = !!editing
   const [logDate, setLogDate] = useState(editing?.log_date || defaultLogDate || TODAY)
   const [phase, setPhase] = useState(editing?.phase || (task.nature === '维护' ? 'maintenance' : 'main'))
@@ -49,7 +47,7 @@ export function LogCompose({ task, todos, tasks = [], editing, onSave, onCancel,
   const polishLog = usePolishContent({ task_id: task.id })
   const draftMutation = useDraftLog(task.id)
   const { showToast } = useToastContext()
-  const { openModal, closeModal } = useModalContext()
+  const { openModal } = useModalContext()
   const { data: placeholders } = usePlaceholders()
 
   const fileIds = useMemo(() => {
@@ -62,7 +60,7 @@ export function LogCompose({ task, todos, tasks = [], editing, onSave, onCancel,
   const { data: attList = [] } = useAttachmentsByIds(fileIds)
   const attachments = useMemo(() => {
     const map = new Map<number, { name: string; mime: string }>()
-    attList.forEach((a: any) => map.set(a.id, { name: a.original_name || `文件 #${a.id}`, mime: a.mime }))
+    attList.forEach((a) => map.set(a.id, { name: a.original_name || `文件 #${a.id}`, mime: a.mime }))
     return map
   }, [attList])
 
@@ -85,6 +83,9 @@ export function LogCompose({ task, todos, tasks = [], editing, onSave, onCancel,
     setSelectedTodoIds(extractTodoMentionIds(content))
     setSelectedTaskIds(extractTaskRefIds(content))
   }, [content])
+
+  // 封版（已完成+非维护 或 已作废）→ 不渲染日志表单，所有 hook 已在上方调用
+  if (task.status === '已作废' || (task.status === '已完成' && task.nature !== '维护')) return null
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -164,9 +165,9 @@ export function LogCompose({ task, todos, tasks = [], editing, onSave, onCancel,
       setContent(result.polished)
       setDraftOpen(false)
       setDraftInput('')
-    } catch (err: any) {
-      const hint = err.status === 503 ? '（未配置 LLM）' : err.status === 502 ? '（调用失败）' : ''
-      showToast('草稿生成失败：' + err.message + hint)
+    } catch (err: unknown) {
+      const hint = (err as {status?: number})?.status === 503 ? '（未配置 LLM）' : (err as {status?: number})?.status === 502 ? '（调用失败）' : ''
+      showToast('草稿生成失败：' + (err as Error).message + hint)
     }
   }
 

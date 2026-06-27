@@ -4,7 +4,7 @@ import { useToastContext } from '@/context/ToastContext'
 
 interface PolishArgs {
   task_id?: number
-  type?: 'log' | 'todo' | 'task_desc'
+  type?: 'log' | 'todo'
 }
 
 /**
@@ -30,10 +30,10 @@ export function usePolishContent(args: PolishArgs = {}) {
       const result = await mutation.mutateAsync({ content: raw, ...args })
       setPolishedFrom(raw)
       setContent(result.polished)
-    } catch (err: any) {
-      const hint = err.status === 503 ? '（未配置 LLM）'
-                 : err.status === 502 ? '（调用失败）' : ''
-      showToast('润色失败：' + err.message + hint)
+    } catch (err: unknown) {
+      const hint = (err as {status?: number})?.status === 503 ? '（未配置 LLM）'
+                 : (err as {status?: number})?.status === 502 ? '（调用失败）' : ''
+      showToast('润色失败：' + (err as Error).message + hint)
     }
   }
 

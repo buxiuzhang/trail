@@ -116,28 +116,28 @@ export function TaskCard({ task, logCount = 0, logMainCount = 0 }: TaskCardProps
     if (e.detail >= 2) return
     try {
       if (pinned) {
-        await unpinTask.mutateAsync(undefined as any)
+        await unpinTask.mutateAsync()
         showToast('已取消置顶')
       } else {
-        await pinTask.mutateAsync(undefined as any)
+        await pinTask.mutateAsync()
         showToast('已置顶')
       }
-    } catch (err: any) {
-      showToast('操作失败：' + err.message)
+    } catch (err: unknown) {
+      showToast('操作失败：' + (err as Error).message)
     }
   }
 
   async function handleWatch() {
     try {
       if (watched) {
-        await unwatchTask.mutateAsync(undefined as any)
+        await unwatchTask.mutateAsync()
         showToast('已取消关注')
       } else {
-        await watchTask.mutateAsync(undefined as any)
+        await watchTask.mutateAsync()
         showToast('已添加到特别关注')
       }
-    } catch (err: any) {
-      showToast('操作失败：' + err.message)
+    } catch (err: unknown) {
+      showToast('操作失败：' + (err as Error).message)
     }
   }
 
@@ -167,7 +167,7 @@ export function TaskCard({ task, logCount = 0, logMainCount = 0 }: TaskCardProps
           tabIndex={0}
           onClick={handlePin}
           onDoubleClick={(e) => e.stopPropagation()}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); handlePin(e as any) } }}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); handlePin(e as unknown as React.MouseEvent) } }}
           title={pinned ? '取消置顶' : '置顶到列表首位'}
         >
           📌
@@ -256,8 +256,8 @@ export function TaskCard({ task, logCount = 0, logMainCount = 0 }: TaskCardProps
           pinned={pinned}
           onWatch={handleWatch}
           onUnwatch={handleWatch}
-          onPin={() => handlePin({ stopPropagation: () => {}, detail: 1 } as any)}
-          onUnpin={() => handlePin({ stopPropagation: () => {}, detail: 1 } as any)}
+          onPin={() => handlePin({ stopPropagation: () => {}, detail: 1 } as unknown as React.MouseEvent)}
+          onUnpin={() => handlePin({ stopPropagation: () => {}, detail: 1 } as unknown as React.MouseEvent)}
           onOpen={() => navigate(`/task/${task.id}`)}
           onClose={() => setMenu(null)}
         />

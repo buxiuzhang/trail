@@ -75,8 +75,6 @@ const DEFAULT_GROUPS: TypeGroup[] = [
   },
 ]
 
-const ALL_DEFAULT_MIMES = new Set(DEFAULT_GROUPS.flatMap(g => g.entries.map(e => e.mime)))
-
 // 后端硬编码白名单对应的 MIME 集合（不含编程分组）
 const DEFAULT_ENABLED_MIMES = new Set(
   DEFAULT_GROUPS
@@ -167,7 +165,7 @@ export function UploadLimitsSection() {
       })
       showToast('附件设置已保存')
     } catch {
-      showToast('保存失败', 'error')
+      showToast('保存失败')
     }
   }
 

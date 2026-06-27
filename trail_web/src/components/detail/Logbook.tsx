@@ -13,7 +13,6 @@ interface LogbookProps {
   onSaveNew: (data: { log_date: string; content: string; phase: string; hours: number; todo_ids: number[]; task_ids: number[] }) => Promise<void>
   onSaveEdit: (logId: number, data: { log_date: string; content: string; phase: string; hours: number; todo_ids: number[]; task_ids: number[] }) => Promise<void>
   onDelete: (logId: number) => void
-  onAddLogFocus: boolean
   revealLogId?: number
   fetchNextPage: () => void
   hasNextPage: boolean
@@ -22,7 +21,7 @@ interface LogbookProps {
   onSortChange: (order: 'asc' | 'desc') => void
 }
 
-export function Logbook({ task, logs, todos, tasks = [], onSaveNew, onSaveEdit, onDelete, onAddLogFocus, revealLogId, fetchNextPage, hasNextPage, isFetchingNextPage, sortOrder, onSortChange }: LogbookProps) {
+export function Logbook({ task, logs, todos, tasks = [], onSaveNew, onSaveEdit, onDelete, revealLogId, fetchNextPage, hasNextPage, isFetchingNextPage, sortOrder, onSortChange }: LogbookProps) {
   const [editingLogId, setEditingLogId] = useState<number | null>(null)
   const prevRevealId = useRef<number | undefined>(undefined)
   const sentinelRef = useInfiniteScroll(fetchNextPage, hasNextPage, isFetchingNextPage)

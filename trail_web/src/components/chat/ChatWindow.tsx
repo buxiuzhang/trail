@@ -26,7 +26,6 @@ export function ChatWindow() {
   const {
     isOpen,
     messages,
-    isLoading,
     closeChat,
     addMessage,
     updateLastMessage,
@@ -250,7 +249,7 @@ export function ChatWindow() {
           setToolStatus({ name, input, executing: true })
         },
         // onToolResult
-        (name, ok) => {
+        (_name, _ok) => {
           setToolStatus(prev => prev ? { ...prev, executing: false } : null)
         },
         // onIteration
@@ -263,9 +262,9 @@ export function ChatWindow() {
           if (liveRef.current) liveRef.current.textContent = ''
         },
       )
-    } catch (err: any) {
-      const detail = err?.message ?? String(err)
-      const status = (err as any)?.status
+    } catch (err: unknown) {
+      const detail = (err as Error)?.message ?? String(err)
+      const status = (err as { status?: number })?.status
       if (
         detail.includes('503') ||
         detail.includes('未配置') ||
@@ -273,7 +272,7 @@ export function ChatWindow() {
         status === 503
       ) {
         showToast('LLM 未配置，请在设置中配置 API Key')
-      } else if (err.name === 'AbortError') {
+      } else if ((err as Error).name === 'AbortError') {
         // 用户主动停止，不弹 toast
       } else if (
         detail.includes('429') ||

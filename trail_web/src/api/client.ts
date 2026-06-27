@@ -24,7 +24,7 @@ interface FetchOptions extends Omit<RequestInit, 'body'> {
 
 /** 带重试的 request（处理 DuckDB 锁冲突） */
 async function request<T>(path: string, opts: FetchOptions = {}, retries = 3): Promise<T> {
-  const { body, headers, skipNeedsDataDirRetry, ...rest } = opts;
+  const { body, headers, skipNeedsDataDirRetry: _skipNeedsDataDirRetry, ...rest } = opts;
   const apiBase = getApiBase(); // 动态获取
   for (let attempt = 0; attempt <= retries; attempt++) {
     const res = await fetch(apiBase + path, {

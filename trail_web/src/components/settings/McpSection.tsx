@@ -103,7 +103,7 @@ export function McpSection() {
       }
       closeForm()
     } catch (err: unknown) {
-      showToast((err as Error).message ?? '保存失败', 'error')
+      showToast((err as Error).message ?? '保存失败')
     }
   }
 
@@ -119,7 +119,7 @@ export function McpSection() {
       await deleteServer.mutateAsync(server.id)
       showToast('已删除')
     } catch (err: unknown) {
-      showToast((err as Error).message ?? '删除失败', 'error')
+      showToast((err as Error).message ?? '删除失败')
     }
   }
 
@@ -127,7 +127,7 @@ export function McpSection() {
     try {
       await updateServer.mutateAsync({ id: server.id, name: server.name, type: server.type, enabled: server.enabled ? 0 : 1 })
     } catch (err: unknown) {
-      showToast((err as Error).message ?? '操作失败', 'error')
+      showToast((err as Error).message ?? '操作失败')
     }
   }
 

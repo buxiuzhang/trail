@@ -1,7 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
 import { useTasks } from '@/api/tasks'
-import { useCreateLog } from '@/api/logs'
 import { useTodos } from '@/api/todos'
 import { useAttachmentsByIds } from '@/api/attachments'
 import { useToastContext } from '@/context/ToastContext'
@@ -64,7 +62,7 @@ function EntryCard({ index, entry, tasks, mode, placeholder, onUpdate, onRemove,
   const { data: attList = [] } = useAttachmentsByIds(fileIds)
   const attachments = useMemo(() => {
     const map = new Map<number, { name: string; mime: string }>()
-    attList.forEach((a: any) => map.set(a.id, { name: a.original_name || `文件 #${a.id}`, mime: a.mime }))
+    attList.forEach((a) => map.set(a.id, { name: a.original_name || `文件 #${a.id}`, mime: a.mime }))
     return map
   }, [attList])
 
@@ -83,9 +81,9 @@ function EntryCard({ index, entry, tasks, mode, placeholder, onUpdate, onRemove,
       onUpdate({ content: result.polished })
       setDraftOpen(false)
       setDraftInput('')
-    } catch (err: any) {
-      const hint = err.status === 503 ? '（未配置 LLM）' : err.status === 502 ? '（调用失败）' : ''
-      showToast('草稿生成失败：' + err.message + hint)
+    } catch (err: unknown) {
+      const hint = (err as {status?: number})?.status === 503 ? '（未配置 LLM）' : (err as {status?: number})?.status === 502 ? '（调用失败）' : ''
+      showToast('草稿生成失败：' + (err as Error).message + hint)
     }
   }
 
@@ -264,7 +262,7 @@ export function BatchLogPanel({ defaultDate, onClose, onSubmitted }: Props) {
     try {
       const prev = loadDraft() ?? { step: 'input', rawText: '', entries: [], date: defaultDate }
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...prev, ...patch }))
-    } catch {}
+    } catch { /* localStorage unavailable */ }
   }
 
   function clearDraft() {
@@ -313,7 +311,7 @@ export function BatchLogPanel({ defaultDate, onClose, onSubmitted }: Props) {
   const { data: rawAttList = [] } = useAttachmentsByIds(rawFileIds)
   const rawAttachments = useMemo(() => {
     const map = new Map<number, { name: string; mime: string }>()
-    rawAttList.forEach((a: any) => map.set(a.id, { name: a.original_name || `文件 #${a.id}`, mime: a.mime }))
+    rawAttList.forEach((a) => map.set(a.id, { name: a.original_name || `文件 #${a.id}`, mime: a.mime }))
     return map
   }, [rawAttList])
 
@@ -321,7 +319,8 @@ export function BatchLogPanel({ defaultDate, onClose, onSubmitted }: Props) {
     if (step === 'review') {
       setEntries(prev => prev.map(e => ({ ...e, log_date: date })))
     }
-  }, [date])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [date, step])
 
   async function handleTag() {
     // 已标注时点击撤回
@@ -340,7 +339,7 @@ export function BatchLogPanel({ defaultDate, onClose, onSubmitted }: Props) {
       isProgrammaticRef.current = true
       setRawText(result.text)
     } catch {
-      showToast('AI 标注失败，请重试', 'error')
+      showToast('AI 标注失败，请重试')
     } finally {
       setTagging(false)
     }
@@ -348,7 +347,7 @@ export function BatchLogPanel({ defaultDate, onClose, onSubmitted }: Props) {
 
   function handleSplit() {
     const currentText = rawText.trim()
-    if (!currentText) { showToast('内容为空', 'error'); return }
+    if (!currentText) { showToast('内容为空'); return }
     const segments = currentText.split(/(?=@task:\d+)/g).map(s => s.trim()).filter(Boolean)
     const parsed: ParsedEntry[] = segments.map(seg => {
       const match = seg.match(/^@task:(\d+)\s*\n?([\s\S]*)/)
@@ -360,7 +359,7 @@ export function BatchLogPanel({ defaultDate, onClose, onSubmitted }: Props) {
       }
       return { task_title: null, content: seg, hours: 1, phase: 'main', log_date: date, taskId: null }
     })
-    if (!parsed.length) { showToast('未识别到任何条目', 'error'); return }
+    if (!parsed.length) { showToast('未识别到任何条目'); return }
     setEntries(parsed)
     setEntryModes(parsed.map(() => 'preview' as EditorMode))
     setStep('review')
@@ -368,7 +367,7 @@ export function BatchLogPanel({ defaultDate, onClose, onSubmitted }: Props) {
 
   async function handleSubmitAll() {
     const valid = entries.filter(e => e.taskId)
-    if (!valid.length) { showToast('没有可提交的条目', 'error'); return }
+    if (!valid.length) { showToast('没有可提交的条目'); return }
     const ok = await confirm({
       title: `落档 ${valid.length} 条日报？`,
       body: <p>将向 {new Set(valid.map(e => e.taskId)).size} 个任务写入日报，落档后可在任务详情中修改或软删。</p>,
@@ -387,7 +386,7 @@ export function BatchLogPanel({ defaultDate, onClose, onSubmitted }: Props) {
         })
         done++
       } catch {
-        showToast(`「${e.task_title}」提交失败`, 'error')
+        showToast(`「${e.task_title}」提交失败`)
       }
     }
     setSubmitting(false)

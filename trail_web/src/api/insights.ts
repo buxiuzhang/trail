@@ -18,10 +18,26 @@ export function useStaleTasks(idleDays: number = 30) {
   })
 }
 
+export interface RelatedTodo { id?: number; title: string }
+
+export interface LogByDateItem {
+  id: number
+  task_id: number
+  task_title: string
+  log_date: string
+  phase: string
+  ordinal: number
+  content: string
+  polished_content: string | null
+  hours: number
+  attachment_count: number
+  related_todos?: RelatedTodo[]
+}
+
 export function useLogsByDate(date: string) {
   return useQuery({
     queryKey: ['logs', 'by-date', date],
-    queryFn: () => api.get<Record<string, unknown>[]>(`/api/logs/by-date?date=${date}`),
+    queryFn: () => api.get<LogByDateItem[]>(`/api/logs/by-date?date=${date}`),
     staleTime: 30_000,
     enabled: !!date,
   })

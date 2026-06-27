@@ -67,13 +67,6 @@
       <version>4.9.0</version>
     </dependency>
 
-    <!-- LanceDB Java SDK（本地嵌入式向量存储） -->
-    <dependency>
-      <groupId>com.lancedb</groupId>
-      <artifactId>lance-core</artifactId>
-      <version>0.39.0</version>
-    </dependency>
-
     <!-- Ed25519 JWT 签发（和风天气认证） -->
     <dependency>
       <groupId>com.nimbusds</groupId>
@@ -96,6 +89,10 @@
         <artifactId>spring-boot-maven-plugin</artifactId>
         <configuration>
           <mainClass>com.trail.TrailApiApplication</mainClass>
+          <jvmArguments>
+            --add-opens=java.base/java.nio=ALL-UNNAMED
+            --add-opens=java.base/sun.nio.ch=ALL-UNNAMED
+          </jvmArguments>
         </configuration>
       </plugin>
     </plugins>

@@ -198,7 +198,7 @@ export function useSpeechRecognition(
         clearInterval(progressTimerRef.current)
       }
     }
-  }, [isSupported])
+  }, [isSupported, MAX_DURATION])
 
   const start = useCallback(() => {
     if (!recognitionRef.current) {

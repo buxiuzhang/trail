@@ -133,7 +133,7 @@ export function SkillsSection() {
       }
       closeForm()
     } catch (err: unknown) {
-      showToast((err as Error).message ?? '保存失败', 'error')
+      showToast((err as Error).message ?? '保存失败')
     }
   }
 
@@ -149,7 +149,7 @@ export function SkillsSection() {
       await deleteSkill.mutateAsync(skill.id)
       showToast('已删除')
     } catch (err: unknown) {
-      showToast((err as Error).message ?? '删除失败', 'error')
+      showToast((err as Error).message ?? '删除失败')
     }
   }
 
@@ -162,7 +162,7 @@ export function SkillsSection() {
         enabled: skill.enabled ? 0 : 1,
       })
     } catch (err: unknown) {
-      showToast((err as Error).message ?? '操作失败', 'error')
+      showToast((err as Error).message ?? '操作失败')
     }
   }
 

@@ -59,16 +59,16 @@ function TaskRow({ task }: { task: TaskOut }) {
 
   async function handlePin() {
     try {
-      if (pinned) { await unpinTask.mutateAsync(undefined as any); showToast('已取消置顶') }
-      else { await pinTask.mutateAsync(undefined as any); showToast('已置顶') }
-    } catch (err: any) { showToast('操作失败：' + err.message) }
+      if (pinned) { await unpinTask.mutateAsync(); showToast('已取消置顶') }
+      else { await pinTask.mutateAsync(); showToast('已置顶') }
+    } catch (err: unknown) { showToast('操作失败：' + (err as Error).message) }
   }
 
   async function handleWatch() {
     try {
-      if (watched) { await unwatchTask.mutateAsync(undefined as any); showToast('已取消关注') }
-      else { await watchTask.mutateAsync(undefined as any); showToast('已添加到特别关注') }
-    } catch (err: any) { showToast('操作失败：' + err.message) }
+      if (watched) { await unwatchTask.mutateAsync(); showToast('已取消关注') }
+      else { await watchTask.mutateAsync(); showToast('已添加到特别关注') }
+    } catch (err: unknown) { showToast('操作失败：' + (err as Error).message) }
   }
 
   return (

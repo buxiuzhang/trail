@@ -3,6 +3,8 @@ package com.trail.store;
 import com.trail.db.SqliteDb;
 import com.trail.store.exception.NotFoundException;
 import com.trail.store.exception.StoreError;
+import com.trail.vector.VectorIndexEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -25,10 +27,16 @@ public class TodoStore {
 
     private final SqliteDb db;
     private final EntityRefStore entityRefStore;
+    private final ApplicationEventPublisher publisher;
 
-    public TodoStore(SqliteDb db, EntityRefStore entityRefStore) {
+    public TodoStore(SqliteDb db, EntityRefStore entityRefStore, ApplicationEventPublisher publisher) {
         this.db = db;
         this.entityRefStore = entityRefStore;
+        this.publisher = publisher;
+    }
+
+    private static String todoText(String title, String description) {
+        return (description != null && !description.isBlank()) ? title + "\n" + description : title;
     }
 
     /**
@@ -78,6 +86,7 @@ public class TodoStore {
             """, taskId, t, d);
         if (newId == null) throw new StoreError("写待办失败");
         if (d != null) entityRefStore.syncAllRefs("todo", newId, "description", d);
+        publisher.publishEvent(new VectorIndexEvent.Upsert("todo:" + newId, "todo", todoText(t, d)));
         return getTodo(newId);
     }
 
@@ -120,7 +129,10 @@ public class TodoStore {
             String d = description.isBlank() ? "" : description.strip();
             entityRefStore.syncAllRefs("todo", todoId, "description", d);
         }
-        return getTodo(todoId);
+        Map<String, Object> updated = getTodo(todoId);
+        publisher.publishEvent(new VectorIndexEvent.Upsert("todo:" + todoId, "todo",
+            todoText((String) updated.get("title"), (String) updated.get("description"))));
+        return updated;
     }
 
     /**

@@ -17,7 +17,7 @@ function getInitialViewMode(): ViewMode {
   try {
     const saved = localStorage.getItem('taskListViewMode')
     if (saved === 'list' || saved === 'card') return saved
-  } catch {}
+  } catch { /* localStorage unavailable */ }
   return 'card'
 }
 
@@ -41,7 +41,7 @@ export function IndexPage() {
 
   function switchViewMode(mode: ViewMode) {
     setViewMode(mode)
-    try { localStorage.setItem('taskListViewMode', mode) } catch {}
+    try { localStorage.setItem('taskListViewMode', mode) } catch { /* localStorage unavailable */ }
   }
 
   // 无限滚动：分页 + 筛选后端化（status/nature/month/tag 走 query param）

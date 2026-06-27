@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useState, type ReactNode } from 'react'
 
 type WorkbenchPanel = 'quick-log' | 'dashboard' | null
@@ -16,7 +17,7 @@ function getInitialPanel(): WorkbenchPanel {
   try {
     const saved = localStorage.getItem('workbenchPanel')
     if (saved === 'quick-log' || saved === 'dashboard') return saved
-  } catch {}
+  } catch { /* localStorage unavailable */ }
   return 'quick-log'
 }
 
@@ -29,7 +30,7 @@ export function WorkbenchProvider({ children }: { children: ReactNode }) {
     setTargetDate(date ?? null)
     setPanelState(p)
     setSwitchCount(c => c + 1)
-    try { if (p) localStorage.setItem('workbenchPanel', p) } catch {}
+    try { if (p) localStorage.setItem('workbenchPanel', p) } catch { /* localStorage unavailable */ }
   }
 
   function clearTargetDate() {

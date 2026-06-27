@@ -42,7 +42,7 @@ function defaultState(f: FieldDef): FieldState {
   }
 }
 
-function buildPart(state: FieldState, f: FieldDef): string {
+function buildPart(state: FieldState, _f: FieldDef): string {
   switch (state.mode) {
     case 'every': return '*'
     case 'specific':

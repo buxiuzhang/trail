@@ -1,211 +1,236 @@
 package com.trail.store;
 
-import com.lancedb.lance.Dataset;
-import com.lancedb.lance.WriteParams;
-import com.lancedb.lance.ipc.ScanOptions;
-import org.apache.arrow.c.ArrowArrayStream;
-import org.apache.arrow.c.Data;
-import org.apache.arrow.memory.BufferAllocator;
-import org.apache.arrow.memory.RootAllocator;
-import org.apache.arrow.vector.*;
-import org.apache.arrow.vector.complex.ListVector;
-import org.apache.arrow.vector.complex.impl.UnionListWriter;
-import org.apache.arrow.vector.ipc.ArrowStreamReader;
-import org.apache.arrow.vector.types.FloatingPointPrecision;
-import org.apache.arrow.vector.types.pojo.*;
+import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-import jakarta.annotation.PreDestroy;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.*;
+import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
- * LanceDB 向量存储。
+ * 向量存储（SQLite 实现）。
  *
- * 表结构：
- *   id         VARCHAR   — 来源标识，格式 "log:{id}" / "task:{id}" 等
- *   source     VARCHAR   — 来源类型
- *   text       VARCHAR   — 原始文本
- *   vector     LIST<f32> — embedding 向量
- *   created_at VARCHAR   — ISO 日期
+ * 用独立的 vectors/vectors.sqlite 存储 embedding 向量，
+ * 查询时全量加载入内存做余弦相似度计算（线性扫描）。
+ *
+ * 数据量在个人工作记录场景（万级）内性能充裕：
+ *   5000 条 × 1536 维 ≈ 5ms，5 万条 ≈ 50ms。
  */
 @Component
 public class VectorStore {
 
     private static final Logger log = LoggerFactory.getLogger(VectorStore.class);
-    private static final String TABLE_NAME = "embeddings";
 
-    private final BufferAllocator allocator = new RootAllocator();
-    private volatile Path vectorDir;
-    private volatile Dataset dataset;
+    private volatile Connection conn;
+    private volatile Path dbPath;
+    private final ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock();
 
     /** 由 StartupChecks / DataDirService 在数据目录就绪后调用 */
     public synchronized void open(Path dataDir) {
-        if (this.vectorDir != null) {
-            close();
-        }
-        this.vectorDir = dataDir.resolve("vectors");
+        close();
         try {
+            Path vectorDir = dataDir.resolve("vectors");
             Files.createDirectories(vectorDir);
-        } catch (IOException e) {
-            log.warn("创建 vectors/ 目录失败: {}", e.getMessage());
-            return;
-        }
-        Path tablePath = vectorDir.resolve(TABLE_NAME + ".lance");
-        try {
-            if (Files.exists(tablePath)) {
-                dataset = Dataset.open(tablePath.toString(), allocator);
-                log.info("LanceDB dataset opened: {} ({} rows)", tablePath, dataset.countRows());
-            } else {
-                log.info("LanceDB dataset will be created on first write: {}", tablePath);
-            }
+            dbPath = vectorDir.resolve("vectors.sqlite");
+            conn = DriverManager.getConnection("jdbc:sqlite:" + dbPath);
+            conn.setAutoCommit(true);
+            ensureSchema();
+            log.info("VectorStore 已开启: {} ({} 条)", dbPath, countRows());
         } catch (Exception e) {
-            log.warn("LanceDB open 失败: {}", e.getMessage());
+            log.warn("VectorStore 初始化失败: {}", e.getMessage());
+            conn = null;
         }
     }
 
     public synchronized void close() {
-        if (dataset != null) {
-            try { dataset.close(); } catch (Exception ignored) {}
-            dataset = null;
+        if (conn != null) {
+            try { conn.close(); } catch (Exception ignored) {}
+            conn = null;
         }
     }
 
     @PreDestroy
     public void shutdown() {
         close();
-        try { allocator.close(); } catch (Exception ignored) {}
+    }
+
+    /** 写入或更新一条向量记录（upsert by id）。 */
+    public void upsert(String id, String source, String text, float[] vector) {
+        requireOpen();
+        rwLock.writeLock().lock();
+        try {
+            String sql = """
+                INSERT INTO embeddings (id, source, text, created_at, vector)
+                VALUES (?, ?, ?, date('now'), ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    source = excluded.source,
+                    text = excluded.text,
+                    vector = excluded.vector
+                """;
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, id);
+                ps.setString(2, source);
+                ps.setString(3, text);
+                ps.setBytes(4, floatsToBytes(vector));
+                ps.executeUpdate();
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("向量写入失败: " + e.getMessage(), e);
+        } finally {
+            rwLock.writeLock().unlock();
+        }
     }
 
     /**
-     * 写入一条向量记录（upsert by id）。
+     * 余弦相似度搜索，返回 topK 条最相似记录。
      */
-    public synchronized void upsert(String id, String source, String text, float[] vector) {
-        if (vectorDir == null) {
-            throw new com.trail.store.exception.DataDirNotConfiguredException();
-        }
-        Path tablePath = vectorDir.resolve(TABLE_NAME + ".lance");
-        Schema schema = buildSchema(vector.length);
+    public List<SearchResult> search(float[] query, int topK) {
+        requireOpen();
+        rwLock.readLock().lock();
+        try {
+            List<Row> rows = loadAll();
+            float queryNorm = norm(query);
+            if (queryNorm == 0f) return List.of();
 
-        try (VectorSchemaRoot root = VectorSchemaRoot.create(schema, allocator)) {
-            root.allocateNew();
-
-            // 字符串字段
-            ((VarCharVector) root.getVector("id")).setSafe(0, id.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-            ((VarCharVector) root.getVector("source")).setSafe(0, source.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-            ((VarCharVector) root.getVector("text")).setSafe(0, text.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-            ((VarCharVector) root.getVector("created_at")).setSafe(0,
-                    java.time.LocalDate.now().toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
-
-            // 向量字段（LIST<FLOAT32>）
-            ListVector listVec = (ListVector) root.getVector("vector");
-            UnionListWriter writer = listVec.getWriter();
-            writer.startList();
-            for (float v : vector) {
-                writer.float4().writeFloat4(v);
+            List<SearchResult> results = new ArrayList<>(rows.size());
+            for (Row row : rows) {
+                float score = cosine(query, queryNorm, row.vector());
+                results.add(new SearchResult(row.id(), row.source(), row.text(), score));
             }
-            writer.endList();
-            listVec.setValueCount(1);
-
-            root.setRowCount(1);
-
-            byte[] ipcBytes = toIpcBytes(root);
-
-            if (!Files.exists(tablePath)) {
-                // 首次创建
-                try (ArrowArrayStream stream = buildArrowStream(ipcBytes)) {
-                    dataset = Dataset.create(allocator, stream, tablePath.toString(),
-                            new WriteParams.Builder().build());
-                }
-                log.info("LanceDB dataset created: {}", tablePath);
-            } else {
-                // upsert：先删旧记录，再追加
-                if (dataset == null) {
-                    dataset = Dataset.open(tablePath.toString(), allocator);
-                }
-                String safeId = id.replace("'", "''");
-                try { dataset.delete("id = '" + safeId + "'"); } catch (Exception ignored) {}
-
-                try (ArrowArrayStream stream = buildArrowStream(ipcBytes)) {
-                    Dataset.create(allocator, stream, tablePath.toString(),
-                            new WriteParams.Builder()
-                                .withMode(WriteParams.WriteMode.APPEND)
-                                .build());
-                }
-                // 重新打开以刷新引用
-                dataset.close();
-                dataset = Dataset.open(tablePath.toString(), allocator);
-            }
-        } catch (Exception e) {
-            log.error("VectorStore.upsert 失败 id={}: {}", id, e.getMessage(), e);
-            throw new RuntimeException("向量写入失败: " + e.getMessage(), e);
+            results.sort((a, b) -> Float.compare(b.score(), a.score()));
+            return results.subList(0, Math.min(topK, results.size()));
+        } catch (SQLException e) {
+            throw new RuntimeException("向量搜索失败: " + e.getMessage(), e);
+        } finally {
+            rwLock.readLock().unlock();
         }
     }
 
-    /** 列出所有记录 id（调试用） */
-    public List<String> listIds() {
-        if (dataset == null) return List.of();
-        List<String> ids = new ArrayList<>();
-        try {
-            ScanOptions opts = new ScanOptions.Builder()
-                    .columns(List.of("id"))
-                    .build();
-            try (var reader = dataset.newScan(opts).scanBatches()) {
-                while (reader.loadNextBatch()) {
-                    VectorSchemaRoot batch = reader.getVectorSchemaRoot();
-                    VarCharVector vec = (VarCharVector) batch.getVector("id");
-                    for (int i = 0; i < batch.getRowCount(); i++) {
-                        if (!vec.isNull(i)) ids.add(new String(vec.get(i), java.nio.charset.StandardCharsets.UTF_8));
-                    }
-                }
-            }
-        } catch (Exception e) {
-            log.warn("VectorStore.listIds 失败: {}", e.getMessage());
+    /** 删除单条向量记录（id 不存在时静默成功）。 */
+    public void delete(String id) {
+        if (conn == null || id == null) return;
+        rwLock.writeLock().lock();
+        try (PreparedStatement ps = conn.prepareStatement("DELETE FROM embeddings WHERE id = ?")) {
+            ps.setString(1, id);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            log.warn("向量删除失败 id={}: {}", id, e.getMessage());
+        } finally {
+            rwLock.writeLock().unlock();
         }
-        return ids;
+    }
+
+    public List<String> listIds() {
+        if (conn == null) return List.of();
+        rwLock.readLock().lock();
+        try {
+            List<String> ids = new ArrayList<>();
+            try (Statement st = conn.createStatement();
+                 ResultSet rs = st.executeQuery("SELECT id FROM embeddings ORDER BY rowid")) {
+                while (rs.next()) ids.add(rs.getString(1));
+            }
+            return ids;
+        } catch (SQLException e) {
+            log.warn("listIds 失败: {}", e.getMessage());
+            return List.of();
+        } finally {
+            rwLock.readLock().unlock();
+        }
     }
 
     public long countRows() {
-        if (dataset == null) return 0;
-        try { return dataset.countRows(); } catch (Exception e) { return 0; }
-    }
-
-    // ── helpers ────────────────────────────────────────────────────────────
-
-    private Schema buildSchema(int dim) {
-        return new Schema(List.of(
-            new Field("id",         FieldType.nullable(ArrowType.Utf8.INSTANCE), null),
-            new Field("source",     FieldType.nullable(ArrowType.Utf8.INSTANCE), null),
-            new Field("text",       FieldType.nullable(ArrowType.Utf8.INSTANCE), null),
-            new Field("created_at", FieldType.nullable(ArrowType.Utf8.INSTANCE), null),
-            new Field("vector",
-                FieldType.nullable(new ArrowType.List()),
-                List.of(new Field("item",
-                    FieldType.nullable(new ArrowType.FloatingPoint(FloatingPointPrecision.SINGLE)),
-                    null)))
-        ));
-    }
-
-    private byte[] toIpcBytes(VectorSchemaRoot root) throws IOException {
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        try (var writer = new org.apache.arrow.vector.ipc.ArrowStreamWriter(root, null, out)) {
-            writer.start();
-            writer.writeBatch();
-            writer.end();
+        if (conn == null) return 0;
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT COUNT(*) FROM embeddings")) {
+            return rs.next() ? rs.getLong(1) : 0;
+        } catch (SQLException e) {
+            return 0;
         }
-        return out.toByteArray();
     }
 
-    private ArrowArrayStream buildArrowStream(byte[] ipcBytes) throws IOException {
-        ArrowStreamReader reader = new ArrowStreamReader(new ByteArrayInputStream(ipcBytes), allocator);
-        ArrowArrayStream stream = ArrowArrayStream.allocateNew(allocator);
-        Data.exportArrayStream(allocator, reader, stream);
-        return stream;
+    // ── records ────────────────────────────────────────────────────
+
+    public record SearchResult(String id, String source, String text, float score) {}
+
+    private record Row(String id, String source, String text, float[] vector) {}
+
+    // ── helpers ────────────────────────────────────────────────────
+
+    private void ensureSchema() throws SQLException {
+        try (Statement st = conn.createStatement()) {
+            st.execute("""
+                CREATE TABLE IF NOT EXISTS embeddings (
+                    id         TEXT PRIMARY KEY,
+                    source     TEXT,
+                    text       TEXT,
+                    created_at TEXT,
+                    vector     BLOB NOT NULL
+                )
+                """);
+        }
+    }
+
+    private void requireOpen() {
+        if (conn == null) throw new com.trail.store.exception.DataDirNotConfiguredException();
+    }
+
+    private List<Row> loadAll() throws SQLException {
+        List<Row> rows = new ArrayList<>();
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT id, source, text, vector FROM embeddings")) {
+            while (rs.next()) {
+                rows.add(new Row(
+                    rs.getString(1),
+                    rs.getString(2),
+                    rs.getString(3),
+                    bytesToFloats(rs.getBytes(4))
+                ));
+            }
+        }
+        return rows;
+    }
+
+    private static float cosine(float[] a, float aNorm, float[] b) {
+        if (a.length != b.length) return 0f;
+        float dot = 0f;
+        for (int i = 0; i < a.length; i++) dot += a[i] * b[i];
+        float bNorm = norm(b);
+        return bNorm == 0f ? 0f : dot / (aNorm * bNorm);
+    }
+
+    private static float norm(float[] v) {
+        float s = 0f;
+        for (float x : v) s += x * x;
+        return (float) Math.sqrt(s);
+    }
+
+    private static byte[] floatsToBytes(float[] floats) {
+        byte[] bytes = new byte[floats.length * 4];
+        for (int i = 0; i < floats.length; i++) {
+            int bits = Float.floatToIntBits(floats[i]);
+            bytes[i * 4]     = (byte) (bits >> 24);
+            bytes[i * 4 + 1] = (byte) (bits >> 16);
+            bytes[i * 4 + 2] = (byte) (bits >> 8);
+            bytes[i * 4 + 3] = (byte) bits;
+        }
+        return bytes;
+    }
+
+    private static float[] bytesToFloats(byte[] bytes) {
+        if (bytes == null) return new float[0];
+        float[] floats = new float[bytes.length / 4];
+        for (int i = 0; i < floats.length; i++) {
+            int bits = ((bytes[i * 4] & 0xFF) << 24)
+                     | ((bytes[i * 4 + 1] & 0xFF) << 16)
+                     | ((bytes[i * 4 + 2] & 0xFF) << 8)
+                     |  (bytes[i * 4 + 3] & 0xFF);
+            floats[i] = Float.intBitsToFloat(bits);
+        }
+        return floats;
     }
 }

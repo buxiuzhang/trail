@@ -89,7 +89,10 @@ start_api() {
 
     # 后台启动
     cd trail_api
-    nohup java -jar target/trail-api.jar > "$API_LOG" 2>&1 &
+    nohup java \
+        --add-opens=java.base/java.nio=ALL-UNNAMED \
+        --add-opens=java.base/sun.nio.ch=ALL-UNNAMED \
+        -jar target/trail-api.jar > "$API_LOG" 2>&1 &
     cd ..
 
     # 等待启动

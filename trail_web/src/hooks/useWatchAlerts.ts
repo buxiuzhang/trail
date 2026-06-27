@@ -13,7 +13,7 @@ interface AlertPayload {
 const STORAGE_KEY = 'trail_watch_alerts'
 
 function loadState(): { ignored: Record<number, string> } {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') } catch {}
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') } catch { /* ignore parse errors */ }
   return { ignored: {} }
 }
 

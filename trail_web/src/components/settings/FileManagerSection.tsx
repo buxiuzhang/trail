@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAttachmentList, useAttachmentTasks, useDeleteAttachment, type AttachmentListItem } from '@/api/attachments'
 import { MultiSelect } from '@/components/shared/MultiSelect'
@@ -8,6 +8,23 @@ import { useModalContext } from '@/context/ModalContext'
 import { useQueryClient } from '@tanstack/react-query'
 import { api } from '@/api/client'
 import { useDownloadQueue } from '@/context/DownloadQueueContext'
+
+interface RefEntry {
+  source_type: 'task' | 'log' | 'todo'
+  task_id: number
+  title: string | null
+  log_date: string | null
+  deleted: boolean
+  sourceType?: 'task' | 'log' | 'todo'
+  logDate?: string | null
+}
+
+interface RefGroup {
+  task_id: number
+  title: string | null
+  sources: string[]
+  allDeleted: boolean
+}
 
 const FILE_TYPE_GROUPS = [
   { label: '图片',   value: 'image',    mimes: ['image/png', 'image/jpeg', 'image/gif', 'image/webp'] },
@@ -60,7 +77,7 @@ export function FileManagerSection() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
-  const [expandedRefs, setExpandedRefs] = useState<Record<number, any[]>>({})
+  const [expandedRefs, setExpandedRefs] = useState<Record<number, RefGroup[]>>({})
   const [loadingRefs, setLoadingRefs] = useState<Record<number, boolean>>({})
   const [rowCtxMenu, setRowCtxMenu] = useState<{ x: number; y: number; item: AttachmentListItem } | null>(null)
 
@@ -92,8 +109,8 @@ export function FileManagerSection() {
     }
     setLoadingRefs(prev => ({ ...prev, [id]: true }))
     try {
-      const data = await fetch(`/api/attachments/${id}/references`).then(r => r.json())
-      const grouped: Record<number, { task_id: number; title: string | null; sources: string[]; allDeleted: boolean }> = {}
+      const data: RefEntry[] = await fetch(`/api/attachments/${id}/references`).then(r => r.json())
+      const grouped: Record<number, RefGroup> = {}
       for (const r of data) {
         const tid = r.task_id
         if (!grouped[tid]) grouped[tid] = { task_id: tid, title: r.title, sources: [], allDeleted: true }
@@ -111,7 +128,7 @@ export function FileManagerSection() {
 
   const handleDelete = useCallback(async (item: AttachmentListItem) => {
     if (item.active_ref_count > 0) {
-      const refs = await fetch(`/api/attachments/${item.id}/references`).then(r => r.json())
+      const refs: RefEntry[] = await fetch(`/api/attachments/${item.id}/references`).then(r => r.json())
       openModal({
         eyebrow: '无法删除',
         title: '此文件正在被引用',
@@ -122,7 +139,7 @@ export function FileManagerSection() {
               该文件被 <strong>{item.active_ref_count}</strong> 处有效引用，请先在对应的任务日报或描述中删除该附件引用，再回来删除此文件。
             </p>
             <ul style={{ paddingLeft: 16, fontSize: 13, color: 'var(--ink-faded)', lineHeight: 1.8 }}>
-              {refs.filter((r: any) => !r.deleted).map((r: any, i: number) => (
+              {refs.filter((r) => !r.deleted).map((r, i: number) => (
                 <li key={i}>
                   [{r.sourceType === 'task' ? '任务' : r.sourceType === 'log' ? '日报' : '待办'}]
                   {' '}{r.title || ''}{r.logDate ? ` · ${r.logDate}` : ''}
@@ -308,7 +325,7 @@ export function FileManagerSection() {
                   background: 'var(--paper-warm)',
                   borderTop: '0.5px solid var(--rule-soft)',
                 }}>
-                  {refs.map((r: any, ri: number) => {
+                  {refs.map((r, ri: number) => {
                     const taskTitle = referencedTasks.find(t => t.id === r.task_id)?.title
                       || r.title
                       || `任务 #${r.task_id}`

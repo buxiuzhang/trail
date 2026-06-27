@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { type Skill } from '@/api/skills'
 import { useUpdateSkill } from '@/api/skills'
@@ -190,7 +190,7 @@ export function SkillOptimizeDialog({ skill, onClose }: Props) {
       showToast('Skill 已保存')
       onClose()
     } catch (e: unknown) {
-      showToast((e as Error).message ?? '保存失败', 'error')
+      showToast((e as Error).message ?? '保存失败')
     }
   }
 

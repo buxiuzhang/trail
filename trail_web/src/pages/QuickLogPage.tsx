@@ -1,15 +1,8 @@
 import { useState, useEffect } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
 import { useLogsByDate } from '@/api/insights'
-import { useNavigate, useLocation } from 'react-router-dom'
-
-function localToday(): string {
-  const d = new Date()
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
-}
+import type { LogByDateItem } from '@/api/insights'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useTasks, useTask } from '@/api/tasks'
 import { useTodos } from '@/api/todos'
 import { useToastContext } from '@/context/ToastContext'
@@ -30,22 +23,15 @@ import EditIcon from '@/icons/edit.svg'
 import DeleteIcon from '@/icons/delete.svg'
 import styles from './QuickLogPage.module.css'
 
-// ── 类型 ──────────────────────────────────────────────────────────
-interface DraftLog {
-  localId: number
-  taskId: number
-  taskTitle: string
-  logDate: string
-  phase: string
-  hours: number
-  content: string
-  todo_ids: number[]
-  task_ids: number[]
+function localToday(): string {
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
 }
 
-let localIdSeq = 1
 
-// ── 占位 task ────────────────────────────────────────────────────
 function makePlaceholderTask(): TaskOut {
   return {
     id: 0, title: '', alias: null, description: null,
@@ -54,7 +40,7 @@ function makePlaceholderTask(): TaskOut {
     maintenance_summary: null, tags: [], original_title: null,
     source: '', pinned_at: null, watched_at: null,
     created_at: TODAY, updated_at: TODAY,
-    contacts: [], last_log_date: null, days_idle: 0,
+    contacts: [], last_log_date: null,
     log_count: 0, log_main_count: 0, total_hours: 0,
     todo_active_count: 0, todo_completed_count: 0, todo_abandoned_count: 0,
   }
@@ -65,7 +51,7 @@ function FloatingCard({
   onClose, editingLog, defaultDate,
 }: {
   onClose: () => void
-  editingLog?: any
+  editingLog?: LogByDateItem
   defaultDate?: string
 }) {
   const isEdit = !!editingLog
@@ -96,7 +82,7 @@ function FloatingCard({
             task={taskForCompose}
             todos={todos}
             tasks={tasks}
-            editing={isEdit ? (editingLog as LogOut) : null}
+            editing={isEdit ? (editingLog as unknown as LogOut) : null}
             saveDisabled={!taskId}
             saveLabel={isEdit ? '保存' : undefined}
             defaultLogDate={defaultDate}
@@ -132,7 +118,7 @@ function resolveMentions(content: string, relatedTodos?: { id?: number; title: s
   })
 }
 
-function LogRow({ log, idx, onEdit }: { log: any; idx: number; onEdit: (log: any) => void }) {
+function LogRow({ log, idx, onEdit }: { log: LogByDateItem; idx: number; onEdit: (log: LogByDateItem) => void }) {
   const confirm = useConfirm()
   const { showToast } = useToastContext()
   const qc = useQueryClient()
@@ -153,7 +139,7 @@ function LogRow({ log, idx, onEdit }: { log: any; idx: number; onEdit: (log: any
       qc.invalidateQueries({ queryKey: ['logs', 'by-date', TODAY] })
       showToast('已删除')
     } catch {
-      showToast('删除失败', 'error')
+      showToast('删除失败')
     }
   }
 
@@ -341,11 +327,10 @@ function OnboardGuide({ onAddLog, onBatch }: { onAddLog: () => void; onBatch: ()
 export function QuickLogPage() {
   const [date, setDate] = useState(() => localToday())
   const { data: submitted = [], isLoading } = useLogsByDate(date)
-  const { showToast } = useToastContext()
   const { openModal, closeModal } = useModalContext()
   const qc = useQueryClient()
   const [showCard, setShowCard] = useState(false)
-  const [editingLog, setEditingLog] = useState<any>(null)
+  const [editingLog, setEditingLog] = useState<LogByDateItem | undefined>(undefined)
   const [showBatchPanel, setShowBatchPanel] = useState(false)
 
   const { targetDate, clearTargetDate } = useWorkbench()
@@ -357,12 +342,14 @@ export function QuickLogPage() {
       setDate(targetDate)
       clearTargetDate()
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // 每次导航到此页面时同步今日日期（无跳转目标时）
   const location = useLocation()
   useEffect(() => {
     if (!targetDate) setDate(localToday())
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname])
 
   function handleExportClick() {
@@ -374,12 +361,6 @@ export function QuickLogPage() {
       buttons: [],
     })
   }
-
-  async function handleSubmitAll() {
-    // 已废弃，直接提交逻辑移至 FloatingCard
-  }
-
-  function removeDraft(_localId: number) {}
 
   return (
     <div className={styles.page}>
@@ -410,9 +391,9 @@ export function QuickLogPage() {
         <div className={styles.sectionLabel}>
           <span>已提交 <span className={styles.sectionCount}>{submitted.length} 条</span>
           {submitted.length > 0 && (() => {
-            const hours = parseFloat(submitted.reduce((sum: number, log: any) => sum + (log.hours || 0), 0).toFixed(1))
+            const hours = parseFloat(submitted.reduce((sum: number, log) => sum + (log.hours || 0), 0).toFixed(1))
             const followedTodos = new Set(
-              submitted.flatMap((log: any) => (log.related_todos ?? []).map((t: any) => t.id))
+              submitted.flatMap((log) => (log.related_todos ?? []).map((t) => t.id))
             ).size
             return <>
               <span className={styles.sectionCount}>· {hours} 小时</span>
@@ -444,7 +425,7 @@ export function QuickLogPage() {
                 </tr>
               </thead>
               <tbody>
-                {submitted.map((log: any, idx: number) => (
+                {submitted.map((log, idx: number) => (
                   <LogRow key={log.id} log={log} idx={idx} onEdit={setEditingLog} />
                 ))}
               </tbody>
@@ -461,7 +442,7 @@ export function QuickLogPage() {
         <FloatingCard
           editingLog={editingLog}
           defaultDate={date}
-          onClose={() => { setShowCard(false); setEditingLog(null) }}
+          onClose={() => { setShowCard(false); setEditingLog(undefined) }}
         />
       )}
 

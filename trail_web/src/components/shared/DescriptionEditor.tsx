@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 /**
  * DescriptionEditor · 基于 TipTap 的 Markdown WYSIWYG 编辑器
  *
@@ -34,7 +35,6 @@ import { Plugin, PluginKey } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import { useDownloadQueue } from '@/context/DownloadQueueContext'
 import { useUploadQueue } from '@/context/UploadQueueContext'
-import { useToastContext } from '@/context/ToastContext'
 import { normalizeMentions } from './richtext-utils'
 import { ImagePreview } from './ImagePreview'
 import type { TodoOut, TaskOut } from '@/types'
@@ -273,7 +273,6 @@ export const DescriptionEditor = forwardRef<HTMLTextAreaElement, DescriptionEdit
 
   // hooks
   const { uploadFile: queueUpload } = useUploadQueue()
-  const { showToast } = useToastContext()
 
   // 图片预览状态
   const [previewImage, setPreviewImage] = useState<string | null>(null)

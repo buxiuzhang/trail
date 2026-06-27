@@ -112,25 +112,6 @@ function emptyContact(): ContactIn {
   return { kind: 'person', channel: 'wechat', name: '' }
 }
 
-const STAMP_CLASS: Record<string, string> = {
-  '未开始': 'stamp--ns',
-  '进行中': 'stamp--ip',
-  '已完成': 'stamp--dn',
-  '已作废': 'stamp--cn',
-}
-function statusToStampClass(s: string): string {
-  return STAMP_CLASS[s] || 'stamp--ns'
-}
-
-const NATURE_BADGE_CLASS: Record<string, string> = {
-  '长期': 'nature-badge--lt',
-  '临时': 'nature-badge--tp',
-  '维护': 'nature-badge--mt',
-}
-function natureToBadgeClass(n: string): string {
-  return NATURE_BADGE_CLASS[n] || 'nature-badge--tp'
-}
-
 export function TaskForm({ mode, task }: TaskFormProps) {
   const navigate = useNavigate()
   const { showToast } = useToastContext()
@@ -140,7 +121,7 @@ export function TaskForm({ mode, task }: TaskFormProps) {
 
   const isEdit = mode === 'edit'
   const taskId = task?.id
-  const polishDesc = usePolishContent({ type: 'task_desc', task_id: taskId })
+  const polishDesc = usePolishContent({ task_id: taskId })
 
   // 表单状态
   const [title, setTitle] = useState(task?.title || '')
@@ -211,8 +192,8 @@ export function TaskForm({ mode, task }: TaskFormProps) {
         showToast('已落档')
         navigate(`/task/${newTask.id}`)
       }
-    } catch (err: any) {
-      showToast((isEdit ? '保存失败：' : '落档失败：') + err.message)
+    } catch (err: unknown) {
+      showToast((isEdit ? '保存失败：' : '落档失败：') + (err as Error).message)
     } finally {
       setSubmitting(false)
     }

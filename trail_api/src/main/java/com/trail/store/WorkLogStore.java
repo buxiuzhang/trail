@@ -3,6 +3,8 @@ package com.trail.store;
 import com.trail.db.SqliteDb;
 import com.trail.store.exception.NotFoundException;
 import com.trail.store.exception.StoreError;
+import com.trail.vector.VectorIndexEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
@@ -24,11 +26,14 @@ public class WorkLogStore {
     private final SqliteDb db;
     private final EntityRefStore entityRefStore;
     private final TaskStore taskStore;
+    private final ApplicationEventPublisher publisher;
 
-    public WorkLogStore(SqliteDb db, EntityRefStore entityRefStore, TaskStore taskStore) {
+    public WorkLogStore(SqliteDb db, EntityRefStore entityRefStore, TaskStore taskStore,
+                        ApplicationEventPublisher publisher) {
         this.db = db;
         this.entityRefStore = entityRefStore;
         this.taskStore = taskStore;
+        this.publisher = publisher;
     }
 
     public List<Map<String, Object>> listLogs(long taskId, String phase, boolean includeDeleted,
@@ -167,6 +172,7 @@ public class WorkLogStore {
                 taskIds.stream().distinct().collect(java.util.stream.Collectors.toList()));
         }
 
+        publisher.publishEvent(new VectorIndexEvent.Upsert("log:" + newId, "log", content.strip()));
         return getLog(newId);
     }
 
@@ -267,6 +273,9 @@ public class WorkLogStore {
                 taskIds.stream().distinct().collect(java.util.stream.Collectors.toList()));
         }
 
+        if (content != null) {
+            publisher.publishEvent(new VectorIndexEvent.Upsert("log:" + logId, "log", content.strip()));
+        }
         return getLog(logId);
     }
 
@@ -284,6 +293,7 @@ public class WorkLogStore {
                 logId, taskId);
             if (n == 0) throw new NotFoundException("日志不存在或不属于此任务：log=" + logId + " task=" + taskId);
         }
+        publisher.publishEvent(new VectorIndexEvent.Delete("log:" + logId));
     }
 
     // ============================================================

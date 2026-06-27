@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useCallback, useState, useRef, useEffect, type ReactNode } from 'react'
 
 function getApiBase(): string {

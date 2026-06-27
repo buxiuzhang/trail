@@ -71,10 +71,10 @@ export function useChat() {
           abortRef.current = null
           setIsPending(false)
           return
-        } catch (err: any) {
-          lastError = err
+        } catch (err: unknown) {
+          lastError = err instanceof Error ? err : new Error(String(err))
           // 用户主动停止，不重试
-          if (err.name === 'AbortError') break
+          if ((err as Error).name === 'AbortError') break
           // 还有重试机会：通知外层清理部分内容，退避后重试
           if (attempt < MAX_RETRIES - 1) {
             onRetry?.()

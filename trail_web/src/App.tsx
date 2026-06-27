@@ -1,4 +1,4 @@
-import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { HashRouter, Routes, Route, useLocation } from 'react-router-dom'
 import { FilterProvider } from './context/FilterContext'
 import { ModalProvider } from './context/ModalContext'
 import { ToastProvider } from './context/ToastContext'
@@ -26,20 +26,8 @@ import { NotFoundPage } from './pages/NotFoundPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { WorkbenchProvider } from './context/WorkbenchContext'
 import { useWatchAlerts } from './hooks/useWatchAlerts'
-import { createContext, useContext, useState, type ReactNode } from 'react'
-
-// 设置页面分类状态上下文
-interface SettingsContextType {
-  activeSection: string
-  setActiveSection: (section: string) => void
-}
-
-const SettingsContext = createContext<SettingsContextType | null>(null)
-
-export function useSettingsContext() {
-  const ctx = useContext(SettingsContext)
-  return ctx
-}
+import { useState, type ReactNode } from 'react'
+import { SettingsContext } from './context/SettingsContext'
 
 /** 始终挂载，确保 WebSocket 长连接不依赖 ChatWindow 是否打开。 */
 function WatchAlertsMount() {

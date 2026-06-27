@@ -5,6 +5,8 @@ import com.trail.store.exception.DuplicateException;
 import com.trail.store.exception.InvalidTransitionException;
 import com.trail.store.exception.NotFoundException;
 import com.trail.store.exception.StoreError;
+import com.trail.vector.VectorIndexEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
@@ -28,10 +30,17 @@ public class TaskStore {
 
     private final SqliteDb db;
     private final EntityRefStore entityRefStore;
+    private final ApplicationEventPublisher publisher;
 
-    public TaskStore(SqliteDb db, EntityRefStore entityRefStore) {
+    public TaskStore(SqliteDb db, EntityRefStore entityRefStore, ApplicationEventPublisher publisher) {
         this.db = db;
         this.entityRefStore = entityRefStore;
+        this.publisher = publisher;
+    }
+
+    private static String taskText(String title, Object description) {
+        String desc = description instanceof String s && !s.isBlank() ? s : null;
+        return desc != null ? title + "\n" + desc : title;
     }
 
     // ============================================================
@@ -274,6 +283,8 @@ public class TaskStore {
         );
         if (newId == null) throw new StoreError("创建任务失败");
         if (description != null) entityRefStore.syncAllRefs("task", newId, "description", description);
+        publisher.publishEvent(new VectorIndexEvent.Upsert("task:" + newId, "task",
+            taskText(title.trim(), description)));
         return getTask(newId);
     }
 
@@ -332,6 +343,11 @@ public class TaskStore {
                 String text = fields.get(field) instanceof String s ? s : null;
                 entityRefStore.syncAllRefs("task", taskId, field, text != null ? text : "");
             }
+        }
+        if (fields.containsKey("title") || fields.containsKey("description")) {
+            Map<String, Object> updated = getTask(taskId);
+            publisher.publishEvent(new VectorIndexEvent.Upsert("task:" + taskId, "task",
+                taskText((String) updated.get("title"), updated.get("description"))));
         }
         return getTask(taskId);
     }
