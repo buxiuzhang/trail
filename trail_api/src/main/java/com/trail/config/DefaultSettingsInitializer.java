@@ -70,7 +70,6 @@ public class DefaultSettingsInitializer {
         putIfPresent(defaults, "polish_system_prompt", d.polishSystemPrompt());
         putIfPresent(defaults, "polish_todo_system_prompt", d.polishTodoSystemPrompt());
         putIfPresent(defaults, "polish_task_desc_system_prompt", d.polishTaskDescSystemPrompt());
-        putIfPresent(defaults, "draft_log_system_prompt", d.draftLogSystemPrompt());
         putIfPresent(defaults, "summarize_system_prompt", d.summarizeSystemPrompt());
         putIfPresent(defaults, "summarize_maintenance_prompt", d.summarizeMaintenancePrompt());
         putIfPresent(defaults, "ask_maintenance_prompt", d.askMaintenancePrompt());

@@ -18,7 +18,6 @@ export interface LLMSettings {
   summarize_system_prompt: string
   summarize_maintenance_prompt: string
   ask_maintenance_prompt: string
-  draft_log_system_prompt: string
   // 特别关注阈值
   watch_idle_hot_days: string
   watch_idle_warn_days: string

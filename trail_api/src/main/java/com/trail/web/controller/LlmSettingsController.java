@@ -54,7 +54,6 @@ public class LlmSettingsController {
                 all.getOrDefault("summarize_system_prompt", ""),
                 all.getOrDefault("summarize_maintenance_prompt", ""),
                 all.getOrDefault("ask_maintenance_prompt", ""),
-                all.getOrDefault("draft_log_system_prompt", ""),
                 all.getOrDefault("daily_report_template", ""),
                 all.getOrDefault("weekly_report_template", ""),
                 all.getOrDefault("batch_tag_system_prompt", ""),
@@ -98,7 +97,6 @@ public class LlmSettingsController {
         saveIfPresent(data, "summarize_system_prompt");
         saveIfPresent(data, "summarize_maintenance_prompt");
         saveIfPresent(data, "ask_maintenance_prompt");
-        saveIfPresent(data, "draft_log_system_prompt");
 
         saveIfPresent(data, "daily_report_template");
         saveIfPresent(data, "weekly_report_template");

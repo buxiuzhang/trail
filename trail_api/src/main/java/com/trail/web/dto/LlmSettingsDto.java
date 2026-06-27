@@ -22,7 +22,6 @@ public record LlmSettingsDto(
         String summarizeSystemPrompt,
         String summarizeMaintenancePrompt,
         String askMaintenancePrompt,
-        String draftLogSystemPrompt,
         // 日报/周报模板
         String dailyReportTemplate,
         String weeklyReportTemplate,

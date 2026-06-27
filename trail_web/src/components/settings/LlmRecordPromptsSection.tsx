@@ -27,8 +27,6 @@ export function LlmRecordPromptsSection() {
 
   const [polishPrompt, setPolishPrompt] = useState('')
   const [polishPromptMode, setPolishPromptMode] = useState<EditorMode>('preview')
-  const [draftLogPrompt, setDraftLogPrompt] = useState('')
-  const [draftLogPromptMode, setDraftLogPromptMode] = useState<EditorMode>('preview')
   const [polishTodoPrompt, setPolishTodoPrompt] = useState('')
   const [polishTodoPromptMode, setPolishTodoPromptMode] = useState<EditorMode>('preview')
   const [polishTaskDescPrompt, setPolishTaskDescPrompt] = useState('')
@@ -37,7 +35,6 @@ export function LlmRecordPromptsSection() {
   useEffect(() => {
     if (!settings) return
     setPolishPrompt(settings.polish_system_prompt || '')
-    setDraftLogPrompt(settings.draft_log_system_prompt || '')
     setPolishTodoPrompt(settings.polish_todo_system_prompt || '')
     setPolishTaskDescPrompt(settings.polish_task_desc_system_prompt || '')
   }, [settings])
@@ -47,7 +44,6 @@ export function LlmRecordPromptsSection() {
     try {
       await saveLLM.mutateAsync({
         polish_system_prompt: polishPrompt.trim(),
-        draft_log_system_prompt: draftLogPrompt.trim(),
         polish_todo_system_prompt: polishTodoPrompt.trim(),
         polish_task_desc_system_prompt: polishTaskDescPrompt.trim(),
       })
@@ -60,7 +56,7 @@ export function LlmRecordPromptsSection() {
   return (
     <section id="llm-record" className={styles.section}>
       <h2 className={styles.sectionTitle}>工作记录</h2>
-      <p className={styles.sectionHint}>日报润色、草稿生成、待办润色、任务描述润色的提示词，留空则使用默认值。</p>
+      <p className={styles.sectionHint}>润色采用对话式引导：LLM 先分析不足、询问方向，再给出建议版本。留空则使用默认值。</p>
       {isLoading ? (
         <p className={styles.sectionHint}>载入中...</p>
       ) : (
@@ -75,18 +71,6 @@ export function LlmRecordPromptsSection() {
             <p className={styles.promptDesc}>润色工作日报，使其书面化、正式化。后端自动注入任务标题和描述。</p>
             <div style={{ marginTop: '8px' }}>
               <DescriptionEditorWithMode value={polishPrompt || ''} onChange={setPolishPrompt} mode={polishPromptMode} onModeChange={setPolishPromptMode} minHeight={150} textareaClassName="field__textarea" hideInlineToggle autoGrow maxHeight={300} />
-            </div>
-          </PromptGroup>
-          <PromptGroup name="草稿生成" desc="关键词→日报">
-            <div className={styles.promptLabel}>
-              <span className={styles.promptName}>
-                <button type="button" onClick={async () => { if (await confirm({ level: 'moderate', title: '重置草稿生成提示词？', body: <p>将恢复为系统默认值。</p>, confirmLabel: '重置' })) setDraftLogPrompt('') }} className={styles.resetBtn}>重置</button>
-              </span>
-              <button type="button" className={styles.modeToggle} onClick={() => setDraftLogPromptMode(draftLogPromptMode === 'source' ? 'preview' : 'source')}>{draftLogPromptMode === 'source' ? '预览模式' : '源码模式'}</button>
-            </div>
-            <p className={styles.promptDesc}>根据粗糙描述和任务背景生成日报草稿。后端自动注入任务标题、描述、最近日报和待办。</p>
-            <div style={{ marginTop: '8px' }}>
-              <DescriptionEditorWithMode value={draftLogPrompt || ''} onChange={setDraftLogPrompt} mode={draftLogPromptMode} onModeChange={setDraftLogPromptMode} minHeight={150} textareaClassName="field__textarea" hideInlineToggle autoGrow maxHeight={300} />
             </div>
           </PromptGroup>
           <PromptGroup name="待办润色" desc="补充说明">

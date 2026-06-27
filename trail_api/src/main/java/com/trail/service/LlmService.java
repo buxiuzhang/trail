@@ -87,7 +87,6 @@ public class LlmService {
     private volatile String cachedSummarizeMaintenancePrompt;
     private volatile String cachedAskMaintenancePrompt;
     private volatile String cachedChatPrompt;
-    private volatile String cachedDraftLogPrompt;
     private volatile String cachedBatchTagPrompt;
 
     public LlmService(AppProperties props, LLMSettingsStore settingsStore, TaskStore taskStore,
@@ -119,7 +118,6 @@ public class LlmService {
         cachedSummarizeMaintenancePrompt = settings.get("summarize_maintenance_prompt");
         cachedAskMaintenancePrompt = settings.get("ask_maintenance_prompt");
         cachedChatPrompt = settings.get("chat_system_prompt");
-        cachedDraftLogPrompt = settings.get("draft_log_system_prompt");
         cachedBatchTagPrompt = settings.get("batch_tag_system_prompt");
         log.info("Prompt 模板已加载到内存");
     }
@@ -237,62 +235,6 @@ public class LlmService {
     /** 兼容旧接口：日志润色 */
     public String polish(String content, Long taskId) {
         return polish(content, taskId, "log");
-    }
-
-    // ============================================================
-    // 日志草稿生成
-    // ============================================================
-
-    private static final String DRAFT_LOG_USER_TEMPLATE = """
-        任务名称：{title}
-        任务状态：{status}
-
-        最近工作日志（供参考）：
-        {recent_logs}
-
-        未完成待办：
-        {todos}
-
-        我今天的粗糙描述：
-        {hint}
-
-        请根据以上信息生成一条工作日志。
-        """;
-
-    public String draftLog(long taskId, String hint) {
-        ensurePromptsLoaded();
-        LlmConfig cfg = getConfig();
-        Map<String, Object> task = taskStore.getTask(taskId);
-        String title = (String) task.get("title");
-        String status = (String) task.get("status");
-
-        // 最近 5 条日志作为上下文
-        List<Map<String, Object>> recentLogs = workLogStore.listLogs(taskId, null, false, null, 5);
-        String recentLogsText = recentLogs.isEmpty() ? "（暂无日志）" : buildLogsText(recentLogs);
-
-        // 未完成待办
-        List<Map<String, Object>> todos = todoStore.listTodos(taskId).stream()
-            .filter(t -> Integer.valueOf(0).equals(t.get("is_completed"))
-                      && Integer.valueOf(0).equals(t.get("is_abandoned")))
-            .toList();
-        String todosText = todos.isEmpty() ? "（暂无待办）"
-            : todos.stream()
-                .map(t -> "- " + t.get("title"))
-                .collect(java.util.stream.Collectors.joining("\n"));
-
-        String system = appendSkills(cachedDraftLogPrompt, "draft");
-        String user = DRAFT_LOG_USER_TEMPLATE
-            .replace("{title}", title)
-            .replace("{status}", status)
-            .replace("{recent_logs}", recentLogsText)
-            .replace("{todos}", todosText)
-            .replace("{hint}", hint);
-
-        AnthropicResponse resp = callAnthropic(cfg, system, List.of(userMessage(user)));
-        String promptText = "[system]\n" + system + "\n\n[user]\n" + user;
-        aiRecordStore.addRecord(taskId, null, "draft_log", promptText, resp.raw(), false);
-
-        return resp.text();
     }
 
     // ============================================================

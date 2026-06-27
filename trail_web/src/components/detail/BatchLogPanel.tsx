@@ -5,10 +5,9 @@ import { useAttachmentsByIds } from '@/api/attachments'
 import { useToastContext } from '@/context/ToastContext'
 import { useConfirm } from '@/utils/confirm'
 import { usePolishContent } from '@/hooks/usePolishContent'
-import { useDraftLog, LLM_AVAILABLE } from '@/api/llm'
+import { LLM_AVAILABLE } from '@/api/llm'
 import { usePlaceholders, DEFAULT_PLACEHOLDERS } from '@/api/settings'
 import polishIcon from '@/icons/polish.svg'
-import draftIcon from '@/icons/draft.svg'
 import { api } from '@/api/client'
 import type { TaskOut } from '@/types'
 import { DescriptionEditorWithMode, type EditorMode } from '@/components/shared/DescriptionEditorWithMode'
@@ -44,12 +43,7 @@ interface EntryCardProps {
 }
 
 function EntryCard({ index, entry, tasks, mode, placeholder, onUpdate, onRemove, onModeChange }: EntryCardProps) {
-  const [draftOpen, setDraftOpen] = useState(false)
-  const [draftInput, setDraftInput] = useState('')
-  const draftInputRef = useRef<HTMLTextAreaElement>(null)
-  const { showToast } = useToastContext()
   const polishLog = usePolishContent({ task_id: entry.taskId ?? undefined })
-  const draftMutation = useDraftLog(entry.taskId ?? 0)
   const { data: todos = [] } = useTodos(entry.taskId ?? 0)
 
   const fileIds = useMemo(() => {
@@ -65,27 +59,6 @@ function EntryCard({ index, entry, tasks, mode, placeholder, onUpdate, onRemove,
     attList.forEach((a) => map.set(a.id, { name: a.original_name || `文件 #${a.id}`, mime: a.mime }))
     return map
   }, [attList])
-
-  useEffect(() => {
-    if (draftOpen && draftInputRef.current) {
-      draftInputRef.current.focus()
-      draftInputRef.current.style.height = 'auto'
-      draftInputRef.current.style.height = draftInputRef.current.scrollHeight + 'px'
-    }
-  }, [draftOpen])
-
-  async function handleDraftGenerate() {
-    if (!draftInput.trim()) { showToast('请先输入几个关键词'); return }
-    try {
-      const result = await draftMutation.mutateAsync(draftInput.trim())
-      onUpdate({ content: result.polished })
-      setDraftOpen(false)
-      setDraftInput('')
-    } catch (err: unknown) {
-      const hint = (err as {status?: number})?.status === 503 ? '（未配置 LLM）' : (err as {status?: number})?.status === 502 ? '（调用失败）' : ''
-      showToast('草稿生成失败：' + (err as Error).message + hint)
-    }
-  }
 
   return (
     <div className={`${styles.entryCard} ${!entry.taskId ? styles.entryUnmatched : ''}`}>
@@ -152,74 +125,9 @@ function EntryCard({ index, entry, tasks, mode, placeholder, onUpdate, onRemove,
         tasks={tasks}
         attachments={attachments}
       />
-      {draftOpen && (
-        <div className={logStyles.draftSection}>
-          <div className={logStyles.draftHeader}>
-            <span className={logStyles.draftLabel}>草稿</span>
-            <span className={logStyles.draftHint}>简单描述今天做了什么，LLM 结合任务背景生成日报草稿</span>
-            <button type="button" className={logStyles.draftClose} onClick={() => setDraftOpen(false)}>
-              <svg viewBox="0 0 16 16" fill="none" width="12" height="12">
-                <path d="M3 3l10 10M13 3L3 13" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-              </svg>
-            </button>
-          </div>
-          <div className={logStyles.draftInputRow}>
-            <textarea
-              ref={draftInputRef}
-              className={logStyles.draftInput}
-              placeholder="例：完成了接口联调，修了一个并发 bug…"
-              value={draftInput}
-              rows={1}
-              onChange={e => {
-                setDraftInput(e.target.value)
-                const el = e.currentTarget
-                el.style.height = 'auto'
-                el.style.height = el.scrollHeight + 'px'
-              }}
-              onKeyDown={e => {
-                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleDraftGenerate()
-              }}
-            />
-          </div>
-        </div>
-      )}
       <div className={`${logStyles.composeFoot} ${styles.entryFoot}`}>
         <span className={logStyles.composeHint} />
         <div className={logStyles.composeActions}>
-          {(() => {
-            const isGenMode = draftOpen && !!draftInput.trim()
-            const isDraftActive = draftOpen && !!entry.content.trim()
-            return (
-              <button
-                type="button"
-                className={logStyles.btnDraft}
-                disabled={!LLM_AVAILABLE || !entry.taskId || draftMutation.isPending}
-                data-tooltip={
-                  !LLM_AVAILABLE ? 'LLM 暂未接入' :
-                  !entry.taskId ? '请先选择任务' :
-                  draftMutation.isPending ? '生成中…' :
-                  isGenMode ? '⌘Enter 生成草稿' :
-                  isDraftActive ? '草稿（已打开）' : '生成日报草稿'
-                }
-                onClick={() => {
-                  if (!draftOpen) { setDraftInput(entry.content.trim()); setDraftOpen(true) }
-                  else if (isGenMode) handleDraftGenerate()
-                  else setDraftOpen(false)
-                }}
-              >
-                <img
-                  src={draftIcon}
-                  alt=""
-                  className={[
-                    logStyles.draftIcon,
-                    isDraftActive ? logStyles.draftIconActive : '',
-                    isGenMode ? logStyles.draftIconGen : '',
-                    draftMutation.isPending ? logStyles.draftIconPending : '',
-                  ].filter(Boolean).join(' ')}
-                />
-              </button>
-            )
-          })()}
           <button
             type="button"
             className={logStyles.btnPolish}

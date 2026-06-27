@@ -59,7 +59,6 @@ public record AppProperties(
             String polishSystemPrompt,
             String polishTodoSystemPrompt,
             String polishTaskDescSystemPrompt,
-            String draftLogSystemPrompt,
             String summarizeSystemPrompt,
             String summarizeMaintenancePrompt,
             String askMaintenancePrompt,

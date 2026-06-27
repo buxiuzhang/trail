@@ -13,7 +13,6 @@ import styles from './SkillsSection.module.css'
 
 const SCOPE_OPTIONS = [
   { value: 'chat',         label: '工作对话' },
-  { value: 'draft',        label: '草稿生成' },
   { value: 'polish_log',   label: '日报润色' },
   { value: 'polish_task',  label: '任务描述润色' },
   { value: 'polish_todo',  label: '待办润色' },

@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import type { LogOut, TaskOut, TodoOut } from '@/types'
 import { TODAY } from '@/constants'
-import { useDraftLog, LLM_AVAILABLE } from '@/api/llm'
+import { LLM_AVAILABLE } from '@/api/llm'
 import { usePlaceholders, DEFAULT_PLACEHOLDERS } from '@/api/settings'
 import { useToastContext } from '@/context/ToastContext'
 import { useModalContext } from '@/context/ModalContext'
@@ -13,7 +13,6 @@ import { ModeToggleButton } from '@/components/shared/ModeToggleButton'
 import { TodoRefSection } from '@/components/detail/TodoRefSection'
 import { extractTodoMentionIds, extractTaskRefIds, expandMentionsForLLM } from '@/components/shared/richtext-utils'
 import polishIcon from '@/icons/polish.svg'
-import draftIcon from '@/icons/draft.svg'
 import styles from './Logbook.module.css'
 
 interface LogComposeProps {
@@ -40,11 +39,7 @@ export function LogCompose({ task, todos, tasks = [], editing, onSave, onCancel,
   const [selectedTaskIds, setSelectedTaskIds] = useState<number[]>(editing?.task_ids || [])
   const [submitting, setSubmitting] = useState(false)
   const [mode, setMode] = useState<'preview' | 'source'>('preview')
-  const [draftOpen, setDraftOpen] = useState(false)
-  const [draftInput, setDraftInput] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const draftInputRef = useRef<HTMLTextAreaElement>(null)
-  const draftMutation = useDraftLog(task.id)
   const { showToast } = useToastContext()
   const { openModal } = useModalContext()
   const { openPolish } = useChatContext()
@@ -69,14 +64,6 @@ export function LogCompose({ task, todos, tasks = [], editing, onSave, onCancel,
       textareaRef.current.focus()
     }
   }, [isEdit])
-
-  useEffect(() => {
-    if (draftOpen && draftInputRef.current) {
-      draftInputRef.current.focus()
-      draftInputRef.current.style.height = 'auto'
-      draftInputRef.current.style.height = draftInputRef.current.scrollHeight + 'px'
-    }
-  }, [draftOpen])
 
   // 内容变化时同步 @ 提及 ID，使 TodoRefSection 与编辑器联动（双向）
   useEffect(() => {
@@ -147,26 +134,11 @@ export function LogCompose({ task, todos, tasks = [], editing, onSave, onCancel,
       setContent('')
       setSelectedTodoIds([])
       setSelectedTaskIds([])
-      setDraftInput('')
-      setDraftOpen(false)
       if (!isEdit) setLogDate(TODAY)
     } catch {
       // error toasted by parent
     } finally {
       setSubmitting(false)
-    }
-  }
-
-  async function handleDraftGenerate() {
-    if (!draftInput.trim()) { showToast('请先输入几个关键词'); return }
-    try {
-      const result = await draftMutation.mutateAsync(draftInput.trim())
-      setContent(result.polished)
-      setDraftOpen(false)
-      setDraftInput('')
-    } catch (err: unknown) {
-      const hint = (err as {status?: number})?.status === 503 ? '（未配置 LLM）' : (err as {status?: number})?.status === 502 ? '（调用失败）' : ''
-      showToast('草稿生成失败：' + (err as Error).message + hint)
     }
   }
 
@@ -226,43 +198,6 @@ export function LogCompose({ task, todos, tasks = [], editing, onSave, onCancel,
         tasks={tasks}
         attachments={attachments}
       />
-      {draftOpen && (
-        <div className={styles.draftSection}>
-          <div className={styles.draftHeader}>
-            <span className={styles.draftLabel}>草稿</span>
-            <span className={styles.draftHint}>简单描述今天做了什么，LLM 结合任务背景生成日报草稿</span>
-            <button
-              type="button"
-              className={styles.draftClose}
-              onClick={() => setDraftOpen(false)}
-              title="关闭草稿"
-              aria-label="关闭草稿"
-            >
-              <svg viewBox="0 0 16 16" fill="none" width="12" height="12">
-                <path d="M3 3l10 10M13 3L3 13" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-              </svg>
-            </button>
-          </div>
-          <div className={styles.draftInputRow}>
-            <textarea
-              ref={draftInputRef}
-              className={styles.draftInput}
-              placeholder="例：完成了接口联调，修了一个并发 bug，下午开了需求评审会…"
-              value={draftInput}
-              rows={1}
-              onChange={e => {
-                setDraftInput(e.target.value)
-                const el = e.currentTarget
-                el.style.height = 'auto'
-                el.style.height = el.scrollHeight + 'px'
-              }}
-              onKeyDown={e => {
-                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleDraftGenerate()
-              }}
-            />
-          </div>
-        </div>
-      )}
       {/* 内部 onChange 同时清理编辑器中的 @mention 文本，保持联动 */}
       <TodoRefSection
         todos={todos}
@@ -307,44 +242,6 @@ export function LogCompose({ task, todos, tasks = [], editing, onSave, onCancel,
               取消
             </button>
           )}
-          {(() => {
-            const isGenMode = draftOpen && !!draftInput.trim()
-            const isDraftActive = draftOpen && !!content.trim()
-            return (
-              <button
-                type="button"
-                className={styles.btnDraft}
-                disabled={!LLM_AVAILABLE || draftMutation.isPending}
-                data-tooltip={
-                  !LLM_AVAILABLE ? 'LLM 暂未接入' :
-                  draftMutation.isPending ? '生成中…' :
-                  isGenMode ? '⌘Enter 生成草稿' :
-                  isDraftActive ? '草稿（已打开）' : '生成日报草稿'
-                }
-                onClick={() => {
-                  if (!draftOpen) {
-                    setDraftInput(content.trim())
-                    setDraftOpen(true)
-                  } else if (isGenMode) {
-                    handleDraftGenerate()
-                  } else {
-                    setDraftOpen(false)
-                  }
-                }}
-              >
-                <img
-                  src={draftIcon}
-                  alt=""
-                  className={[
-                    styles.draftIcon,
-                    isDraftActive ? styles.draftIconActive : '',
-                    isGenMode ? styles.draftIconGen : '',
-                    draftMutation.isPending ? styles.draftIconPending : '',
-                  ].filter(Boolean).join(' ')}
-                />
-              </button>
-            )
-          })()}
           <button
             type="button"
             className={styles.btnPolish}

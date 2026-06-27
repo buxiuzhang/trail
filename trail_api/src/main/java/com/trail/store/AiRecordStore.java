@@ -18,7 +18,7 @@ import java.util.zip.GZIPOutputStream;
 @Component
 public class AiRecordStore {
 
-    public static final Set<String> OPS = Set.of("polish", "summarize", "ask_maintenance", "chat", "chat_tool_use", "draft_log", "batch_parse", "batch_tag");
+    public static final Set<String> OPS = Set.of("polish", "summarize", "ask_maintenance", "chat", "chat_tool_use", "batch_parse", "batch_tag");
 
     private final SqliteDb db;
 
