@@ -5,6 +5,19 @@ import { useToastContext } from '@/context/ToastContext'
 import { useConfirm } from '@/utils/confirm'
 import styles from '@/pages/SettingsPage.module.css'
 
+const TOKEN_MAX_PRESETS = [256, 512, 1000, 2000, 4000, 8000, 16000]
+const TOKEN_MIN_PRESETS = [0, 100, 200, 500, 1000, 2000]
+
+function stepThrough(presets: number[], current: number, dir: 1 | -1): number {
+  const idx = presets.indexOf(current)
+  if (idx !== -1) {
+    const next = idx + dir
+    return presets[Math.max(0, Math.min(presets.length - 1, next))]
+  }
+  if (dir === -1) return presets.filter(d => d < current).pop() ?? presets[0]
+  return presets.find(d => d > current) ?? presets[presets.length - 1]
+}
+
 export function LlmConnectionSection() {
   const { showToast } = useToastContext()
   const confirm = useConfirm()
@@ -18,8 +31,8 @@ export function LlmConnectionSection() {
   const [baseUrl, setBaseUrl] = useState('')
   const [model, setModel] = useState('')
   const [authType, setAuthType] = useState<'bearer' | 'x-api-key'>('bearer')
-  const [maxTokens, setMaxTokens] = useState('1000')
-  const [minTokens, setMinTokens] = useState('100')
+  const [maxTokens, setMaxTokens] = useState(1000)
+  const [minTokens, setMinTokens] = useState(0)
   const [showKey, setShowKey] = useState(false)
   const [isDecrypting, setIsDecrypting] = useState(false)
 
@@ -32,8 +45,8 @@ export function LlmConnectionSection() {
     setBaseUrl(settings.base_url || '')
     setModel(settings.model || '')
     setAuthType((settings.auth_type as 'bearer' | 'x-api-key') || 'bearer')
-    setMaxTokens(settings.max_tokens || '1000')
-    setMinTokens(settings.min_tokens || '100')
+    setMaxTokens(parseInt(settings.max_tokens || '1000') || 1000)
+    setMinTokens(parseInt(settings.min_tokens || '0') || 0)
   }, [settings])
 
   async function handleShowApiKey() {
@@ -65,8 +78,8 @@ export function LlmConnectionSection() {
         base_url: baseUrl.trim(),
         model: model.trim(),
         auth_type: authType,
-        max_tokens: maxTokens.trim(),
-        min_tokens: minTokens.trim(),
+        max_tokens: String(maxTokens),
+        min_tokens: String(minTokens),
       })
       showToast('已保存')
     } catch (err: unknown) {
@@ -75,8 +88,8 @@ export function LlmConnectionSection() {
   }
 
   return (
-    <section className={styles.section}>
-      <h2 className={styles.sectionTitle}>大模型</h2>
+    <section id="llm-connection" className={styles.section}>
+      <h2 className={styles.sectionTitle}>大语言模型</h2>
       {isLoading ? (
         <p className={styles.sectionHint}>载入中...</p>
       ) : (
@@ -161,27 +174,39 @@ export function LlmConnectionSection() {
           <div className="field-row">
             <div className="field">
               <div className="field__label"><span>Max Tokens</span><span className="field__hint">输出上限</span></div>
-              <input
-                className="field__input"
-                type="number"
-                min="1"
-                step="1"
-                value={maxTokens}
-                onChange={e => setMaxTokens(e.target.value.replace(/\D/g, ''))}
-                placeholder="1000"
-              />
+              <div style={{ display: 'flex', alignItems: 'flex-end', borderBottom: '0.5px solid var(--rule)', paddingBottom: 8 }}>
+                <button type="button" tabIndex={-1} onClick={() => setMaxTokens(v => stepThrough(TOKEN_MAX_PRESETS, v, -1))}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 4px', fontSize: 16, color: 'var(--ink-soft)', lineHeight: 1 }}>−</button>
+                <input
+                  type="number"
+                  className={styles.dimInput}
+                  value={maxTokens || ''}
+                  placeholder="1000"
+                  min={1}
+                  onChange={e => setMaxTokens(parseInt(e.target.value) || 0)}
+                  style={{ flex: 1, width: 'auto', textAlign: 'center' }}
+                />
+                <button type="button" tabIndex={-1} onClick={() => setMaxTokens(v => stepThrough(TOKEN_MAX_PRESETS, v, 1))}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 4px', fontSize: 16, color: 'var(--ink-soft)', lineHeight: 1 }}>+</button>
+              </div>
             </div>
             <div className="field">
-              <div className="field__label"><span>Min Tokens</span><span className="field__hint">输出下限，0=不限制</span></div>
-              <input
-                className="field__input"
-                type="number"
-                min="0"
-                step="1"
-                value={minTokens}
-                onChange={e => setMinTokens(e.target.value.replace(/\D/g, ''))}
-                placeholder="100"
-              />
+              <div className="field__label"><span>Min Tokens</span><span className="field__hint">输出下限，0 = 不限制</span></div>
+              <div style={{ display: 'flex', alignItems: 'flex-end', borderBottom: '0.5px solid var(--rule)', paddingBottom: 8 }}>
+                <button type="button" tabIndex={-1} onClick={() => setMinTokens(v => stepThrough(TOKEN_MIN_PRESETS, v, -1))}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 4px', fontSize: 16, color: 'var(--ink-soft)', lineHeight: 1 }}>−</button>
+                <input
+                  type="number"
+                  className={styles.dimInput}
+                  value={minTokens || ''}
+                  placeholder="0"
+                  min={0}
+                  onChange={e => setMinTokens(parseInt(e.target.value) || 0)}
+                  style={{ flex: 1, width: 'auto', textAlign: 'center' }}
+                />
+                <button type="button" tabIndex={-1} onClick={() => setMinTokens(v => stepThrough(TOKEN_MIN_PRESETS, v, 1))}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 4px', fontSize: 16, color: 'var(--ink-soft)', lineHeight: 1 }}>+</button>
+              </div>
             </div>
           </div>
 

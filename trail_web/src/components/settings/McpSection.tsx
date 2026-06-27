@@ -10,6 +10,8 @@ import CloseCircleIcon from '@/icons/close-circle.svg'
 import EditIcon from '@/icons/edit.svg'
 import TestIcon from '@/icons/test.svg'
 import DeleteIcon from '@/icons/delete.svg'
+import LockIcon from '@/icons/lock.svg'
+import UnlockIcon from '@/icons/unlock.svg'
 import styles from './McpSection.module.css'
 
 interface FormState {
@@ -169,17 +171,14 @@ export function McpSection() {
                 </span>
               </div>
               <div className={styles.cardActions}>
-                <label
-                  className={styles.toggle}
+                <button
+                  type="button"
+                  className={styles.iconBtn}
                   title={server.enabled ? '已启用，点击禁用' : '已禁用，点击启用'}
+                  onClick={() => handleToggle(server)}
                 >
-                  <input
-                    type="checkbox"
-                    checked={!!server.enabled}
-                    onChange={() => handleToggle(server)}
-                  />
-                  <span className={styles.toggleSlider} />
-                </label>
+                  <img src={server.enabled ? UnlockIcon : LockIcon} width={16} height={16} alt={server.enabled ? '已启用' : '已禁用'} style={{ opacity: server.enabled ? 0.7 : 0.3 }} />
+                </button>
                 <button
                   type="button"
                   className={`${styles.iconBtn} ${testingId === server.id ? styles.iconBtnLoading : ''}`}

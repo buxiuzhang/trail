@@ -9,6 +9,8 @@ import { MarkdownRenderer } from '@/components/shared/MarkdownRenderer'
 import { SkillOptimizeDialog } from './SkillOptimizeDialog'
 import EditIcon from '@/icons/edit.svg'
 import DeleteIcon from '@/icons/delete.svg'
+import LockIcon from '@/icons/lock.svg'
+import UnlockIcon from '@/icons/unlock.svg'
 import styles from './SkillsSection.module.css'
 
 const SCOPE_OPTIONS = [
@@ -193,10 +195,14 @@ export function SkillsSection() {
                   onClick={() => setOptimizingSkill(skill)}
                   title="智能优化"
                 >✦</button>
-                <label className={styles.toggle} title={skill.enabled ? '已启用，点击禁用' : '已禁用，点击启用'}>
-                  <input type="checkbox" checked={!!skill.enabled} onChange={() => handleToggle(skill)} />
-                  <span className={styles.toggleSlider} />
-                </label>
+                <button
+                  type="button"
+                  className={styles.iconBtn}
+                  title={skill.enabled ? '已启用，点击禁用' : '已禁用，点击启用'}
+                  onClick={() => handleToggle(skill)}
+                >
+                  <img src={skill.enabled ? UnlockIcon : LockIcon} width={16} height={16} alt={skill.enabled ? '已启用' : '已禁用'} style={{ opacity: skill.enabled ? 0.7 : 0.3 }} />
+                </button>
                 <button type="button" className={styles.iconBtn} onClick={() => openEdit(skill)} title="编辑">
                   <img src={EditIcon} width={16} height={16} alt="编辑" />
                 </button>

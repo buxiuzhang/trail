@@ -19,12 +19,13 @@ const SECTIONS = [
 ]
 
 const LLM_SUB = [
-  { id: 'llm-record', label: '工作记录' },
-  { id: 'llm-dialog', label: '对话与报表' },
-  { id: 'llm-vector', label: '向量模型' },
-  { id: 'llm-mcp', label: 'MCP 工具服务' },
-  { id: 'llm-skills', label: 'Skills 扩展' },
-  { id: 'llm-disabled', label: '暂不可用' },
+  { id: 'llm-connection', label: '大语言模型' },
+  { id: 'llm-vector',     label: '向量模型' },
+  { id: 'llm-record',     label: '工作记录' },
+  { id: 'llm-dialog',     label: '对话与报表' },
+  { id: 'llm-mcp',        label: 'MCP 工具服务' },
+  { id: 'llm-skills',     label: 'Skills 扩展' },
+  { id: 'llm-disabled',   label: '暂不可用' },
 ]
 
 const INTERFACE_SUB = [
