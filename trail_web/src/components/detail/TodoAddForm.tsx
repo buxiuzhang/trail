@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { usePlaceholders, DEFAULT_PLACEHOLDERS } from '@/api/settings'
 import { LLM_AVAILABLE } from '@/api/llm'
-import { usePolishContent } from '@/hooks/usePolishContent'
+import { useChatContext } from '@/context/ChatContext'
+import { useToastContext } from '@/context/ToastContext'
 import { DescriptionEditorWithMode as DescriptionEditor, type EditorMode } from '@/components/shared/DescriptionEditorWithMode'
 import { ModeToggleButton } from '@/components/shared/ModeToggleButton'
 import polishIcon from '@/icons/polish.svg'
@@ -15,14 +16,14 @@ interface TodoAddFormProps {
 
 export function TodoAddForm({ onSubmit, onClose, initialTitle = '', initialDescription = '' }: TodoAddFormProps) {
   const { data: placeholders } = usePlaceholders()
+  const { openPolish } = useChatContext()
+  const { showToast } = useToastContext()
   const [title, setTitle] = useState(initialTitle)
   const [description, setDescription] = useState(initialDescription)
   const [submitting, setSubmitting] = useState(false)
   const [hoverClose, setHoverClose] = useState(false)
   const [hoverContinue, setHoverContinue] = useState(false)
   const [editorMode, setEditorMode] = useState<EditorMode>('preview')
-
-  const polish = usePolishContent({ type: 'todo' })
 
   const interactive = !submitting && title.trim()
 
@@ -34,38 +35,26 @@ export function TodoAddForm({ onSubmit, onClose, initialTitle = '', initialDescr
       if (andContinue) {
         setTitle('')
         setDescription('')
-        polish.reset()
         const input = document.getElementById('todo-add-form')?.querySelector('input')
         input?.focus()
       } else {
         onClose()
       }
     } catch {
-      // onSubmit 回调已负责 toast 错误提示，此处仅吞掉异常
+      // onSubmit 回调已负责 toast 错误提示
     } finally {
       setSubmitting(false)
     }
   }
 
   return (
-    <form
-      id="todo-add-form"
-      onSubmit={e => e.preventDefault()}
-      style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
-    >
+    <form id="todo-add-form" onSubmit={e => e.preventDefault()} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div className="field" style={{ marginBottom: 0 }}>
         <div className="field__label">
           <span>待办标题</span>
           <span className="field__hint">必填</span>
         </div>
-        <input
-          className="field__input"
-          value={title}
-          onChange={e => setTitle(e.target.value)}
-          placeholder="例：对接 XX 平台 API"
-          autoFocus
-          required
-        />
+        <input className="field__input" value={title} onChange={e => setTitle(e.target.value)} placeholder="例：对接 XX 平台 API" autoFocus required />
       </div>
       <div className="field" style={{ marginBottom: 0 }}>
         <div className="field__label">
@@ -74,28 +63,19 @@ export function TodoAddForm({ onSubmit, onClose, initialTitle = '', initialDescr
           <ModeToggleButton mode={editorMode} onModeChange={setEditorMode} style={{ marginLeft: 'auto' }} />
           <button
             type="button"
-            onClick={() => polish.handlePolish(description, setDescription)}
-            disabled={!LLM_AVAILABLE || polish.isPending}
-            title={LLM_AVAILABLE ? (polish.isPolished ? '撤销润色' : 'AI 润色') : 'LLM 暂未接入'}
-            style={{
-              background: 'none',
-              border: 'none',
-              padding: '0 0 0 8px',
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              opacity: LLM_AVAILABLE ? 1 : 0.3,
+            onClick={() => {
+              const ok = openPolish({
+                type: 'todo',
+                initialContent: description,
+                onAdopt: (suggestion) => setDescription(suggestion),
+              })
+              if (!ok) showToast('工作对话已开启，请先关闭后再使用润色')
             }}
+            disabled={!LLM_AVAILABLE || !description.trim()}
+            title={LLM_AVAILABLE ? 'AI 对话润色' : 'LLM 暂未接入'}
+            style={{ background: 'none', border: 'none', padding: '0 0 0 8px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', opacity: LLM_AVAILABLE ? 1 : 0.3 }}
           >
-            <img
-              src={polishIcon}
-              alt=""
-              style={{
-                width: 16,
-                height: 16,
-                opacity: polish.isPolished ? 0.85 : 0.4,
-              }}
-            />
+            <img src={polishIcon} alt="" style={{ width: 16, height: 16, opacity: 0.4 }} />
           </button>
         </div>
         <DescriptionEditor
@@ -110,49 +90,23 @@ export function TodoAddForm({ onSubmit, onClose, initialTitle = '', initialDescr
         />
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontFamily: 'var(--mono)', fontSize: '10.5px', color: 'var(--ink-ghost)' }}>
-          — 添加后可在列表中勾选或废弃 —
-        </span>
+        <span style={{ fontFamily: 'var(--mono)', fontSize: '10.5px', color: 'var(--ink-ghost)' }}>— 添加后可在列表中勾选或废弃 —</span>
         <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-          <button
-            type="button"
-            disabled={!interactive}
-            onClick={() => handleSubmit(true)}
-            onMouseEnter={() => setHoverContinue(true)}
-            onMouseLeave={() => setHoverContinue(false)}
-            style={{
-              fontFamily: 'var(--body)',
-              fontSize: hoverContinue ? '14.5px' : '14px',
-              fontStyle: 'italic',
+          <button type="button" disabled={!interactive} onClick={() => handleSubmit(true)}
+            onMouseEnter={() => setHoverContinue(true)} onMouseLeave={() => setHoverContinue(false)}
+            style={{ fontFamily: 'var(--body)', fontSize: hoverContinue ? '14.5px' : '14px', fontStyle: 'italic',
               color: !interactive ? 'var(--ink-ghost)' : hoverContinue ? 'var(--green-ink)' : 'var(--ink)',
               background: !interactive ? 'transparent' : hoverContinue ? 'var(--card)' : 'var(--card-deep)',
-              border: 'none',
-              borderRadius: '3px',
-              padding: '8px 18px',
-              cursor: interactive ? 'pointer' : 'default',
-              transition: 'font-size 250ms ease, background 250ms ease, color 250ms ease',
-            }}
-          >
+              border: 'none', borderRadius: '3px', padding: '8px 18px', cursor: interactive ? 'pointer' : 'default',
+              transition: 'font-size 250ms ease, background 250ms ease, color 250ms ease' }}>
             {submitting ? '添加中…' : '继续添加'}
           </button>
-          <button
-            type="button"
-            disabled={!interactive}
-            onClick={() => handleSubmit(false)}
-            onMouseEnter={() => setHoverClose(true)}
-            onMouseLeave={() => setHoverClose(false)}
-            style={{
-              fontFamily: 'var(--body)',
-              fontSize: hoverClose ? '14.5px' : '14px',
-              fontStyle: 'italic',
+          <button type="button" disabled={!interactive} onClick={() => handleSubmit(false)}
+            onMouseEnter={() => setHoverClose(true)} onMouseLeave={() => setHoverClose(false)}
+            style={{ fontFamily: 'var(--body)', fontSize: hoverClose ? '14.5px' : '14px', fontStyle: 'italic',
               color: !interactive ? 'var(--ink-ghost)' : hoverClose ? 'var(--ink)' : 'var(--ink-faded)',
-              background: 'none',
-              border: 'none',
-              padding: '6px 0',
-              cursor: interactive ? 'pointer' : 'default',
-              transition: 'font-size 250ms ease, color 250ms ease',
-            }}
-          >
+              background: 'none', border: 'none', padding: '6px 0', cursor: interactive ? 'pointer' : 'default',
+              transition: 'font-size 250ms ease, color 250ms ease' }}>
             {submitting ? '添加中…' : '保存并关闭'}
           </button>
         </div>
@@ -160,3 +114,4 @@ export function TodoAddForm({ onSubmit, onClose, initialTitle = '', initialDescr
     </form>
   )
 }
+

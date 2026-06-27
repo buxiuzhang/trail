@@ -1,39 +1,60 @@
 import { useState, useRef, useEffect, useCallback, type FormEvent } from 'react'
 import { useChatContext, type Message } from '@/context/ChatContext'
 import { useChat } from '@/api/chat'
+import { usePolishDialog } from '@/api/polishDialog'
 import { useToastContext } from '@/context/ToastContext'
 import { useLLMSettings } from '@/api/settings'
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition'
 import { ignoreAlert } from '@/hooks/useWatchAlerts'
 import { MessageContent } from './MessageContent'
+import { MarkdownRenderer } from '@/components/shared/MarkdownRenderer'
 import CopyIcon from './copy.svg'
 import CopiedIcon from './copied.svg'
 import CloseCircleIcon from './close-circle.svg'
+import FullscreenIcon from '@/icons/fullscreen.svg'
 import styles from './ChatWindow.module.css'
 
-/** 最近消息条数上限（防 token 溢出） */
 const MAX_HISTORY = 20
-/** 打字机速度：每字毫秒数。 */
 const TYPEWRITER_MS = 30
 
-/** 工具名称中文映射 */
 const TOOL_NAMES: Record<string, string> = {
   get_api_docs: '查询接口',
   call_api: '执行操作',
 }
 
+const POLISH_TYPE_LABEL: Record<string, string> = {
+  log:       '日报润色',
+  todo:      '待办润色',
+  task_desc: '任务描述润色',
+}
+
+/** 从文本中提取【建议版本】后的代码块内容 */
+function extractSuggestion(text: string): string | null {
+  const marker = '【建议版本】'
+  const idx = text.indexOf(marker)
+  if (idx === -1) return null
+  const after = text.slice(idx + marker.length)
+  const codeMatch = after.match(/```[\s\S]*?\n([\s\S]*?)```/)
+  if (codeMatch) return codeMatch[1].trim()
+  return after.trim() || null
+}
+
+function splitAssistantContent(text: string): { body: string; suggestion: string | null } {
+  const marker = '【建议版本】'
+  const idx = text.indexOf(marker)
+  if (idx === -1) return { body: text, suggestion: null }
+  return { body: text.slice(0, idx).trim(), suggestion: extractSuggestion(text) }
+}
+
 export function ChatWindow() {
   const {
-    isOpen,
-    messages,
-    closeChat,
-    addMessage,
-    updateLastMessage,
-    setIsLoading,
-    clearAlerts,
-    clearMessages,
+    isOpen, isExpanded, polishConfig,
+    messages, closeChat, addMessage, updateLastMessage,
+    setIsLoading, clearAlerts, clearMessages,
+    expandChat, collapseChat,
   } = useChatContext()
-  const { send, abort, isPending } = useChat()
+  const { send: sendChat, abort: abortChat, isPending: chatPending } = useChat()
+  const { send: sendPolish, abort: abortPolish, isPending: polishPending } = usePolishDialog()
   const { showToast } = useToastContext()
   const [input, setInput] = useState('')
   const bodyRef = useRef<HTMLDivElement>(null)
@@ -43,114 +64,65 @@ export function ChatWindow() {
   const speechDuration = parseInt(llmSettings?.speech_duration || '10', 10)
   const modelName = llmSettings?.model || ''
 
+  // 润色模式：首轮自动发送
+  const sentInitial = useRef(false)
+  const isPending = polishConfig ? polishPending : chatPending
+
   const handleAction = useCallback((action: string) => {
     const parts = action.split(':')
     const type = parts[0]
     const id = parseInt(parts[1])
     if (isNaN(id)) return
-    if (type === 'ignore') {
-      ignoreAlert(id)
-      showToast('今日不再提醒')
-    }
+    if (type === 'ignore') { ignoreAlert(id); showToast('今日不再提醒') }
   }, [showToast])
 
-  // 打开时清空未读角标
-  useEffect(() => {
-    if (isOpen) clearAlerts()
-  }, [isOpen, clearAlerts])
+  useEffect(() => { if (isOpen) clearAlerts() }, [isOpen, clearAlerts])
 
-  // 语音识别 - 使用回调方式实时更新输入框
-  const {
-    isListening,
-    progress,
-    start: startSpeech,
-    stop: stopSpeech,
-    isSupported: speechSupported,
-    error: speechError,
-  } = useSpeechRecognition((text) => {
-    // 实时更新输入框（替换而非追加）
-    setInput(text)
-  }, speechDuration)
-  // 流式写入时直接更新最后一条 assistant 消息的 content（不通过 addMessage 走 state path）
+  const { isListening, progress, start: startSpeech, stop: stopSpeech,
+    isSupported: speechSupported, error: speechError } = useSpeechRecognition(
+    (text) => setInput(text), speechDuration
+  )
+
   const liveRef = useRef<HTMLDivElement>(null)
-  // 待渲染的字符队列。流式期间 appendDelta 把整段推入，由打字机定时器逐字取空。
   const queueRef = useRef<string[]>([])
   const timerRef = useRef<number | null>(null)
-  // 工具调用状态
-  const [toolStatus, setToolStatus] = useState<{
-    name: string
-    input: Record<string, unknown> | null
-    executing: boolean
-  } | null>(null)
-  // 迭代次数
+  const [toolStatus, setToolStatus] = useState<{ name: string; input: Record<string, unknown> | null; executing: boolean } | null>(null)
   const [iterationInfo, setIterationInfo] = useState<{ current: number; max: number } | null>(null)
 
-  // 自动滚到底部
   const scrollToBottom = useCallback(() => {
-    if (bodyRef.current) {
-      bodyRef.current.scrollTop = bodyRef.current.scrollHeight
-    }
+    if (bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight
   }, [])
 
+  useEffect(() => { scrollToBottom() }, [messages, scrollToBottom])
   useEffect(() => {
-    scrollToBottom()
-  }, [messages, scrollToBottom])
-
-  useEffect(() => {
-    if (isOpen) {
-      const id = setTimeout(scrollToBottom, 50)
-      return () => clearTimeout(id)
-    }
+    if (isOpen) { const id = setTimeout(scrollToBottom, 50); return () => clearTimeout(id) }
   }, [isOpen, scrollToBottom])
 
-  // 启动打字机（如未启动）；取一个字符追加到 DOM。
   const pump = useCallback(() => {
     const q = queueRef.current
-    if (q.length === 0) {
-      if (timerRef.current != null) {
-        clearInterval(timerRef.current)
-        timerRef.current = null
-      }
-      return
-    }
+    if (q.length === 0) { if (timerRef.current != null) { clearInterval(timerRef.current); timerRef.current = null } return }
     const ch = q.shift()!
     const el = liveRef.current
     if (el) el.textContent = (el.textContent ?? '') + ch
     scrollToBottom()
   }, [scrollToBottom])
 
-  // 启动打字机 interval（幂等：已有就不重复启动）
   const ensureTimer = useCallback(() => {
-    if (timerRef.current == null) {
-      timerRef.current = window.setInterval(pump, TYPEWRITER_MS)
-    }
+    if (timerRef.current == null) timerRef.current = window.setInterval(pump, TYPEWRITER_MS)
   }, [pump])
 
-  // 停止打字机（流结束 / 卸载 / 中断）
   const stopTimer = useCallback(() => {
-    if (timerRef.current != null) {
-      clearInterval(timerRef.current)
-      timerRef.current = null
-    }
+    if (timerRef.current != null) { clearInterval(timerRef.current); timerRef.current = null }
     queueRef.current = []
   }, [])
 
-  // 把一整段 delta 拆成字符推入队列（中文按字、英文按 grapheme 太复杂，
-  // 这里 Array.from 走码点粒度已经够好——标点和 emoji 大多单码点）。
-  const enqueueDelta = useCallback(
-    (piece: string) => {
-      if (!piece) return
-      queueRef.current.push(...Array.from(piece))
-      ensureTimer()
-    },
-    [ensureTimer],
-  )
+  const enqueueDelta = useCallback((piece: string) => {
+    if (!piece) return
+    queueRef.current.push(...Array.from(piece))
+    ensureTimer()
+  }, [ensureTimer])
 
-  // 把 liveRef DOM 节点里的 partial / 完整文本写回 messages state。
-  // 打字机是逐字出，结束时 must 同步一次，否则下一轮发消息时
-  // messages 里的 assistant 还是 ""，会被后端 422 拒掉。
   const syncLiveToState = useCallback(() => {
-    // 先把队列里剩余的字符瞬间排空（流结束就一次全写）
     if (liveRef.current) {
       const rest = queueRef.current.join('')
       if (rest) liveRef.current.textContent = (liveRef.current.textContent ?? '') + rest
@@ -160,135 +132,124 @@ export function ChatWindow() {
     if (liveRef.current) updateLastMessage(liveRef.current.textContent ?? '')
   }, [stopTimer, updateLastMessage])
 
-  // 打开时聚焦输入框
   useEffect(() => {
-    if (isOpen) {
-      const id = setTimeout(() => inputRef.current?.focus(), 350)
-      return () => clearTimeout(id)
-    }
+    if (isOpen) { const id = setTimeout(() => inputRef.current?.focus(), 350); return () => clearTimeout(id) }
   }, [isOpen])
 
-  // 快捷键处理
   useEffect(() => {
     if (!isOpen || !speechSupported) return
-
     const inputEl = inputRef.current
     if (!inputEl) return
-
     const handleKeyDown = (e: KeyboardEvent) => {
-      // 空格键：输入框为空时，开始录音
-      if (e.code === 'Space' && !input && !isListening) {
-        e.preventDefault()
-        startSpeech()
-        return
-      }
-
-      // 回车键：录音中时停止录音
-      if (e.code === 'Enter' && isListening) {
-        e.preventDefault()
-        stopSpeech()
-        return
-      }
+      if (e.code === 'Space' && !input && !isListening) { e.preventDefault(); startSpeech(); return }
+      if (e.code === 'Enter' && isListening) { e.preventDefault(); stopSpeech(); return }
     }
-
     inputEl.addEventListener('keydown', handleKeyDown)
-    return () => {
-      inputEl.removeEventListener('keydown', handleKeyDown)
-    }
+    return () => inputEl.removeEventListener('keydown', handleKeyDown)
   }, [isOpen, speechSupported, input, isListening, startSpeech, stopSpeech])
 
-  // 语音识别错误提示
+  useEffect(() => { if (speechError) showToast(speechError) }, [speechError, showToast])
+  useEffect(() => () => { abortChat(); abortPolish(); stopTimer() }, [abortChat, abortPolish, stopTimer])
   useEffect(() => {
-    if (speechError) {
-      showToast(speechError)
+    if (isExpanded) {
+      document.body.style.overflow = 'hidden'
+      return () => { document.body.style.overflow = '' }
     }
-  }, [speechError, showToast])
+  }, [isExpanded])
 
-  // 卸载时取消进行中的流 + 停掉打字机
+  // 润色模式首轮自动发送
   useEffect(() => {
-    return () => {
-      abort()
-      stopTimer()
-    }
-  }, [abort, stopTimer])
+    if (!polishConfig || sentInitial.current) return
+    sentInitial.current = true
+    handleSendPolish(polishConfig.initialContent, polishConfig.contentForLLM)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [polishConfig])
+
+  // polishConfig 变化时重置
+  useEffect(() => { sentInitial.current = false }, [polishConfig])
 
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null)
 
   if (!isOpen) return null
 
+  // ——— 润色模式发送 ———
+  async function handleSendPolish(text: string, llmText?: string) {
+    if (!polishConfig) return
+    addMessage('user', text)
+    addMessage('assistant', '')
+    setIsLoading(true)
+
+    const historyMsgs = messages
+      .filter(m => m.content.trim())
+      .map(m => ({ role: m.role, content: m.content }))
+    historyMsgs.push({ role: 'user', content: llmText ?? text })
+
+    let accum = ''
+    try {
+      await sendPolish(
+        {
+          type: polishConfig.type,
+          content: polishConfig.contentForLLM ?? polishConfig.initialContent,
+          task_id: polishConfig.taskId,
+          messages: historyMsgs,
+        },
+        (delta) => {
+          accum += delta
+          if (liveRef.current) liveRef.current.textContent = accum
+          scrollToBottom()
+        },
+      )
+    } catch (err: unknown) {
+      const msg = (err as Error).name === 'AbortError' ? null : (err as Error).message
+      if (msg) showToast(msg.includes('未配置') ? 'LLM 未配置，请在设置中配置 API Key' : '请求失败：' + msg)
+    } finally {
+      syncLiveToState()
+      setIsLoading(false)
+    }
+  }
+
+  // ——— 普通 Chat 发送 ———
   async function handleSend(e?: FormEvent) {
     e?.preventDefault()
     const text = input.trim()
     if (!text || isPending) return
-
     setInput('')
+
+    if (polishConfig) {
+      await handleSendPolish(text)
+      return
+    }
+
     addMessage('user', text)
-    // 先插入空 assistant 占位
     addMessage('assistant', '')
     setIsLoading(true)
-    // 重置工具状态
     setToolStatus(null)
     setIterationInfo(null)
 
     const recent = messages.slice(-MAX_HISTORY)
-    // 防御性：跳过空 content 的历史消息（占位 / 中断未恢复）。
-    // 后端 ChatIn 校验 content min_length=1，空消息会触发 422。
     const payload = [
-      ...recent
-        .filter((m: Message) => m.content.trim().length > 0)
-        .map((m: Message) => ({ role: m.role, content: m.content })),
+      ...recent.filter((m: Message) => m.content.trim().length > 0).map((m: Message) => ({ role: m.role, content: m.content })),
       { role: 'user' as const, content: text },
     ]
 
     try {
-      await send(
+      await sendChat(
         { messages: payload },
         enqueueDelta,
-        // onToolCall
-        (name, input) => {
-          setToolStatus({ name, input, executing: true })
-        },
-        // onToolResult
-        (_name, _ok) => {
-          setToolStatus(prev => prev ? { ...prev, executing: false } : null)
-        },
-        // onIteration
-        (current, max) => {
-          setIterationInfo({ current, max })
-        },
-        // onRetry：重试前清空已渲染的 partial 内容
-        () => {
-          stopTimer()
-          if (liveRef.current) liveRef.current.textContent = ''
-        },
+        (name, input) => setToolStatus({ name, input, executing: true }),
+        (_name, _ok) => setToolStatus(prev => prev ? { ...prev, executing: false } : null),
+        (current, max) => setIterationInfo({ current, max }),
+        () => { stopTimer(); if (liveRef.current) liveRef.current.textContent = '' },
       )
     } catch (err: unknown) {
       const detail = (err as Error)?.message ?? String(err)
       const status = (err as { status?: number })?.status
-      if (
-        detail.includes('503') ||
-        detail.includes('未配置') ||
-        detail.includes('未设置') ||
-        status === 503
-      ) {
-        showToast('LLM 未配置，请在设置中配置 API Key')
-      } else if ((err as Error).name === 'AbortError') {
-        // 用户主动停止，不弹 toast
-      } else if (
-        detail.includes('429') ||
-        detail.includes('RateLimit') ||
-        detail.includes('rate_limit') ||
-        detail.includes('限流') ||
-        detail.includes('Too Many')
-      ) {
-        showToast('请求过快或套餐限额，请稍后再试')
-      } else if (detail.includes('502') || status === 502) {
-        showToast('LLM 服务暂时异常，请稍后再试')
-      } else {
-        showToast('LLM 服务暂时无法响应，已重试 3 次仍未成功，请稍后再试')
-      }
+      if (detail.includes('503') || detail.includes('未配置') || status === 503) showToast('LLM 未配置，请在设置中配置 API Key')
+      else if ((err as Error).name === 'AbortError') { /* 用户停止 */ }
+      else if (detail.includes('429') || detail.includes('RateLimit')) showToast('请求过快或套餐限额，请稍后再试')
+      else if (detail.includes('502') || status === 502) showToast('LLM 服务暂时异常，请稍后再试')
+      else showToast('LLM 服务暂时无法响应，已重试 3 次仍未成功，请稍后再试')
     } finally {
-      // 流结束（正常 / 异常 / 中止）时，把队列里剩余字符瞬间排空 + 同步回 state
       syncLiveToState()
       setIsLoading(false)
       setToolStatus(null)
@@ -296,22 +257,34 @@ export function ChatWindow() {
     }
   }
 
-  // 流是否正在进行（用于 liveRef 绑到 DOM 节点 + 渲染 typing dots）
   const lastMsg = messages[messages.length - 1]
-  // isStreaming: assistant 正在流式输出（内容会逐字写入 liveRef）
-  // 内容为空时显示 typing dots，同时 liveRef 也要绑定
   const isStreaming = isPending && lastMsg?.role === 'assistant'
-  // showTyping: 内容为空时显示跳动动画
   const showTyping = isStreaming && lastMsg?.content === ''
 
-  return (
-    <div className={styles.window} role="dialog" aria-label="工作对话">
+  const headerTitle = polishConfig ? POLISH_TYPE_LABEL[polishConfig.type] ?? '润色对话' : '工作对话'
+
+  const windowContent = (
+    <div className={isExpanded ? styles.windowExpanded : styles.window} role="dialog" aria-label={headerTitle}>
+      {/* 顶部虚线 */}
+      {!isExpanded && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: 'repeating-linear-gradient(to right, var(--rule) 0, var(--rule) 2px, transparent 2px, transparent 5px)', opacity: 0.45 }} />}
+
       {/* 头部 */}
       <div className={styles.header}>
-        <span className={styles.title}>工作对话</span>
-        <button className={styles.close} onClick={closeChat} aria-label="关闭对话">
-          <img src={CloseCircleIcon} width={18} height={18} alt="" aria-hidden="true" />
-        </button>
+        <span className={styles.title}>{headerTitle}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {/* Expand / Collapse 按钮 */}
+          <button
+            className={styles.expandBtn}
+            onClick={isExpanded ? collapseChat : expandChat}
+            aria-label={isExpanded ? '收缩' : '展开'}
+            title={isExpanded ? '收缩' : '展开'}
+          >
+            <img src={FullscreenIcon} width={16} height={16} alt="" />
+          </button>
+          <button className={styles.close} onClick={closeChat} aria-label="关闭对话">
+            <img src={CloseCircleIcon} width={18} height={18} alt="" aria-hidden="true" />
+          </button>
+        </div>
       </div>
 
       {/* 消息列表 */}
@@ -332,39 +305,26 @@ export function ChatWindow() {
               isStreaming={isLast && isStreaming}
               showTyping={isLast && showTyping && !toolStatus}
               onAction={handleAction}
+              isPolishMode={!!polishConfig}
+              polishTodos={polishConfig?.todos}
+              polishTasks={polishConfig?.tasks}
+              onAdopt={polishConfig && isLast ? (suggestion) => { polishConfig.onAdopt(suggestion); closeChat() } : undefined}
             />
           )
         })}
-        {/* 工具调用状态 */}
         {toolStatus && (
           <div className={styles.toolStatus}>
             <span className={styles.toolIcon}>⚙</span>
-            <span className={styles.toolText}>
-              {TOOL_NAMES[toolStatus.name] || toolStatus.name}
-              {toolStatus.executing ? '...' : ' ✓'}
-            </span>
-            {iterationInfo && (
-              <span className={styles.iteration}>
-                ({iterationInfo.current}/{iterationInfo.max})
-              </span>
-            )}
+            <span className={styles.toolText}>{TOOL_NAMES[toolStatus.name] || toolStatus.name}{toolStatus.executing ? '...' : ' ✓'}</span>
+            {iterationInfo && <span className={styles.iteration}>({iterationInfo.current}/{iterationInfo.max})</span>}
           </div>
         )}
       </div>
 
       {/* 右键菜单 */}
       {ctxMenu && (
-        <ul
-          className={styles.ctxMenu}
-          style={{ left: ctxMenu.x, top: ctxMenu.y }}
-          onMouseLeave={() => setCtxMenu(null)}
-        >
-          <li
-            className={styles.ctxItem}
-            onMouseDown={(e) => { e.preventDefault(); clearMessages(); setCtxMenu(null) }}
-          >
-            清空聊天记录
-          </li>
+        <ul className={styles.ctxMenu} style={{ left: ctxMenu.x, top: ctxMenu.y }} onMouseLeave={() => setCtxMenu(null)}>
+          <li className={styles.ctxItem} onMouseDown={(e) => { e.preventDefault(); clearMessages(); setCtxMenu(null) }}>清空聊天记录</li>
         </ul>
       )}
 
@@ -376,27 +336,14 @@ export function ChatWindow() {
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="询问工作进展…"
-          disabled={false}
+          placeholder={polishConfig ? '回复 AI 的问题，或输入调整要求…' : '询问工作进展…'}
           autoComplete="off"
         />
-        {/* 语音输入按钮 */}
-        {speechSupported && (
+        {speechSupported && !polishConfig && (
           <div className={styles.micWrapper}>
-            <button
-              type="button"
-              className={isListening ? styles.micBtnActive : styles.micBtn}
-              onClick={(e) => {
-                e.preventDefault()
-                if (isListening) {
-                  stopSpeech()
-                } else {
-                  startSpeech()
-                }
-              }}
-              title={isListening ? '停止录音' : '语音输入'}
-              aria-label={isListening ? '停止录音' : '开始语音输入'}
-            >
+            <button type="button" className={isListening ? styles.micBtnActive : styles.micBtn}
+              onClick={(e) => { e.preventDefault(); isListening ? stopSpeech() : startSpeech() }}
+              title={isListening ? '停止录音' : '语音输入'} aria-label={isListening ? '停止录音' : '开始语音输入'}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
                 <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
@@ -404,47 +351,36 @@ export function ChatWindow() {
                 <line x1="8" y1="23" x2="16" y2="23"/>
               </svg>
             </button>
-            {/* 进度条（在按钮外，不受闪烁影响） */}
             {isListening && (
               <div className={styles.micProgress}>
-                <div
-                  className={styles.micProgressFill}
-                  style={{ width: `${Math.round(progress * 100)}%` }}
-                />
+                <div className={styles.micProgressFill} style={{ width: `${Math.round(progress * 100)}%` }} />
               </div>
             )}
           </div>
         )}
         {isPending ? (
-          <button
-            className={styles.sendBtn}
-            type="button"
-            onClick={abort}
-          >
-            停止
-          </button>
+          <button className={styles.sendBtn} type="button" onClick={polishConfig ? abortPolish : abortChat}>停止</button>
         ) : (
-          <button
-            className={styles.sendBtn}
-            type="submit"
-            disabled={!input.trim()}
-          >
-            发送
-          </button>
+          <button className={styles.sendBtn} type="submit" disabled={!input.trim()}>发送</button>
         )}
       </form>
     </div>
   )
+
+  if (isExpanded) {
+    return (
+      <div className={styles.overlay} onClick={(e) => { if (e.target === e.currentTarget) collapseChat() }}>
+        {windowContent}
+      </div>
+    )
+  }
+  return windowContent
 }
 
 /** 单条消息 */
 function ChatMessageRow({
-  message,
-  modelName,
-  liveRef,
-  isStreaming,
-  showTyping,
-  onAction,
+  message, modelName, liveRef, isStreaming, showTyping, onAction,
+  isPolishMode, polishTodos, polishTasks, onAdopt,
 }: {
   message: Message
   modelName?: string
@@ -452,6 +388,10 @@ function ChatMessageRow({
   isStreaming?: boolean
   showTyping?: boolean
   onAction?: (action: string) => void
+  isPolishMode?: boolean
+  polishTodos?: { id: number; title: string }[]
+  polishTasks?: { id: number; title: string }[]
+  onAdopt?: (suggestion: string) => void
 }) {
   const isUser = message.role === 'user'
   const [copied, setCopied] = useState(false)
@@ -462,6 +402,11 @@ function ChatMessageRow({
     setTimeout(() => setCopied(false), 1500)
   }
 
+  // 润色模式：分离正文和建议版本
+  const { body, suggestion } = isPolishMode && !isUser
+    ? splitAssistantContent(message.content)
+    : { body: message.content, suggestion: null }
+
   return (
     <div className={`${styles.msg} ${isUser ? styles.msgUser : styles.msgAssistant}`}>
       <div className={styles.msgBubble}>
@@ -470,37 +415,51 @@ function ChatMessageRow({
         ) : (
           <div className={styles.msgRoleRow}>
             <span className={styles.msgRole}>Trail</span>
-            {modelName && <span className={styles.modelName}>{modelName}</span>}
+            {modelName && !isPolishMode && <span className={styles.modelName}>{modelName}</span>}
           </div>
         )}
+
         {isStreaming && liveRef ? (
-          // 流式：纯文本 + 打字机
-          <div className={styles.msgContent} ref={liveRef} />
+          <>
+            <div className={styles.msgContent} ref={liveRef} />
+            {showTyping && (
+              <div className={styles.typingIndicator}>
+                <span className={styles.typingDotSmall} /><span className={styles.typingDotSmall} /><span className={styles.typingDotSmall} />
+              </div>
+            )}
+          </>
+        ) : isPolishMode && !isUser ? (
+          <>
+            {body && (
+              <MarkdownRenderer
+                text={body}
+                todos={polishTodos}
+                tasks={polishTasks}
+                className={styles.msgContent}
+              />
+            )}
+            {suggestion && onAdopt && (
+              <div className={styles.suggestion}>
+                <div className={styles.suggestionHeader}>
+                  <span className={styles.suggestionLabel}>建议版本</span>
+                  <button className={styles.adoptBtn} onClick={() => onAdopt(suggestion)}>采用</button>
+                </div>
+                <MarkdownRenderer
+                  text={suggestion}
+                  todos={polishTodos}
+                  tasks={polishTasks}
+                  className={styles.suggestionContent}
+                />
+              </div>
+            )}
+          </>
         ) : (
-          // 完成：使用 MessageContent 组件解析链接
           <MessageContent content={message.content} onAction={onAction} />
         )}
-        {/* 等待中：右下角显示 typing dots */}
-        {showTyping && (
-          <div className={styles.typingIndicator}>
-            <span className={styles.typingDotSmall} />
-            <span className={styles.typingDotSmall} />
-            <span className={styles.typingDotSmall} />
-          </div>
-        )}
-        {/* 助手消息完成后显示复制按钮 */}
+
         {!isUser && !isStreaming && !showTyping && (
-          <button
-            className={styles.copyBtn}
-            onClick={handleCopy}
-            title={copied ? '已复制' : '复制'}
-            aria-label="复制内容"
-          >
-            {copied ? (
-              <img src={CopiedIcon} alt="" className={styles.copyIcon} />
-            ) : (
-              <img src={CopyIcon} alt="" className={styles.copyIcon} />
-            )}
+          <button className={styles.copyBtn} onClick={handleCopy} title={copied ? '已复制' : '复制'} aria-label="复制内容">
+            {copied ? <img src={CopiedIcon} alt="" className={styles.copyIcon} /> : <img src={CopyIcon} alt="" className={styles.copyIcon} />}
           </button>
         )}
       </div>

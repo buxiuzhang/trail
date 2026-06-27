@@ -2,16 +2,16 @@ import { useState, useRef, useEffect, useMemo } from 'react'
 import type { LogOut, TaskOut, TodoOut } from '@/types'
 import { TODAY } from '@/constants'
 import { useDraftLog, LLM_AVAILABLE } from '@/api/llm'
-import { usePolishContent } from '@/hooks/usePolishContent'
 import { usePlaceholders, DEFAULT_PLACEHOLDERS } from '@/api/settings'
 import { useToastContext } from '@/context/ToastContext'
 import { useModalContext } from '@/context/ModalContext'
+import { useChatContext } from '@/context/ChatContext'
 import { useAttachmentsByIds } from '@/api/attachments'
 import { Select } from '@/components/shared/Select'
 import { DescriptionEditorWithMode as DescriptionEditor } from '@/components/shared/DescriptionEditorWithMode'
 import { ModeToggleButton } from '@/components/shared/ModeToggleButton'
 import { TodoRefSection } from '@/components/detail/TodoRefSection'
-import { extractTodoMentionIds, extractTaskRefIds } from '@/components/shared/richtext-utils'
+import { extractTodoMentionIds, extractTaskRefIds, expandMentionsForLLM } from '@/components/shared/richtext-utils'
 import polishIcon from '@/icons/polish.svg'
 import draftIcon from '@/icons/draft.svg'
 import styles from './Logbook.module.css'
@@ -44,10 +44,10 @@ export function LogCompose({ task, todos, tasks = [], editing, onSave, onCancel,
   const [draftInput, setDraftInput] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const draftInputRef = useRef<HTMLTextAreaElement>(null)
-  const polishLog = usePolishContent({ task_id: task.id })
   const draftMutation = useDraftLog(task.id)
   const { showToast } = useToastContext()
   const { openModal } = useModalContext()
+  const { openPolish } = useChatContext()
   const { data: placeholders } = usePlaceholders()
 
   const fileIds = useMemo(() => {
@@ -145,7 +145,6 @@ export function LogCompose({ task, todos, tasks = [], editing, onSave, onCancel,
       const allTaskIds = [...new Set([...mentionTaskIds, ...selectedTaskIds])]
       await onSave({ log_date: logDate, content: contentToSave, phase, hours, todo_ids: allTodoIds, task_ids: allTaskIds })
       setContent('')
-      polishLog.reset()
       setSelectedTodoIds([])
       setSelectedTaskIds([])
       setDraftInput('')
@@ -349,15 +348,26 @@ export function LogCompose({ task, todos, tasks = [], editing, onSave, onCancel,
           <button
             type="button"
             className={styles.btnPolish}
-            onClick={() => polishLog.handlePolish(content, setContent)}
-            disabled={!LLM_AVAILABLE || polishLog.isPending}
-            data-tooltip={LLM_AVAILABLE ? (polishLog.isPolished ? '撤销润色' : '润色') : 'LLM 暂未接入'}
+            onClick={() => {
+              const ok = openPolish({
+                type: 'log',
+                initialContent: content,
+                contentForLLM: expandMentionsForLLM(
+                  content,
+                  new Map(todos.map(t => [t.id, t.title])),
+                  new Map(tasks.map(t => [t.id, t.title])),
+                ),
+                taskId: task.id,
+                todos,
+                tasks,
+                onAdopt: (suggestion) => setContent(suggestion),
+              })
+              if (!ok) showToast('工作对话已开启，请先关闭后再使用润色')
+            }}
+            disabled={!LLM_AVAILABLE || !content.trim()}
+            data-tooltip={LLM_AVAILABLE ? 'AI 对话润色' : 'LLM 暂未接入'}
           >
-            <img
-              src={polishIcon}
-              alt=""
-              className={`${styles.polishIcon} ${polishLog.isPolished ? styles.polishIconActive : ''}`}
-            />
+            <img src={polishIcon} alt="" className={styles.polishIcon} />
           </button>
           <button type="submit" className={styles.btnSave} disabled={submitting || !content.trim() || saveDisabled}>
             {saveLabel ?? (isEdit ? '保存' : '落档')}

@@ -25,7 +25,24 @@ export function extractTaskRefIds(text: string): number[] {
   return [...new Set(ids)] // 去重
 }
 
-/** 规范化提及格式：确保每个提及后面有空格
+
+/** 将 @todo:N / @task:N 展开为带标题的形式，供发给 LLM 时使用。
+ *  例：@todo:24 → @todo:24「待办标题」
+ *  找不到对应条目时保持原文不变。
+ */
+export function expandMentionsForLLM(
+  text: string,
+  todos: Map<number, string>,
+  tasks: Map<number, string>,
+): string {
+  return text.replace(/@(todo|task):(\d+)/g, (match, type, idStr) => {
+    const id = parseInt(idStr, 10)
+    const title = type === 'todo' ? todos.get(id) : tasks.get(id)
+    return title ? `${match}「${title}」` : match
+  })
+}
+
+/** 规范化提及格式：确保每个提及后面有空格。
  *  在保存前调用，让保存的内容包含空格，便于后续编辑时光标定位
  */
 export function normalizeMentions(text: string): string {

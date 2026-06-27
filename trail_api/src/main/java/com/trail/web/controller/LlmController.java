@@ -104,6 +104,17 @@ public class LlmController {
         return llmService.parseBatchLogs(text, taskTitles);
     }
 
+    @Operation(summary = "对话式润色（SSE）", description = "以多轮对话方式引导完成内容润色，支持 log/todo/task_desc 三种类型")
+    @PostMapping(value = "/chat/polish/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter polishDialogStream(@RequestBody Map<String, Object> body) {
+        String type = (String) body.getOrDefault("type", "log");
+        String content = (String) body.getOrDefault("content", "");
+        Long taskId = body.get("task_id") instanceof Number n ? n.longValue() : null;
+        @SuppressWarnings("unchecked")
+        List<Map<String, String>> messages = (List<Map<String, String>>) body.getOrDefault("messages", List.of());
+        return llmService.polishDialogStream(type, content, taskId, messages);
+    }
+
     @Operation(summary = "基础聊天（SSE）", description = "流式聊天，无工具调用")
     @PostMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter chatStream(@RequestBody ChatRequest req) {

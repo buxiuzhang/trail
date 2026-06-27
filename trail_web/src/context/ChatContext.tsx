@@ -8,19 +8,34 @@ export interface Message {
   timestamp: number
 }
 
+export interface PolishConfig {
+  type: 'log' | 'todo' | 'task_desc'
+  initialContent: string
+  contentForLLM?: string
+  taskId?: number
+  todos?: { id: number; title: string }[]
+  tasks?: { id: number; title: string }[]
+  onAdopt: (suggestion: string) => void
+}
+
 interface ChatContextValue {
   isOpen: boolean
+  isExpanded: boolean
+  /** 非 null 时 ChatWindow 进入润色模式 */
+  polishConfig: PolishConfig | null
   messages: Message[]
   isLoading: boolean
   alertCount: number
   openChat: () => void
   closeChat: () => void
+  expandChat: () => void
+  collapseChat: () => void
+  /** 以润色模式打开对话框。工作对话已开启时返回 false，否则打开并返回 true */
+  openPolish: (config: PolishConfig) => boolean
   addMessage: (role: 'user' | 'assistant', content: string) => void
-  /** 把最后一条消息的 content 改写为新值（用于流式结束时把 partial 文本写回 state）。 */
   updateLastMessage: (content: string) => void
   clearMessages: () => void
   setIsLoading: (v: boolean) => void
-  /** 推入一条预警消息（assistant 角色），并增加未读角标。 */
   pushAlert: (content: string) => void
   clearAlerts: () => void
 }
@@ -31,22 +46,18 @@ const GREETING = '你好，我是 Trail 工作日报助教。你可以问我今�
 
 export function ChatProvider({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(false)
+  const [polishConfig, setPolishConfig] = useState<PolishConfig | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [alertCount, setAlertCount] = useState(0)
 
   const openChat = useCallback(() => {
+    setPolishConfig(null)
     setIsOpen(true)
     setMessages(prev => {
       if (prev.length === 0) {
-        return [
-          {
-            id: crypto.randomUUID(),
-            role: 'assistant' as const,
-            content: GREETING,
-            timestamp: Date.now(),
-          },
-        ]
+        return [{ id: crypto.randomUUID(), role: 'assistant' as const, content: GREETING, timestamp: Date.now() }]
       }
       return prev
     })
@@ -54,18 +65,24 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   const closeChat = useCallback(() => {
     setIsOpen(false)
+    setIsExpanded(false)
+    setPolishConfig(null)
   }, [])
 
+  const expandChat = useCallback(() => setIsExpanded(true), [])
+  const collapseChat = useCallback(() => setIsExpanded(false), [])
+
+  const openPolish = useCallback((config: PolishConfig): boolean => {
+    if (isOpen && polishConfig === null) return false
+    setPolishConfig(config)
+    setMessages([])
+    setIsOpen(true)
+    setIsExpanded(true)
+    return true
+  }, [isOpen, polishConfig])
+
   const addMessage = useCallback((role: 'user' | 'assistant', content: string) => {
-    setMessages(prev => [
-      ...prev,
-      {
-        id: crypto.randomUUID(),
-        role,
-        content,
-        timestamp: Date.now(),
-      },
-    ])
+    setMessages(prev => [...prev, { id: crypto.randomUUID(), role, content, timestamp: Date.now() }])
   }, [])
 
   const updateLastMessage = useCallback((content: string) => {
@@ -77,9 +94,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
-  const clearMessages = useCallback(() => {
-    setMessages([])
-  }, [])
+  const clearMessages = useCallback(() => setMessages([]), [])
 
   const pushAlert = useCallback((content: string) => {
     setMessages(prev => {
@@ -91,27 +106,15 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setAlertCount(n => n + 1)
   }, [])
 
-  const clearAlerts = useCallback(() => {
-    setAlertCount(0)
-  }, [])
+  const clearAlerts = useCallback(() => setAlertCount(0), [])
 
   return (
-    <ChatContext.Provider
-      value={{
-        isOpen,
-        messages,
-        isLoading,
-        alertCount,
-        openChat,
-        closeChat,
-        addMessage,
-        updateLastMessage,
-        clearMessages,
-        setIsLoading,
-        pushAlert,
-        clearAlerts,
-      }}
-    >
+    <ChatContext.Provider value={{
+      isOpen, isExpanded, polishConfig, messages, isLoading, alertCount,
+      openChat, closeChat, expandChat, collapseChat, openPolish,
+      addMessage, updateLastMessage, clearMessages, setIsLoading,
+      pushAlert, clearAlerts,
+    }}>
       {children}
     </ChatContext.Provider>
   )

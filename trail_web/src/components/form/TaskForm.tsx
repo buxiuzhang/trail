@@ -4,9 +4,9 @@ import type { TaskOut, ContactIn, ContactOut } from '@/types'
 import { TODAY } from '@/constants'
 import { useCreateTask, useUpdateTask } from '@/api/tasks'
 import { LLM_AVAILABLE } from '@/api/llm'
-import { usePolishContent } from '@/hooks/usePolishContent'
 import { usePlaceholders, DEFAULT_PLACEHOLDERS } from '@/api/settings'
 import { useToastContext } from '@/context/ToastContext'
+import { useChatContext } from '@/context/ChatContext'
 import { FormField } from './FormField'
 import { ContactRow } from './ContactRow'
 import { DescriptionEditorWithMode as DescriptionEditor, type EditorMode } from '@/components/shared/DescriptionEditorWithMode'
@@ -121,7 +121,7 @@ export function TaskForm({ mode, task }: TaskFormProps) {
 
   const isEdit = mode === 'edit'
   const taskId = task?.id
-  const polishDesc = usePolishContent({ task_id: taskId })
+  const { openPolish } = useChatContext()
 
   // 表单状态
   const [title, setTitle] = useState(task?.title || '')
@@ -273,16 +273,20 @@ export function TaskForm({ mode, task }: TaskFormProps) {
               <ModeToggleButton mode={editorMode} onModeChange={setEditorMode} />
               <button
                 type="button"
-                onClick={() => polishDesc.handlePolish(description, setDescription)}
-                disabled={!LLM_AVAILABLE || polishDesc.isPending}
-                title={LLM_AVAILABLE ? (polishDesc.isPolished ? '撤销润色' : 'AI 润色描述') : 'LLM 暂未接入新后端'}
+                onClick={() => {
+                  const ok = openPolish({
+                    type: 'task_desc',
+                    initialContent: description,
+                    taskId,
+                    onAdopt: (suggestion) => setDescription(suggestion),
+                  })
+                  if (!ok) showToast('工作对话已开启，请先关闭后再使用润色')
+                }}
+                disabled={!LLM_AVAILABLE || !description.trim()}
+                title={LLM_AVAILABLE ? 'AI 对话润色' : 'LLM 暂未接入'}
                 className={styles.polishBtn}
               >
-                <img
-                  src={polishIcon}
-                  alt=""
-                  className={`${styles.polishIcon} ${polishDesc.isPolished ? styles.polishIconActive : ''}`}
-                />
+                <img src={polishIcon} alt="" className={styles.polishIcon} />
               </button>
             </div>
           }

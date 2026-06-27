@@ -16,6 +16,39 @@
   animation: chatIn 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
 }
 
+/* —— Expanded overlay（居中大窗口）—— */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  background: rgba(20, 16, 12, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  overflow: hidden;
+  animation: overlayIn 0.2s ease backwards;
+}
+
+@keyframes overlayIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.windowExpanded {
+  position: relative;
+  width: 100%;
+  max-width: 860px;
+  height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--card);
+  border: 0.5px solid var(--rule);
+  box-shadow: 0 24px 64px -16px rgba(40, 28, 14, 0.5);
+  animation: chatIn 0.25s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+
 /* 顶部虚线装饰 */
 .window::before {
   content: "";
@@ -71,6 +104,7 @@
 .body {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 14px 18px;
   display: flex;
   flex-direction: column;
@@ -78,21 +112,18 @@
   min-height: 0;
 }
 
-/* 滚动条 */
+/* 滚动条完全隐藏 */
 .body::-webkit-scrollbar {
-  width: 4px;
+  display: none;
 }
-.body::-webkit-scrollbar-track {
-  background: transparent;
-}
-.body::-webkit-scrollbar-thumb {
-  background: var(--rule-soft);
+.body {
+  scrollbar-width: none;
 }
 
 /* —— 单条消息行 —— */
 .msg {
   display: flex;
-  max-width: 90%;
+  max-width: 62%;
 }
 .msgUser {
   align-self: flex-end;
@@ -482,3 +513,65 @@
     padding: 8px 12px;
   }
 }
+
+/* —— 头部扩展/收缩按钮 —— */
+.expandBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  opacity: 0.35;
+  transition: opacity 150ms ease;
+  display: flex;
+  align-items: center;
+  color: var(--ink);
+}
+.expandBtn:hover { opacity: 0.75; }
+
+/* —— 建议版本区块 —— */
+.suggestion {
+  margin-top: 10px;
+  border: 0.5px solid var(--rule);
+  background: var(--bg-alt, var(--card-deep));
+}
+
+.suggestionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 10px;
+  border-bottom: 0.5px solid var(--rule-soft);
+  background: var(--card-soft);
+}
+
+.suggestionLabel {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-ghost);
+}
+
+.adoptBtn {
+  padding: 3px 10px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: var(--ink);
+  color: var(--paper);
+  border: none;
+  cursor: pointer;
+  transition: opacity 150ms ease;
+}
+.adoptBtn:hover { opacity: 0.8; }
+
+.suggestionContent {
+  padding: 10px 12px;
+  font-family: var(--body);
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--ink-soft);
+}
+
