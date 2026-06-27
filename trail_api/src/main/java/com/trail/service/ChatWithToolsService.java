@@ -7,9 +7,11 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.trail.config.AppProperties;
 import com.trail.llm.ApiToolExecutor;
 import com.trail.llm.ToolRegistry;
+import com.trail.service.EmbeddingService;
 import com.trail.store.AiRecordStore;
 import com.trail.store.SkillStore;
 import com.trail.store.LLMSettingsStore;
+import com.trail.store.VectorStore;
 import com.trail.store.exception.LlmNotConfiguredException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,6 +57,8 @@ public class ChatWithToolsService {
     private final ApiToolExecutor apiToolExecutor;
     private final AiRecordStore aiRecordStore;
     private final SkillStore skillStore;
+    private final EmbeddingService embeddingService;
+    private final VectorStore vectorStore;
     private final ObjectMapper mapper;
     private final ExecutorService executor;
 
@@ -65,6 +69,8 @@ public class ChatWithToolsService {
         ApiToolExecutor apiToolExecutor,
         AiRecordStore aiRecordStore,
         SkillStore skillStore,
+        EmbeddingService embeddingService,
+        VectorStore vectorStore,
         ObjectMapper mapper
     ) {
         this.props = props;
@@ -73,6 +79,8 @@ public class ChatWithToolsService {
         this.apiToolExecutor = apiToolExecutor;
         this.aiRecordStore = aiRecordStore;
         this.skillStore = skillStore;
+        this.embeddingService = embeddingService;
+        this.vectorStore = vectorStore;
         this.mapper = mapper;
         this.executor = Executors.newCachedThreadPool();
     }
@@ -115,6 +123,10 @@ public class ChatWithToolsService {
                 } else if (props != null && props.llm() != null) {
                     maxIterations = props.llm().getMaxToolIterations();
                 }
+                // 计算 RAG 上下文（只在首轮前计算一次，循环内复用）
+                String ragContext = buildRagContext(messages);
+                String systemPrompt = buildSystemPrompt(ragContext);
+
                 for (int iteration = 0; iteration < maxIterations; iteration++) {
                     log.info("Tool use iteration {} started", iteration + 1);
 
@@ -127,7 +139,7 @@ public class ChatWithToolsService {
                     }
 
                     // 调用 Anthropic API（流式）
-                    AnthropicStreamResult result = callAnthropicStream(cfg, apiMessages, emitter, fullText);
+                    AnthropicStreamResult result = callAnthropicStream(cfg, apiMessages, emitter, fullText, systemPrompt);
 
                     // 检查 stop_reason
                     String stopReason = result.stopReason();
@@ -212,7 +224,8 @@ public class ChatWithToolsService {
         LlmConfig cfg,
         List<ObjectNode> messages,
         SseEmitter emitter,
-        StringBuilder fullText
+        StringBuilder fullText,
+        String systemPrompt
     ) throws Exception {
         HttpClient client = HttpClient.newHttpClient();
 
@@ -224,7 +237,7 @@ public class ChatWithToolsService {
             reqBody.put("min_tokens", cfg.minTokens());
         }
         reqBody.put("stream", true);
-        reqBody.put("system", buildSystemPrompt());
+        reqBody.put("system", systemPrompt);
         reqBody.set("tools", mapper.valueToTree(toolRegistry.getToolsJson()));
         reqBody.set("messages", mapper.valueToTree(messages));
 
@@ -415,9 +428,59 @@ public class ChatWithToolsService {
     }
 
     /**
+     * 用最后一条用户消息做向量检索，返回格式化的 RAG 上下文块。
+     * 向量模型未配置或检索失败时静默返回空字符串。
+     */
+    private String buildRagContext(List<Map<String, String>> messages) {
+        try {
+            if (!embeddingService.isEnabled()) return "";
+            String lastUserText = null;
+            for (int i = messages.size() - 1; i >= 0; i--) {
+                if ("user".equals(messages.get(i).get("role"))) {
+                    lastUserText = messages.get(i).get("content");
+                    break;
+                }
+            }
+            if (lastUserText == null || lastUserText.isBlank()) return "";
+
+            log.info("RAG 检索开始: query.len={}", lastUserText.length());
+            float[] queryVec = embeddingService.embed(lastUserText);
+            List<VectorStore.SearchResult> hits = vectorStore.search(queryVec, 8);
+            log.info("RAG 检索结果: hits={}", hits.size());
+            if (hits.isEmpty()) return "";
+
+            // 过滤低相似度结果（threshold: 0.4）
+            List<VectorStore.SearchResult> relevant = hits.stream()
+                .filter(h -> h.score() >= 0.4f)
+                .toList();
+            log.info("RAG 过滤后: relevant={}, scores={}", relevant.size(),
+                hits.stream().map(h -> String.format("%.3f", h.score())).toList());
+            if (relevant.isEmpty()) return "";
+
+            StringBuilder sb = new StringBuilder("【相关上下文（向量检索）】\n");
+            for (VectorStore.SearchResult hit : relevant) {
+                String label = switch (hit.source()) {
+                    case "task" -> "任务";
+                    case "log"  -> "日报";
+                    case "todo" -> "待办";
+                    default     -> hit.source();
+                };
+                String text = hit.text().length() > 200
+                    ? hit.text().substring(0, 200) + "…"
+                    : hit.text();
+                sb.append("[").append(label).append("] ").append(text).append("\n");
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            log.info("RAG 检索跳过: {}", e.getMessage());
+            return "";
+        }
+    }
+
+    /**
      * 构建 System Prompt，注入日期 + TOOLS_DESC（从配置读取）
      */
-    private String buildSystemPrompt() {
+    private String buildSystemPrompt(String ragContext) {
         LocalDate today = LocalDate.now();
         LocalDate yesterday = today.minusDays(1);
         String weekday = switch (today.getDayOfWeek()) {
@@ -454,7 +517,10 @@ public class ChatWithToolsService {
             systemPrompt = sb.toString();
         }
 
-        return nowBlock + systemPrompt;
+        String ragBlock = (ragContext != null && !ragContext.isBlank())
+            ? ragContext + "\n"
+            : "";
+        return nowBlock + ragBlock + systemPrompt;
     }
 
     private void sendToolCallEvent(SseEmitter emitter, String name, Map<String, Object> input, int iteration, int maxIterations)

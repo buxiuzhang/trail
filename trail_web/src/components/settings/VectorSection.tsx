@@ -15,6 +15,7 @@ export function VectorSection() {
   const [vectorModel, setVectorModel] = useState('')
   const [vectorDimensions, setVectorDimensions] = useState('')
   const [vectorApiKeyPlaceholder, setVectorApiKeyPlaceholder] = useState('')
+  const [vectorEnabled, setVectorEnabled] = useState(false)
 
   useEffect(() => {
     if (!vectorSettings) return
@@ -23,6 +24,7 @@ export function VectorSection() {
     setVectorBaseUrl(vectorSettings.base_url || '')
     setVectorModel(vectorSettings.model || '')
     setVectorDimensions(vectorSettings.dimensions || '')
+    setVectorEnabled(vectorSettings.enabled ?? false)
   }, [vectorSettings])
 
   async function handleSave(e: React.FormEvent) {
@@ -33,6 +35,7 @@ export function VectorSection() {
         base_url: vectorBaseUrl.trim(),
         model: vectorModel.trim(),
         dimensions: vectorDimensions.trim(),
+        enabled: vectorEnabled ? 'true' : 'false',
       })
       setVectorApiKey('')
       showToast('向量模型配置已保存')
@@ -95,6 +98,28 @@ export function VectorSection() {
             placeholder="1536"
             min={1}
           />
+        </div>
+        <div className="field">
+          <div className="field__label">
+            <span>向量检索</span>
+            <span className="field__hint">关闭后所有向量相关功能停止运行</span>
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button
+              type="button"
+              className={vectorEnabled ? 'btn btn--primary' : 'btn btn--ghost'}
+              onClick={() => setVectorEnabled(true)}
+            >
+              启用
+            </button>
+            <button
+              type="button"
+              className={!vectorEnabled ? 'btn btn--primary' : 'btn btn--ghost'}
+              onClick={() => setVectorEnabled(false)}
+            >
+              禁用
+            </button>
+          </div>
         </div>
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
           <button type="submit" className="btn btn--primary" disabled={saveVector.isPending}>

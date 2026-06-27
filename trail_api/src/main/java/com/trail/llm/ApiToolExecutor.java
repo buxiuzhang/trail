@@ -2,6 +2,8 @@ package com.trail.llm;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.trail.db.SqliteDb;
+import com.trail.service.EmbeddingService;
+import com.trail.store.VectorStore;
 import com.trail.store.WorkLogStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,15 +37,20 @@ public class ApiToolExecutor {
     private final HttpClient client;
     private final WorkLogStore workLogStore;
     private final McpClientManager mcpClientManager;
+    private final EmbeddingService embeddingService;
+    private final VectorStore vectorStore;
 
     public ApiToolExecutor(OpenApiService openApiService, SqliteDb db, ObjectMapper mapper,
-                           WorkLogStore workLogStore, McpClientManager mcpClientManager) {
+                           WorkLogStore workLogStore, McpClientManager mcpClientManager,
+                           EmbeddingService embeddingService, VectorStore vectorStore) {
         this.openApiService = openApiService;
         this.db = db;
         this.mapper = mapper;
         this.client = HttpClient.newHttpClient();
         this.workLogStore = workLogStore;
         this.mcpClientManager = mcpClientManager;
+        this.embeddingService = embeddingService;
+        this.vectorStore = vectorStore;
     }
 
     /**
@@ -59,6 +66,7 @@ public class ApiToolExecutor {
                 case "call_api" -> executeCallApi(input);
                 case "export_daily_report" -> executeExportDailyReport(input);
                 case "export_weekly_report" -> executeExportWeeklyReport(input);
+                case "vector_search" -> executeVectorSearch(input);
                 default -> {
                     if (name.startsWith("mcp__")) {
                         yield mcpClientManager.callTool(name, input);
@@ -455,6 +463,54 @@ public class ApiToolExecutor {
         return Map.of(
             "message", "周报已生成，下载链接：[周报_" + start + "_" + end + ".md](" + url + ")"
         );
+    }
+
+    // ============================================================
+    // vector_search 执行
+    // ============================================================
+
+    private Map<String, Object> executeVectorSearch(Map<String, Object> input) {
+        String query = (String) input.get("query");
+        if (query == null || query.isBlank()) {
+            return Map.of("error", "query 参数必填");
+        }
+        if (!embeddingService.isEnabled()) {
+            return Map.of("error", "向量检索未启用，请在设置 → 大模型 → 向量模型中配置并启用");
+        }
+        int topK = 5;
+        Object topKObj = input.get("top_k");
+        if (topKObj instanceof Number n) {
+            topK = Math.min(n.intValue(), 20);
+        }
+        String sourceFilter = (String) input.get("source");
+
+        try {
+            float[] queryVec = embeddingService.embed(query);
+            List<VectorStore.SearchResult> hits = vectorStore.search(queryVec, topK * 2);
+
+            List<Map<String, Object>> results = hits.stream()
+                .filter(h -> sourceFilter == null || sourceFilter.isBlank() || sourceFilter.equals(h.source()))
+                .filter(h -> h.score() >= 0.35f)
+                .limit(topK)
+                .map(h -> {
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("id", h.id());
+                    m.put("source", h.source());
+                    m.put("score", Math.round(h.score() * 1000) / 1000.0);
+                    m.put("text", h.text().length() > 300 ? h.text().substring(0, 300) + "…" : h.text());
+                    return m;
+                })
+                .toList();
+
+            return Map.of(
+                "query", query,
+                "count", results.size(),
+                "results", results
+            );
+        } catch (Exception e) {
+            log.warn("vector_search 执行失败: {}", e.getMessage());
+            return Map.of("error", "向量搜索失败：" + e.getMessage());
+        }
     }
 
     // ============================================================

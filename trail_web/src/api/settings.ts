@@ -261,6 +261,7 @@ export interface VectorSettings {
   base_url: string
   model: string
   dimensions: string
+  enabled: boolean
 }
 
 export function useVectorSettings(options?: { enabled?: boolean }) {
@@ -275,7 +276,7 @@ export function useVectorSettings(options?: { enabled?: boolean }) {
 export function useSaveVectorSettings() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: { api_key?: string; base_url?: string; model?: string; dimensions?: string }) =>
+    mutationFn: (data: { api_key?: string; base_url?: string; model?: string; dimensions?: string; enabled?: string }) =>
       api.put('/api/settings/vector', data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['settings', 'vector'] })

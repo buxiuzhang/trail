@@ -25,6 +25,7 @@ public class EmbeddingService {
     private static final String KEY_BASE_URL   = "vector_base_url";
     private static final String KEY_MODEL      = "vector_model";
     private static final String KEY_DIMENSIONS = "vector_dimensions";
+    private static final String KEY_ENABLED    = "vector_enabled";
 
     private static final String DEFAULT_MODEL  = "text-embedding-v4";
     private static final String DEFAULT_URL    = "https://dashscope.aliyuncs.com/compatible-mode/v1";
@@ -68,6 +69,32 @@ public class EmbeddingService {
         }
         log.debug("embed: text.len={} vector.dim={}", text.length(), result.length);
         return result;
+    }
+
+    /**
+     * 检查向量功能是否已启用（API Key 已配置 且 vector_enabled=true）。
+     */
+    public boolean isEnabled() {
+        try {
+            String enabled = settingsStore.get(KEY_ENABLED);
+            if (!"true".equals(enabled)) return false;
+            String apiKey = settingsStore.get(KEY_API_KEY);
+            return apiKey != null && !apiKey.isBlank();
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
+     * 快速检查向量模型是否已配置（无网络调用）。
+     */
+    public boolean isConfigured() {
+        try {
+            String apiKey = settingsStore.get(KEY_API_KEY);
+            return apiKey != null && !apiKey.isBlank();
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     /**

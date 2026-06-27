@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useInfiniteTasks } from '@/api/tasks'
+import { useVectorSearch, type VectorSearchResult } from '@/api/embed'
 import { useFilterContext } from '@/context/FilterContext'
 import { monthLabel } from '@/constants'
 import { TaskCardList } from '@/components/task/TaskCardList'
@@ -32,12 +34,75 @@ function monthKey(d: string): string {
   return d.slice(0, 7)
 }
 
+function highlight(text: string, query: string): string {
+  const safe = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+  if (!query.trim()) return safe
+  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return safe.replace(new RegExp(`(${escaped})`, 'gi'), '<mark>$1</mark>')
+}
+
+function VectorSearchBlock({ results, navigate, query }: {
+  results: VectorSearchResult[]
+  navigate: (path: string) => void
+  query: string
+}) {
+  const [collapsed, setCollapsed] = useState(false)
+  return (
+    <div className="vector-search-results">
+      <div
+        className="vector-search-header"
+        onClick={() => setCollapsed(c => !c)}
+        style={{ cursor: 'pointer', userSelect: 'none' }}
+      >
+        <span>语义相关 · {results.length} 条</span>
+        {collapsed ? (
+          <svg viewBox="0 0 1024 1024" width={12} height={12} fill="currentColor" style={{ opacity: 0.5 }}>
+            <path d="M210.96 848.05c-11.58-13.35-10.14-33.56 3.22-45.14l331.38-282.1c4.61-4 4.6-11.17-0.04-15.14L214.13 221.19c-13.41-11.51-14.95-31.71-3.44-45.12 11.51-13.41 31.71-14.95 45.12-3.44L634.7 497.88c9.27 7.96 9.3 22.29 0.07 30.29L256.1 851.27c-13.35 11.57-33.56 10.13-45.14-3.22z"/>
+            <path d="M430.31 848.05c-11.58-13.35-10.14-33.56 3.22-45.14l331.38-282.1c4.61-4 4.6-11.17-0.04-15.14L433.48 221.19c-13.41-11.51-14.95-31.71-3.44-45.12 11.51-13.41 31.71-14.95 45.12-3.44l378.88 325.25c9.27 7.96 9.3 22.29 0.07 30.29l-378.68 323.1c-13.33 11.57-33.54 10.13-45.12-3.22z"/>
+          </svg>
+        ) : (
+          <svg viewBox="0 0 1024 1024" width={12} height={12} fill="currentColor" style={{ opacity: 0.5 }}>
+            <path d="M175.95 210.96c13.35-11.58 33.56-10.14 45.14 3.22l282.1 331.38c4 4.61 11.17 4.6 15.14-0.04l284.48-331.39c11.51-13.41 31.71-14.95 45.12-3.44 13.41 11.51 14.95 31.71 3.44 45.12L526.12 634.7c-7.96 9.27-22.29 9.3-30.29 0.07L172.73 256.1c-11.57-13.35-10.13-33.56 3.22-45.14z"/>
+            <path d="M175.95 430.31c13.35-11.58 33.56-10.14 45.14 3.22l282.1 331.38c4 4.61 11.17 4.6 15.14-0.04l284.48-331.39c11.51-13.41 31.71-14.95 45.12-3.44 13.41 11.51 14.95 31.71 3.44 45.12L526.12 854.05c-7.96 9.27-22.29 9.3-30.29 0.07l-323.1-378.68c-11.57-13.34-10.13-33.55 3.22-45.13z"/>
+          </svg>
+        )}
+      </div>
+      {!collapsed && results.map(r => {
+        const sourceLabel = r.source === 'task' ? '任务' : r.source === 'log' ? '日报' : '待办'
+        const taskId = r.task_id ?? null
+        return (
+          <div
+            key={r.id}
+            className="vector-search-item"
+            onClick={() => taskId && navigate(`/task/${taskId}`)}
+            style={{ cursor: taskId ? 'pointer' : 'default' }}
+          >
+            <span className="vector-search-tag">{sourceLabel}</span>
+            <span
+              className="vector-search-text"
+              dangerouslySetInnerHTML={{ __html: highlight(r.text, query) }}
+            />
+            <span className="vector-search-score">{(r.score * 100).toFixed(0)}%</span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 export function IndexPage() {
+  const navigate = useNavigate()
   const { filter } = useFilterContext()
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc')
   const [searchText, setSearchText] = useState('')
   const [backendSearch, setBackendSearch] = useState('')
   const [viewMode, setViewMode] = useState<ViewMode>(getInitialViewMode)
+
+  const { data: vectorData } = useVectorSearch(backendSearch)
 
   function switchViewMode(mode: ViewMode) {
     setViewMode(mode)
@@ -178,6 +243,9 @@ export function IndexPage() {
         <EmptyState glyph="∅" title="此格暂无可录之事" subtitle="试着调整左侧筛选，或 新建任务。" />
       ) : (
         <>
+          {backendSearch && vectorData?.configured && vectorData.results.length > 0 && (
+            <VectorSearchBlock results={vectorData.results} navigate={navigate} query={backendSearch} />
+          )}
           {viewMode === 'list' ? (
             <TaskListTable tasks={sorted} />
           ) : (

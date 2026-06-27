@@ -490,6 +490,76 @@ body::before {
   gap: 12px;
 }
 
+/* 语义搜索结果补充区块 */
+.vector-search-results {
+  margin: 12px 0 16px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.vector-search-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-faded);
+  background: var(--bg-alt);
+  border-bottom: 1px solid var(--border);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.vector-search-item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  transition: background 0.1s;
+}
+
+.vector-search-item:last-child {
+  border-bottom: none;
+}
+
+.vector-search-item:hover {
+  background: var(--bg-alt);
+}
+
+.vector-search-tag {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--ink-faded);
+  background: var(--border);
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+
+.vector-search-text {
+  flex: 1;
+  color: var(--ink-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vector-search-score {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--ink-faded);
+  font-variant-numeric: tabular-nums;
+}
+
+.vector-search-text mark {
+  background: transparent;
+  color: #c0392b;
+  font-weight: 500;
+}
+
 /* 视图切换按钮 */
 .archive-view-btn {
   display: inline-flex;

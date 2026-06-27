@@ -20,6 +20,7 @@ public class VectorSettingsController {
     private static final String KEY_BASE_URL   = "vector_base_url";
     private static final String KEY_MODEL      = "vector_model";
     private static final String KEY_DIMENSIONS = "vector_dimensions";
+    private static final String KEY_ENABLED    = "vector_enabled";
 
     private final LLMSettingsStore store;
 
@@ -47,16 +48,26 @@ public class VectorSettingsController {
         result.put("base_url",   baseUrl   != null ? baseUrl   : "");
         result.put("model",      model     != null ? model     : "");
         result.put("dimensions", dims      != null ? dims      : "");
+        String enabledVal = store.get(KEY_ENABLED);
+        result.put("enabled", "true".equals(enabledVal));
         return result;
     }
 
     @Operation(summary = "保存向量模型配置")
     @PutMapping
     public Map<String, Object> save(@RequestBody Map<String, String> body) {
-        saveOrDelete(KEY_API_KEY,    body.get("api_key"));
+        // api_key：只有明确传且非空才更新，没传则保持不变（防止点保存时清空 key）
+        String apiKey = body.get("api_key");
+        if (apiKey != null && !apiKey.isBlank()) {
+            store.save(KEY_API_KEY, apiKey.strip());
+        }
         saveOrDelete(KEY_BASE_URL,   body.get("base_url"));
         saveOrDelete(KEY_MODEL,      body.get("model"));
         saveOrDelete(KEY_DIMENSIONS, body.get("dimensions"));
+        String enabled = body.get("enabled");
+        if (enabled != null) {
+            store.save(KEY_ENABLED, "true".equals(enabled) ? "true" : "false");
+        }
         return Map.of("ok", true);
     }
 

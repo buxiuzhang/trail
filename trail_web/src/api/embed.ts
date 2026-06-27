@@ -57,3 +57,27 @@ export function useVectorStats() {
     staleTime: 10_000,
   })
 }
+
+export interface VectorSearchResult {
+  id: string
+  source: 'task' | 'log' | 'todo' | string
+  score: number
+  text: string
+  task_id?: number
+}
+
+export interface VectorSearchResponse {
+  configured: boolean
+  results: VectorSearchResult[]
+  error?: string
+}
+
+/** 全局语义搜索（向量检索）。q 为空时不请求。 */
+export function useVectorSearch(q: string) {
+  return useQuery({
+    queryKey: ['embed', 'search', q],
+    queryFn: () => api.get<VectorSearchResponse>(`/api/embed/search?q=${encodeURIComponent(q)}&limit=6`),
+    enabled: q.trim().length > 0,
+    staleTime: 30_000,
+  })
+}

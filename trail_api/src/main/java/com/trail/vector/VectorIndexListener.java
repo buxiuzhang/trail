@@ -29,6 +29,7 @@ public class VectorIndexListener {
     @EventListener
     public void onEvent(VectorIndexEvent event) {
         try {
+            if (!embeddingService.isEnabled()) return;
             if (event instanceof VectorIndexEvent.Upsert u) {
                 if (u.text() == null || u.text().isBlank()) return;
                 float[] vector = embeddingService.embed(u.text());

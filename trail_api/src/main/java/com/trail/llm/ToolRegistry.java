@@ -28,7 +28,8 @@ public class ToolRegistry {
             getLogsByDate(),
             callApi(),
             exportDailyReport(),
-            exportWeeklyReport()
+            exportWeeklyReport(),
+            vectorSearch()
         );
     }
 
@@ -178,6 +179,28 @@ public class ToolRegistry {
             "export_weekly_report",
             "导出本周工作周报，返回下载链接。",
             new Tool.InputSchema("object", props, null)
+        );
+    }
+
+    /**
+     * 向量语义搜索（跨任务/日报/待办）
+     */
+    private Tool vectorSearch() {
+        ObjectNode props = mapper.createObjectNode();
+        props.set("query", mapper.createObjectNode()
+            .put("type", "string")
+            .put("description", "搜索关键词或描述，支持语义搜索，如'登录问题'、'数据库优化'"));
+        props.set("top_k", mapper.createObjectNode()
+            .put("type", "integer")
+            .put("description", "返回结果数量，默认 5，最大 20"));
+        props.set("source", mapper.createObjectNode()
+            .put("type", "string")
+            .put("description", "限定来源类型：task（任务）、log（日报）、todo（待办），不传则搜索全部"));
+
+        return new Tool(
+            "vector_search",
+            "语义搜索任务、日报、待办内容。当需要查找相关历史工作、某类任务或某主题日报时使用。比 call_api 更快，适合模糊检索。",
+            new Tool.InputSchema("object", props, List.of("query"))
         );
     }
 }
