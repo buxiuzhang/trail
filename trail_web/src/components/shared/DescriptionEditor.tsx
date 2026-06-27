@@ -32,6 +32,7 @@ import { Extension } from '@tiptap/core'
 import { HighlightedCodeBlock } from './HighlightedCodeBlock'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
+import { useDownloadQueue } from '@/context/DownloadQueueContext'
 import { useUploadQueue } from '@/context/UploadQueueContext'
 import { useToastContext } from '@/context/ToastContext'
 import { normalizeMentions } from './richtext-utils'
@@ -58,6 +59,8 @@ export function createMentionDecorationExtension(
   styleClasses?: { todoMentionDecor: string; taskMentionDecor: string },
   /** 附件元数据 ref，供 @file:N 渲染使用 */
   attachmentsRef?: React.MutableRefObject<Map<number, { name: string; mime: string }>>,
+  /** 下载回调 ref，供 @file:N chip 点击使用 */
+  downloadRef?: React.MutableRefObject<((url: string, fileName?: string) => void) | null>,
 ) {
   const todoClass = styleClasses?.todoMentionDecor ?? styles.todoMentionDecor
   const taskClass = styleClasses?.taskMentionDecor ?? styles.taskMentionDecor
@@ -160,10 +163,15 @@ export function createMentionDecorationExtension(
                         span.textContent = '📎 ' + name
                         span.addEventListener('click', (e) => {
                           e.preventDefault()
-                          const a = document.createElement('a')
-                          a.href = `/api/attachments/${id}`
-                          a.download = name
-                          a.click()
+                          const dl = downloadRef?.current
+                          if (dl) {
+                            dl(`/api/attachments/${id}`, name)
+                          } else {
+                            const a = document.createElement('a')
+                            a.href = `/api/attachments/${id}`
+                            a.download = name
+                            a.click()
+                          }
                         })
                         return span
                       }, { side: -1, key: `file-chip-${id}-${name}` }),
@@ -224,6 +232,8 @@ export const DescriptionEditor = forwardRef<HTMLTextAreaElement, DescriptionEdit
   const todosRef = useRef(todos)
   const tasksRef = useRef(tasks)
   const attachmentsRef = useRef<Map<number, { name: string; mime: string }>>(attachments ?? new Map())
+  const { enqueueDownload } = useDownloadQueue()
+  const downloadRef = useRef<((url: string, fileName?: string) => void) | null>(enqueueDownload)
   /** 已出现在文档中的 @mention 键集合，防止重复引用 */
   const usedMentionKeysRef = useRef(new Set<string>())
 
@@ -336,7 +346,7 @@ export const DescriptionEditor = forwardRef<HTMLTextAreaElement, DescriptionEdit
       }),
       Markdown,
       // 装饰器扩展：将 @task:ID 和 @todo:ID 显示为标题，@file:ID 显示图片或文件 chip
-      createMentionDecorationExtension(todosRef, tasksRef, undefined, attachmentsRef),
+      createMentionDecorationExtension(todosRef, tasksRef, undefined, attachmentsRef, downloadRef),
       Mention.configure({
         HTMLAttributes: { class: 'mention-ref' },
         suggestion: {

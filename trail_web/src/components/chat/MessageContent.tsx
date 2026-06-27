@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
+import { useDownloadQueue } from '@/context/DownloadQueueContext'
 import styles from './ChatWindow.module.css'
 
 export function MessageContent({
@@ -10,6 +11,7 @@ export function MessageContent({
   onAction?: (action: string) => void
 }) {
   const navigate = useNavigate()
+  const { enqueueDownload } = useDownloadQueue()
 
   return (
     <div className={styles.msgContent}>
@@ -46,9 +48,12 @@ export function MessageContent({
             const normalized = href.startsWith('api/') ? '/' + href : href
             if (normalized.startsWith('/api/')) {
               return (
-                <a href={normalized} className={styles.link} target="_blank" rel="noopener noreferrer" download>
+                <button
+                  className={styles.actionLink}
+                  onClick={() => enqueueDownload(normalized, typeof children === 'string' ? children : undefined)}
+                >
                   {children}
-                </a>
+                </button>
               )
             }
 

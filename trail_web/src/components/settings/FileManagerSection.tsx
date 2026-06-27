@@ -7,6 +7,7 @@ import { useToastContext } from '@/context/ToastContext'
 import { useModalContext } from '@/context/ModalContext'
 import { useQueryClient } from '@tanstack/react-query'
 import { api } from '@/api/client'
+import { useDownloadQueue } from '@/context/DownloadQueueContext'
 
 const FILE_TYPE_GROUPS = [
   { label: '图片',   value: 'image',    mimes: ['image/png', 'image/jpeg', 'image/gif', 'image/webp'] },
@@ -66,6 +67,7 @@ export function FileManagerSection() {
   const navigate = useNavigate()
   const mimes = groupToMimes(selectedTypes)
   const taskIds = selectedTaskIds.map(Number)
+  const { enqueueDownload } = useDownloadQueue()
 
   const { data: attachments = [], isLoading } = useAttachmentList({ mimes, taskIds })
   const { data: referencedTasks = [] } = useAttachmentTasks()
@@ -297,25 +299,6 @@ export function FileManagerSection() {
                   )}
                 </div>
 
-                {/* 操作 */}
-                <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                  {!item.mime.startsWith('image/') && (
-                    <a href={item.url} download={item.original_name || true} style={{
-                      fontFamily: 'var(--mono)', fontSize: 10, letterSpacing: '0.06em',
-                      textTransform: 'uppercase', color: 'var(--ink-ghost)',
-                      textDecoration: 'none', padding: '3px 6px', border: '0.5px solid var(--rule-soft)',
-                    }}>下载</a>
-                  )}
-                  <button type="button" onClick={() => handleDelete(item)} style={{
-                    background: 'none', border: '0.5px solid var(--rule-soft)',
-                    padding: '3px 6px', cursor: 'pointer',
-                    fontFamily: 'var(--mono)', fontSize: 10, letterSpacing: '0.06em',
-                    textTransform: 'uppercase', color: 'var(--ink-ghost)', transition: 'color 150ms',
-                  }}
-                    onMouseEnter={e => { e.currentTarget.style.color = '#c55'; e.currentTarget.style.borderColor = '#c55' }}
-                    onMouseLeave={e => { e.currentTarget.style.color = 'var(--ink-ghost)'; e.currentTarget.style.borderColor = 'var(--rule-soft)' }}
-                  >删除</button>
-                </div>
               </div>
 
               {/* 引用展开区 — 行下方 */}
@@ -383,6 +366,13 @@ export function FileManagerSection() {
             boxShadow: 'var(--shadow-md)', minWidth: 120, padding: '4px 0',
           }}>
             {[
+              ...(!rowCtxMenu.item.mime.startsWith('image/') ? [{
+                label: '下载',
+                action: () => {
+                  setRowCtxMenu(null)
+                  enqueueDownload(rowCtxMenu.item.url, rowCtxMenu.item.original_name || String(rowCtxMenu.item.id))
+                },
+              }] : []),
               { label: '重命名', action: () => { setRowCtxMenu(null); handleRename(rowCtxMenu.item) } },
               { label: '删除',   action: () => { setRowCtxMenu(null); handleDelete(rowCtxMenu.item) } },
             ].map(opt => (

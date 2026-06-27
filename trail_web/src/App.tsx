@@ -4,6 +4,7 @@ import { ModalProvider } from './context/ModalContext'
 import { ToastProvider } from './context/ToastContext'
 import { ChatProvider } from './context/ChatContext'
 import { UploadQueueProvider } from './context/UploadQueueContext'
+import { DownloadQueueProvider } from './context/DownloadQueueContext'
 import { Masthead } from './components/layout/Masthead'
 import { Shell } from './components/layout/Shell'
 import { Sidebar } from './components/sidebar/Sidebar'
@@ -12,6 +13,7 @@ import { WorkbenchSidebar } from './components/sidebar/WorkbenchSidebar'
 import { Modal } from './components/modal/Modal'
 import { Toast } from './components/shared/Toast'
 import { UploadQueuePanel } from './components/shared/UploadQueue'
+import { DownloadQueuePanel } from './components/shared/DownloadQueue'
 import { ChatBubble } from './components/chat/ChatBubble'
 import { ChatWindow } from './components/chat/ChatWindow'
 import { DataDirGate } from './components/layout/DataDirGate'
@@ -76,6 +78,7 @@ export default function App() {
           <ToastProvider>
             <ChatProvider>
               <UploadQueueProvider>
+              <DownloadQueueProvider>
               <DataDirGate>
                 <div className="grain" aria-hidden="true" />
                 <WatchAlertsMount />
@@ -99,10 +102,14 @@ export default function App() {
                 </WorkbenchProvider>
                 <Modal />
                 <Toast />
-                <UploadQueuePanel />
+                <div style={{ position: 'fixed', bottom: 24, right: 24, zIndex: 1100, display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
+                  <DownloadQueuePanel />
+                  <UploadQueuePanel />
+                </div>
                 <ChatBubble />
                 <ChatWindow />
               </DataDirGate>
+              </DownloadQueueProvider>
               </UploadQueueProvider>
             </ChatProvider>
           </ToastProvider>

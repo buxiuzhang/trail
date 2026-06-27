@@ -9,6 +9,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useUpdateLog } from '@/api/logs'
 import { useDeleteAttachment, useAttachmentsByIds } from '@/api/attachments'
 import { api } from '@/api/client'
+import { useDownloadQueue } from '@/context/DownloadQueueContext'
 import styles from './Logbook.module.css'
 
 interface LogEntryProps {
@@ -29,6 +30,7 @@ export function LogEntry({ task, log, todos, tasks = [], isEditing, onEdit, onDe
   const confirm = useConfirm()
   const { openModal } = useModalContext()
   const qc = useQueryClient()
+  const { enqueueDownload } = useDownloadQueue()
   const updateLog = useUpdateLog(task.id)
   const deleteAttachment = useDeleteAttachment()
   const [ctxMenu, setCtxMenu] = useState<{
@@ -188,21 +190,10 @@ export function LogEntry({ task, log, todos, tasks = [], isEditing, onEdit, onDe
               </div>
               <div
                 className={styles.attCtxItem}
-                onClick={async () => {
+                onClick={() => {
                   const att = ctxMenu.att
                   setCtxMenu(null)
-                  const ok = await confirm({
-                    level: 'moderate',
-                    title: '下载附件？',
-                    body: <p>将下载「{att.name}」到本地。</p>,
-                    confirmLabel: '下载',
-                  })
-                  if (ok) {
-                    const a = document.createElement('a')
-                    a.href = att.url
-                    a.download = att.name
-                    a.click()
-                  }
+                  enqueueDownload(att.url, att.name)
                 }}
               >
                 下载

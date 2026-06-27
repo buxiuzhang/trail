@@ -16,6 +16,7 @@ import { useToastContext } from '@/context/ToastContext'
 import { useConfirm } from '@/utils/confirm'
 import { useModalContext } from '@/context/ModalContext'
 import { useWorkbench } from '@/context/WorkbenchContext'
+import { useDownloadQueue } from '@/context/DownloadQueueContext'
 import { LogCompose } from '@/components/detail/LogCompose'
 import { BatchLogPanel } from '@/components/detail/BatchLogPanel'
 import { TaskSelectorRow } from '@/components/shared/TaskSelectorRow'
@@ -230,7 +231,7 @@ const PRESETS = [
   },
 ]
 
-function ExportModalBody({ defaultDate, onClose }: { defaultDate: string; onClose: () => void }) {
+function ExportModalBody({ defaultDate, onClose, enqueueDownload }: { defaultDate: string; onClose: () => void; enqueueDownload: (url: string, fileName?: string) => void }) {
   const [startDate, setStartDate] = useState(defaultDate)
   const [endDate, setEndDate] = useState(defaultDate)
   const [format, setFormat] = useState('markdown')
@@ -243,12 +244,7 @@ function ExportModalBody({ defaultDate, onClose }: { defaultDate: string; onClos
     } else {
       url = `${apiBase}/api/reports/weekly?start=${startDate}&end=${endDate}`
     }
-    const a = document.createElement('a')
-    a.href = url
-    a.download = ''
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
+    enqueueDownload(url)
     onClose()
   }
 
@@ -353,6 +349,7 @@ export function QuickLogPage() {
   const [showBatchPanel, setShowBatchPanel] = useState(false)
 
   const { targetDate, clearTargetDate } = useWorkbench()
+  const { enqueueDownload } = useDownloadQueue()
 
   // 组件挂载时读取跳转传入的目标日期
   useEffect(() => {
@@ -373,7 +370,7 @@ export function QuickLogPage() {
       eyebrow: '导出',
       title: '导出日报',
       titleMode: 'zh',
-      body: <ExportModalBody defaultDate={date} onClose={closeModal} />,
+      body: <ExportModalBody defaultDate={date} onClose={closeModal} enqueueDownload={enqueueDownload} />,
       buttons: [],
     })
   }
