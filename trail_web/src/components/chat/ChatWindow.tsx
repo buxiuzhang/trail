@@ -6,6 +6,7 @@ import { useToastContext } from '@/context/ToastContext'
 import { useLLMSettings } from '@/api/settings'
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition'
 import { ignoreAlert } from '@/hooks/useWatchAlerts'
+import { useConfirm } from '@/utils/confirm'
 import { MessageContent } from './MessageContent'
 import { MarkdownRenderer } from '@/components/shared/MarkdownRenderer'
 import CopyIcon from './copy.svg'
@@ -56,6 +57,7 @@ export function ChatWindow() {
   const { send: sendChat, abort: abortChat, isPending: chatPending } = useChat()
   const { send: sendPolish, abort: abortPolish, isPending: polishPending } = usePolishDialog()
   const { showToast } = useToastContext()
+  const confirm = useConfirm()
   const [input, setInput] = useState('')
   const bodyRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -271,20 +273,14 @@ export function ChatWindow() {
       {/* 头部 */}
       <div className={styles.header}>
         <span className={styles.title}>{headerTitle}</span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          {/* Expand / Collapse 按钮 */}
-          <button
-            className={styles.expandBtn}
-            onClick={isExpanded ? collapseChat : expandChat}
-            aria-label={isExpanded ? '收缩' : '展开'}
-            title={isExpanded ? '收缩' : '展开'}
-          >
-            <img src={FullscreenIcon} width={16} height={16} alt="" />
-          </button>
-          <button className={styles.close} onClick={closeChat} aria-label="关闭对话">
-            <img src={CloseCircleIcon} width={18} height={18} alt="" aria-hidden="true" />
-          </button>
-        </div>
+        <button
+          className={styles.expandBtn}
+          onClick={isExpanded ? collapseChat : expandChat}
+          aria-label={isExpanded ? '收缩' : '展开'}
+          title={isExpanded ? '收缩' : '展开'}
+        >
+          <img src={FullscreenIcon} width={16} height={16} alt="" />
+        </button>
       </div>
 
       {/* 消息列表 */}
@@ -324,7 +320,13 @@ export function ChatWindow() {
       {/* 右键菜单 */}
       {ctxMenu && (
         <ul className={styles.ctxMenu} style={{ left: ctxMenu.x, top: ctxMenu.y }} onMouseLeave={() => setCtxMenu(null)}>
-          <li className={styles.ctxItem} onMouseDown={(e) => { e.preventDefault(); clearMessages(); setCtxMenu(null) }}>清空聊天记录</li>
+          <li className={styles.ctxItem} onMouseDown={async (e) => {
+            e.preventDefault()
+            setCtxMenu(null)
+            const ok = await confirm({ level: 'moderate', title: '清空会话？', body: <p>当前对话记录将被清除，无法恢复。</p>, confirmLabel: '清空' })
+            if (ok) clearMessages()
+          }}>清空会话</li>
+          <li className={styles.ctxItem} onMouseDown={(e) => { e.preventDefault(); closeChat(); setCtxMenu(null) }}>关闭会话</li>
         </ul>
       )}
 

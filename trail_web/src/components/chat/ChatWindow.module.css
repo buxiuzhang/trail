@@ -123,7 +123,7 @@
 /* —— 单条消息行 —— */
 .msg {
   display: flex;
-  max-width: 62%;
+  max-width: 85%;
 }
 .msgUser {
   align-self: flex-end;
