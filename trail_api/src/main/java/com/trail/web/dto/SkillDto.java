@@ -12,5 +12,6 @@ public record SkillDto(
         Boolean enabled,
         Integer sortOrder,
         List<String> scope,
+        String injectionMode,
         String createdAt
 ) {}

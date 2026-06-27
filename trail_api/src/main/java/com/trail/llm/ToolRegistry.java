@@ -29,7 +29,8 @@ public class ToolRegistry {
             callApi(),
             exportDailyReport(),
             exportWeeklyReport(),
-            vectorSearch()
+            vectorSearch(),
+            getSkillDetail()
         );
     }
 
@@ -201,6 +202,22 @@ public class ToolRegistry {
             "vector_search",
             "语义搜索任务、日报、待办内容。当需要查找相关历史工作、某类任务或某主题日报时使用。比 call_api 更快，适合模糊检索。",
             new Tool.InputSchema("object", props, List.of("query"))
+        );
+    }
+
+    /**
+     * 按需获取 Skill 完整提示词（渐进式披露）
+     */
+    private Tool getSkillDetail() {
+        ObjectNode props = mapper.createObjectNode();
+        props.set("name", mapper.createObjectNode()
+            .put("type", "string")
+            .put("description", "Skill 名称，与系统提示词目录中列出的名称完全一致"));
+
+        return new Tool(
+            "get_skill_detail",
+            "获取指定 Skill 的完整系统提示词内容。当系统提示词目录中列出了某个扩展能力，而你需要了解其详细指令时调用。",
+            new Tool.InputSchema("object", props, List.of("name"))
         );
     }
 }

@@ -187,6 +187,7 @@ CREATE TABLE IF NOT EXISTS skills (
     enabled         INTEGER NOT NULL DEFAULT 1,
     sort_order      INTEGER NOT NULL DEFAULT 0,
     scope           TEXT    NOT NULL DEFAULT '["chat"]',
+    injection_mode  TEXT    NOT NULL DEFAULT 'full',
     created_at      TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 

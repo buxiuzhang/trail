@@ -25,9 +25,10 @@ interface FormState {
   description: string
   system_prompt: string
   scope: string[]
+  injection_mode: string
 }
 
-const EMPTY_FORM: FormState = { name: '', description: '', system_prompt: '', scope: ['chat'] }
+const EMPTY_FORM: FormState = { name: '', description: '', system_prompt: '', scope: ['chat'], injection_mode: 'full' }
 
 function parseScope(raw: string | undefined): string[] {
   if (!raw) return ['chat']
@@ -41,6 +42,7 @@ function skillToForm(s: Skill): FormState {
     description: s.description ?? '',
     system_prompt: s.system_prompt,
     scope: parseScope(s.scope).filter(v => validScopes.includes(v)),
+    injection_mode: s.injection_mode ?? 'full',
   }
 }
 
@@ -123,6 +125,7 @@ export function SkillsSection() {
       description: form.description || undefined,
       system_prompt: form.system_prompt,
       scope: form.scope,
+      injection_mode: form.injection_mode,
     }
     try {
       if (editingId) {
@@ -187,6 +190,9 @@ export function SkillsSection() {
               <div className={styles.cardInfo}>
                 <span className={styles.cardName}>{skill.name}</span>
                 <ScopeBadges scope={skill.scope} />
+                {skill.injection_mode === 'lazy' && (
+                  <span className={`${styles.scopeBadge} ${styles.scopeBadge_lazy}`}>渐进</span>
+                )}
               </div>
               <div className={styles.cardActions}>
                 <button
@@ -323,6 +329,31 @@ export function SkillsSection() {
                 })}
               </div>
             </div>
+          </div>
+
+          <div className={styles.field}>
+            <label className={styles.label}>注入方式</label>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button
+                type="button"
+                className={`${styles.btn} ${form.injection_mode === 'full' ? styles.btnPrimary : ''}`}
+                onClick={() => setForm(p => ({ ...p, injection_mode: 'full' }))}
+              >
+                全量注入
+              </button>
+              <button
+                type="button"
+                className={`${styles.btn} ${form.injection_mode === 'lazy' ? styles.btnPrimary : ''}`}
+                onClick={() => setForm(p => ({ ...p, injection_mode: 'lazy' }))}
+              >
+                渐进式披露
+              </button>
+            </div>
+            {form.injection_mode === 'lazy' && (
+              <p style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 6, marginBottom: 0 }}>
+                仅将名称和描述注入上下文，LLM 按需调用 get_skill_detail 获取完整提示词。
+              </p>
+            )}
           </div>
 
           <div className={styles.formActions}>

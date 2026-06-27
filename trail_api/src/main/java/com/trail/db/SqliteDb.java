@@ -280,6 +280,13 @@ public class SqliteDb {
                     log.info("skills.scope 列已添加");
                 }
             }
+            // Skills injection_mode 字段迁移
+            if (tableExists("skills") && !columnExists("skills", "injection_mode")) {
+                try (Statement s = c.createStatement()) {
+                    s.execute("ALTER TABLE skills ADD COLUMN injection_mode TEXT NOT NULL DEFAULT 'full'");
+                    log.info("skills.injection_mode 列已添加");
+                }
+            }
             // M17: v_stale_tasks 视图升级——旧版只查 status='进行中'，新版覆盖所有未完成任务
             try (Statement s = c.createStatement();
                  ResultSet rs = s.executeQuery(

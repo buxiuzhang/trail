@@ -35,14 +35,14 @@ public class SkillController {
     public Map<String, Object> create(@RequestBody SkillDto dto) {
         return store.save(dto.name(), dto.description(), dto.systemPrompt(),
                 dto.sortOrder() != null ? dto.sortOrder() : 0,
-                toScopeJson(dto.scope()));
+                toScopeJson(dto.scope()), dto.injectionMode());
     }
 
     @Operation(summary = "更新 Skill")
     @PutMapping("/{id}")
     public Map<String, Object> update(@PathVariable String id, @RequestBody SkillDto dto) {
         return store.update(id, dto.name(), dto.description(), dto.systemPrompt(),
-                dto.enabled(), dto.sortOrder(), toScopeJson(dto.scope()));
+                dto.enabled(), dto.sortOrder(), toScopeJson(dto.scope()), dto.injectionMode());
     }
 
     @Operation(summary = "删除 Skill")

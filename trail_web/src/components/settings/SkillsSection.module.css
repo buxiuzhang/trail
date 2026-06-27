@@ -121,6 +121,11 @@
   color: #a57;
 }
 
+.scopeBadge_lazy {
+  background: color-mix(in srgb, var(--amber, #f59e0b) 15%, transparent);
+  color: var(--amber, #f59e0b);
+}
+
 .scopePolishRow {
   display: flex;
   align-items: center;

@@ -9,6 +9,7 @@ export interface Skill {
   enabled: number
   sort_order: number
   scope: string
+  injection_mode: string
   created_at: string
 }
 
@@ -18,6 +19,7 @@ export interface SkillSaveRequest {
   system_prompt: string
   sort_order?: number
   scope?: string[]
+  injection_mode?: string
 }
 
 export function useSkills() {

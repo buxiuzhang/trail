@@ -3,8 +3,10 @@ package com.trail.llm;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.trail.db.SqliteDb;
 import com.trail.service.EmbeddingService;
+import com.trail.store.SkillStore;
 import com.trail.store.VectorStore;
 import com.trail.store.WorkLogStore;
+import com.trail.store.exception.NotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -39,10 +41,12 @@ public class ApiToolExecutor {
     private final McpClientManager mcpClientManager;
     private final EmbeddingService embeddingService;
     private final VectorStore vectorStore;
+    private final SkillStore skillStore;
 
     public ApiToolExecutor(OpenApiService openApiService, SqliteDb db, ObjectMapper mapper,
                            WorkLogStore workLogStore, McpClientManager mcpClientManager,
-                           EmbeddingService embeddingService, VectorStore vectorStore) {
+                           EmbeddingService embeddingService, VectorStore vectorStore,
+                           SkillStore skillStore) {
         this.openApiService = openApiService;
         this.db = db;
         this.mapper = mapper;
@@ -51,6 +55,7 @@ public class ApiToolExecutor {
         this.mcpClientManager = mcpClientManager;
         this.embeddingService = embeddingService;
         this.vectorStore = vectorStore;
+        this.skillStore = skillStore;
     }
 
     /**
@@ -67,6 +72,7 @@ public class ApiToolExecutor {
                 case "export_daily_report" -> executeExportDailyReport(input);
                 case "export_weekly_report" -> executeExportWeeklyReport(input);
                 case "vector_search" -> executeVectorSearch(input);
+                case "get_skill_detail" -> executeGetSkillDetail(input);
                 default -> {
                     if (name.startsWith("mcp__")) {
                         yield mcpClientManager.callTool(name, input);
@@ -510,6 +516,27 @@ public class ApiToolExecutor {
         } catch (Exception e) {
             log.warn("vector_search 执行失败: {}", e.getMessage());
             return Map.of("error", "向量搜索失败：" + e.getMessage());
+        }
+    }
+
+    // ============================================================
+    // get_skill_detail 执行
+    // ============================================================
+
+    private Map<String, Object> executeGetSkillDetail(Map<String, Object> input) {
+        String name = (String) input.get("name");
+        if (name == null || name.isBlank()) {
+            return Map.of("error", "name 参数必填");
+        }
+        try {
+            Map<String, Object> skill = skillStore.findEnabledByName(name);
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("name", skill.get("name"));
+            result.put("description", skill.get("description"));
+            result.put("system_prompt", skill.get("system_prompt"));
+            return result;
+        } catch (NotFoundException e) {
+            return Map.of("error", "Skill 不存在或已禁用：" + name);
         }
     }
 

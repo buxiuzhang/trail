@@ -504,15 +504,31 @@ public class ChatWithToolsService {
         Map<String, String> settings = settingsStore.getAll();
         String systemPrompt = settings.getOrDefault("chat_system_prompt", "");
 
-        // 追加 enabled skills 的 system_prompt 片段
+        // 追加 enabled skills 的 system_prompt 片段，按 injection_mode 分拣
         List<Map<String, Object>> enabledSkills = skillStore.findEnabledByScope("chat");
         if (!enabledSkills.isEmpty()) {
             StringBuilder sb = new StringBuilder(systemPrompt);
+            StringBuilder lazyDir = new StringBuilder();
             for (Map<String, Object> skill : enabledSkills) {
-                String snippet = (String) skill.get("system_prompt");
-                if (snippet != null && !snippet.isBlank()) {
-                    sb.append("\n\n---\n\n").append(snippet.strip());
+                String mode = (String) skill.get("injection_mode");
+                if ("lazy".equals(mode)) {
+                    String skillName = (String) skill.get("name");
+                    String skillDesc = (String) skill.get("description");
+                    String dirLine = "- " + skillName;
+                    if (skillDesc != null && !skillDesc.isBlank()) {
+                        dirLine += "：" + skillDesc;
+                    }
+                    dirLine += "（需要时调用 get_skill_detail(\"" + skillName + "\") 获取详细指令）";
+                    lazyDir.append("\n").append(dirLine);
+                } else {
+                    String snippet = (String) skill.get("system_prompt");
+                    if (snippet != null && !snippet.isBlank()) {
+                        sb.append("\n\n---\n\n").append(snippet.strip());
+                    }
                 }
+            }
+            if (!lazyDir.isEmpty()) {
+                sb.append("\n\n【可按需加载的扩展能力】").append(lazyDir);
             }
             systemPrompt = sb.toString();
         }
