@@ -72,6 +72,17 @@ export function useSaveWeatherSettings() {
       api.put('/api/settings/weather', data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['settings', 'weather'] })
+      // 清除天气数据缓存，切换城市后立即重新拉取
+      qc.removeQueries({
+        predicate: q => {
+          const key = q.queryKey
+          return key[0] === 'weather' &&
+            key[1] !== 'provinces' &&
+            key[1] !== 'adm2' &&
+            key[1] !== 'districts' &&
+            key[1] !== 'lookup'
+        },
+      })
     },
   })
 }

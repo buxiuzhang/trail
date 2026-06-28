@@ -54,6 +54,7 @@ public class WeatherSettingsController {
         saveIfPresent(data, "private_key",   "weather_private_key");
         if (data.containsKey("location_id")) {
             saveIfPresent(data, "location_id", "weather_default_city");
+            qWeather.clearWeatherCache();
         } else {
             saveIfPresent(data, "default_city", "weather_default_city");
         }

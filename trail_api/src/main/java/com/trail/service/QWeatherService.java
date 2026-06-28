@@ -120,6 +120,10 @@ public class QWeatherService {
         }
     }
 
+    public void clearWeatherCache() {
+        weatherCache.clear();
+    }
+
     /** 返回实时天气；凭据未配置或请求失败返回 null */
     public WeatherNow getWeather(String location) {
         String projectId    = store.get("weather_project_id");
