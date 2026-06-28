@@ -15,7 +15,7 @@ trail_private.key
 
 # 数据库文件
 *.sqlite
-db/
+/db/
 
 # 日志目录
 logs/
