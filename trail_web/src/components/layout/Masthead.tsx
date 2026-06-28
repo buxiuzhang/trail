@@ -40,16 +40,6 @@ export function Masthead() {
     true
   )
 
-  // 定位成功且天气返回后，自动回写 default_city（城市名），方便下次定位被拒时回退
-  useEffect(() => {
-    if (!weather?.districtName || typeof geoLocation !== 'string') return
-    fetch('/api/settings/weather', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ default_city: weather.districtName }),
-    }).catch(() => {})
-  }, [weather?.districtName, geoLocation])
-
   // 每秒更新指针（秒针实时走）
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 1000)

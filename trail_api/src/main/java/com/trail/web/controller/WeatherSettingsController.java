@@ -88,15 +88,50 @@ public class WeatherSettingsController {
         )).collect(Collectors.toList());
     }
 
-    @Operation(summary = "根据 location_id 反查省市区")
+    @Operation(summary = "根据 location_id 或城市名反查省市区")
     @GetMapping("/cities/lookup")
     public Map<String, String> lookup(@RequestParam String locationId) {
         List<Map<String, Object>> rows = db.query(
             "SELECT location_id, name_zh, adm1_zh, adm2_zh FROM qw_cities WHERE location_id = ?", locationId);
+        boolean needsMigration = false;
+        // 兼容旧版：若按 ID 查不到，依次尝试多种名称匹配
+        if (rows.isEmpty()) {
+            // 1. name_zh 精确匹配
+            rows = db.query(
+                "SELECT location_id, name_zh, adm1_zh, adm2_zh FROM qw_cities WHERE name_zh = ? LIMIT 1", locationId);
+            needsMigration = !rows.isEmpty();
+        }
+        if (rows.isEmpty()) {
+            // 2. adm2_zh 精确匹配（如存的是"广州市"，是市级名称）
+            rows = db.query(
+                "SELECT location_id, name_zh, adm1_zh, adm2_zh FROM qw_cities WHERE adm2_zh = ? ORDER BY name_zh LIMIT 1", locationId);
+            needsMigration = !rows.isEmpty();
+        }
+        if (rows.isEmpty()) {
+            // 3. 去掉末尾"市/区/县"后 name_zh 精确匹配
+            String stripped = locationId.replaceAll("[市区县]$", "");
+            if (!stripped.equals(locationId)) {
+                rows = db.query(
+                    "SELECT location_id, name_zh, adm1_zh, adm2_zh FROM qw_cities WHERE name_zh = ? LIMIT 1", stripped);
+                needsMigration = !rows.isEmpty();
+            }
+        }
+        if (rows.isEmpty()) {
+            // 4. name_zh LIKE 前缀匹配
+            rows = db.query(
+                "SELECT location_id, name_zh, adm1_zh, adm2_zh FROM qw_cities WHERE name_zh LIKE ? LIMIT 1",
+                locationId + "%");
+            needsMigration = !rows.isEmpty();
+        }
         if (rows.isEmpty()) return Map.of();
         Map<String, Object> row = rows.get(0);
+        String canonicalId = orEmpty((String) row.get("location_id"));
+        // 自动迁移旧城市名 → location_id
+        if (needsMigration && !canonicalId.isEmpty()) {
+            store.save("weather_default_city", canonicalId);
+        }
         return Map.of(
-            "location_id", orEmpty((String) row.get("location_id")),
+            "location_id", canonicalId,
             "name_zh",     orEmpty((String) row.get("name_zh")),
             "adm1_zh",     orEmpty((String) row.get("adm1_zh")),
             "adm2_zh",     orEmpty((String) row.get("adm2_zh"))

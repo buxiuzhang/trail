@@ -202,8 +202,8 @@ public class QWeatherService {
                     "SELECT location_id, name_zh, adm2_zh FROM qw_cities WHERE location_id = ?", location);
                 if (!rows.isEmpty()) {
                     Map<String, Object> row = rows.get(0);
-                    String name = str(row, "adm2_zh");
-                    if (name == null || name.isBlank()) name = str(row, "name_zh");
+                    String name = str(row, "name_zh");
+                    if (name == null || name.isBlank()) name = str(row, "adm2_zh");
                     log.debug("Local DB resolved cityId {} → {}", location, name);
                     return new GeoResult(location, name);
                 }
@@ -244,8 +244,8 @@ public class QWeatherService {
         if (rows.isEmpty()) return null;
         Map<String, Object> row = rows.get(0);
         String cityId = str(row, "location_id");
-        String name   = str(row, "adm2_zh");
-        if (name == null || name.isBlank()) name = str(row, "name_zh");
+        String name   = str(row, "name_zh");
+        if (name == null || name.isBlank()) name = str(row, "adm2_zh");
         log.debug("Local DB resolved coords ({},{}) → {} ({})", lat, lon, name, cityId);
         return new GeoResult(cityId, name);
     }

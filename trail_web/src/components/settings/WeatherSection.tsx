@@ -38,11 +38,11 @@ export function WeatherSection() {
   }, [weatherSettings])
 
   useEffect(() => {
-    if (!lookupResult || initDone.current) return
+    if (!lookupResult?.adm1_zh || initDone.current) return
     initDone.current = true
     setProvince(lookupResult.adm1_zh)
     setCity(lookupResult.adm2_zh)
-    setLocationId(existingId)
+    setLocationId(lookupResult.location_id)
   }, [lookupResult, existingId])
 
   function handleProvinceChange(v: string) {
@@ -110,56 +110,55 @@ export function WeatherSection() {
         <p className={styles.fieldHint}>Ed25519 私钥，PKCS#8 PEM 格式或纯 Base64 均可。存储后加密保存，不回显。</p>
       </div>
 
-      <div style={{ display: 'flex', gap: 16 }}>
-        <div className="field" style={{ flex: 1 }}>
-          <div className="field__label">
-            <span>API Host</span>
-            <span className="field__hint">可选，默认 devapi.qweather.com</span>
-          </div>
-          <input className="field__input" value={weatherApiHost} onChange={e => setWeatherApiHost(e.target.value)} placeholder="devapi.qweather.com" style={{ fontFamily: 'var(--mono)', fontSize: '13.5px' }} />
+      <div className="field">
+        <div className="field__label">
+          <span>API Host</span>
+          <span className="field__hint">可选，默认 devapi.qweather.com</span>
         </div>
-        <div className="field" style={{ flex: 1 }}>
-          <div className="field__label">
-            <span>默认城市</span>
-            <span className="field__hint">
-              {selectedDistrict
-                ? `${province} · ${city} · ${selectedDistrict.name_zh}`
-                : weatherSettings?.default_city_name
-                  ? `当前：${weatherSettings.default_city_name} · 定位被拒时回退`
-                  : '浏览器定位被拒时的回退城市'}
-            </span>
-          </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <select
-              className="field__input"
-              value={province}
-              onChange={e => handleProvinceChange(e.target.value)}
-              style={{ flex: 1 }}
-            >
-              <option value="">省/直辖市</option>
-              {provinces.map(p => <option key={p} value={p}>{p}</option>)}
-            </select>
-            <select
-              className="field__input"
-              value={city}
-              onChange={e => handleCityChange(e.target.value)}
-              disabled={!province}
-              style={{ flex: 1 }}
-            >
-              <option value="">市/地区</option>
-              {adm2List.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-            <select
-              className="field__input"
-              value={locationId}
-              onChange={e => setLocationId(e.target.value)}
-              disabled={!city}
-              style={{ flex: 1 }}
-            >
-              <option value="">区/县</option>
-              {districts.map(d => <option key={d.location_id} value={d.location_id}>{d.name_zh}</option>)}
-            </select>
-          </div>
+        <input className="field__input" value={weatherApiHost} onChange={e => setWeatherApiHost(e.target.value)} placeholder="devapi.qweather.com" style={{ fontFamily: 'var(--mono)', fontSize: '13.5px' }} />
+      </div>
+
+      <div className="field">
+        <div className="field__label">
+          <span>默认城市</span>
+          <span className="field__hint">
+            {selectedDistrict
+              ? `${province} · ${city} · ${selectedDistrict.name_zh}`
+              : weatherSettings?.default_city_name
+                ? `当前：${weatherSettings.default_city_name} · 定位被拒时回退`
+                : '浏览器定位被拒时的回退城市'}
+          </span>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <select
+            className="field__input"
+            value={province}
+            onChange={e => handleProvinceChange(e.target.value)}
+            style={{ flex: 1 }}
+          >
+            <option value="">省/直辖市</option>
+            {provinces.map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
+          <select
+            className="field__input"
+            value={city}
+            onChange={e => handleCityChange(e.target.value)}
+            disabled={!province}
+            style={{ flex: 1 }}
+          >
+            <option value="">市/地区</option>
+            {adm2List.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <select
+            className="field__input"
+            value={locationId}
+            onChange={e => setLocationId(e.target.value)}
+            disabled={!city}
+            style={{ flex: 1 }}
+          >
+            <option value="">区/县</option>
+            {districts.map(d => <option key={d.location_id} value={d.location_id}>{d.name_zh}</option>)}
+          </select>
         </div>
       </div>
 

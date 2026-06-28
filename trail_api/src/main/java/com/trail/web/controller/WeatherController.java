@@ -39,9 +39,12 @@ public class WeatherController {
             return ResponseEntity.noContent().build();
         }
 
-        // 浏览器授权定位时，将解析到的城市 ID 写入默认城市，下次无需再定位
+        // 浏览器授权定位时，仅在用户未配置默认城市时才写入，不覆盖已有设置
         if (fromBrowser && now.resolvedCityId() != null && !now.resolvedCityId().isBlank()) {
-            store.save("weather_default_city", now.resolvedCityId());
+            String existing = store.get("weather_default_city");
+            if (existing == null || existing.isBlank()) {
+                store.save("weather_default_city", now.resolvedCityId());
+            }
         }
 
         return ResponseEntity.ok(Map.of(
