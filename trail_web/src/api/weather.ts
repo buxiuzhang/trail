@@ -68,10 +68,49 @@ export function useWeatherSettings() {
 export function useSaveWeatherSettings() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: Partial<WeatherSettings> & { private_key?: string }) =>
+    mutationFn: (data: Partial<WeatherSettings> & { private_key?: string; location_id?: string }) =>
       api.put('/api/settings/weather', data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['settings', 'weather'] })
     },
+  })
+}
+
+export function useWeatherProvinces() {
+  return useQuery({
+    queryKey: ['weather', 'provinces'],
+    queryFn: () => api.get<string[]>('/api/settings/weather/cities/provinces'),
+    staleTime: Infinity,
+  })
+}
+
+export function useWeatherAdm2(province: string | null) {
+  return useQuery({
+    queryKey: ['weather', 'adm2', province],
+    queryFn: () => api.get<string[]>(`/api/settings/weather/cities/adm2?province=${encodeURIComponent(province!)}`),
+    enabled: !!province,
+    staleTime: Infinity,
+  })
+}
+
+export function useWeatherDistricts(province: string | null, city: string | null) {
+  return useQuery({
+    queryKey: ['weather', 'districts', province, city],
+    queryFn: () => api.get<{ location_id: string; name_zh: string }[]>(
+      `/api/settings/weather/cities/districts?province=${encodeURIComponent(province!)}&city=${encodeURIComponent(city!)}`
+    ),
+    enabled: !!province && !!city,
+    staleTime: Infinity,
+  })
+}
+
+export function useWeatherCityLookup(locationId: string | null) {
+  return useQuery({
+    queryKey: ['weather', 'lookup', locationId],
+    queryFn: () => api.get<{ location_id: string; name_zh: string; adm1_zh: string; adm2_zh: string }>(
+      `/api/settings/weather/cities/lookup?locationId=${encodeURIComponent(locationId!)}`
+    ),
+    enabled: !!locationId,
+    staleTime: Infinity,
   })
 }

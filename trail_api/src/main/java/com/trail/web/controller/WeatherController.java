@@ -25,6 +25,7 @@ public class WeatherController {
     @Operation(summary = "获取实时天气", description = "location 可传 lat,lon 或城市名；留空则用默认城市；凭据未配置返回 204")
     @GetMapping
     public ResponseEntity<?> get(@RequestParam(required = false) String location) {
+        boolean fromBrowser = location != null && location.matches("-?\\d+\\.\\d+,-?\\d+\\.\\d+");
         String loc = location;
         if (loc == null || loc.isBlank()) {
             loc = store.get("weather_default_city");
@@ -36,6 +37,11 @@ public class WeatherController {
         QWeatherService.WeatherNow now = qWeather.getWeather(loc);
         if (now == null) {
             return ResponseEntity.noContent().build();
+        }
+
+        // 浏览器授权定位时，将解析到的城市 ID 写入默认城市，下次无需再定位
+        if (fromBrowser && now.resolvedCityId() != null && !now.resolvedCityId().isBlank()) {
+            store.save("weather_default_city", now.resolvedCityId());
         }
 
         return ResponseEntity.ok(Map.of(

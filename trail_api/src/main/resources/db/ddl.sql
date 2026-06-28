@@ -194,6 +194,54 @@ CREATE TABLE IF NOT EXISTS skills (
 CREATE INDEX IF NOT EXISTS idx_mcp_servers_enabled ON mcp_servers(enabled);
 CREATE INDEX IF NOT EXISTS idx_skills_enabled_order ON skills(enabled, sort_order);
 
+-- 和风天气城市与 POI 列表（从 CSV 导入，启动时幂等初始化）
+CREATE TABLE IF NOT EXISTS qw_cities (
+    location_id  TEXT PRIMARY KEY,
+    name_zh      TEXT NOT NULL,
+    name_en      TEXT,
+    adm1_zh      TEXT,
+    adm2_zh      TEXT,
+    latitude     REAL,
+    longitude    REAL,
+    country_code TEXT
+);
+
+CREATE TABLE IF NOT EXISTS qw_poi_air (
+    poi_id      TEXT PRIMARY KEY,
+    poi_name    TEXT NOT NULL,
+    poi_type    TEXT,
+    location_id TEXT,
+    adm1_zh     TEXT,
+    adm2_zh     TEXT,
+    latitude    REAL,
+    longitude   REAL
+);
+
+CREATE TABLE IF NOT EXISTS qw_poi_scenic (
+    poi_id      TEXT PRIMARY KEY,
+    poi_name_zh TEXT NOT NULL,
+    poi_name_en TEXT,
+    location_id TEXT,
+    adm1_zh     TEXT,
+    adm2_zh     TEXT,
+    latitude    REAL,
+    longitude   REAL
+);
+
+CREATE TABLE IF NOT EXISTS qw_poi_tide (
+    poi_id         TEXT PRIMARY KEY,
+    poi_name_zh    TEXT,
+    poi_name_en    TEXT,
+    poi_name_local TEXT,
+    latitude       REAL,
+    longitude      REAL,
+    poi_type       TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_qw_cities_adm1 ON qw_cities(adm1_zh);
+CREATE INDEX IF NOT EXISTS idx_qw_cities_adm2 ON qw_cities(adm1_zh, adm2_zh);
+CREATE INDEX IF NOT EXISTS idx_qw_cities_country ON qw_cities(country_code);
+
 -- 3) 1 个视图
 --    DuckDB 版用 CURRENT_DATE - log_date → SQLite 用 julianday('now') - julianday(log_date)
 CREATE VIEW IF NOT EXISTS v_stale_tasks AS

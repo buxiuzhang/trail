@@ -3,6 +3,7 @@ package com.trail.config;
 import com.trail.crypto.PlainYamlImporter;
 import com.trail.crypto.SecretKeyService;
 import com.trail.db.SqliteDb;
+import com.trail.service.QWeatherCsvImporter;
 import com.trail.store.EntityRefStore;
 import com.trail.store.VectorStore;
 import jakarta.annotation.PostConstruct;
@@ -27,16 +28,19 @@ public class StartupChecks {
     private final PlainYamlImporter importer;
     private final EntityRefStore entityRefStore;
     private final VectorStore vectorStore;
+    private final QWeatherCsvImporter qWeatherCsvImporter;
 
     public StartupChecks(DataDirService dataDir, SqliteDb db,
                          SecretKeyService keys, PlainYamlImporter importer,
-                         EntityRefStore entityRefStore, VectorStore vectorStore) {
+                         EntityRefStore entityRefStore, VectorStore vectorStore,
+                         QWeatherCsvImporter qWeatherCsvImporter) {
         this.dataDir = dataDir;
         this.db = db;
         this.keys = keys;
         this.importer = importer;
         this.entityRefStore = entityRefStore;
         this.vectorStore = vectorStore;
+        this.qWeatherCsvImporter = qWeatherCsvImporter;
     }
 
     @PostConstruct
@@ -53,6 +57,7 @@ public class StartupChecks {
             db.compressAiRecords();   // M16: 存量 ai_records 压缩迁移（已压缩则跳过）
             db.pruneAiRecords(30);    // 清理 30 天前的 ai_records
             vectorStore.open(dataDir.currentDataDir());
+            qWeatherCsvImporter.importAll();
             log.info("启动就绪：dataDir={}", dataDir.currentDataDir());
         } else {
             log.warn("未配置数据目录。HTTP 已起，/api/*（health + data-dir 探测除外）返 503 NEEDS_DATA_DIR。");

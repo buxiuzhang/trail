@@ -1,5 +1,8 @@
-import { useState, useEffect } from 'react'
-import { useWeatherSettings, useSaveWeatherSettings } from '@/api/weather'
+import { useState, useEffect, useRef } from 'react'
+import {
+  useWeatherSettings, useSaveWeatherSettings,
+  useWeatherProvinces, useWeatherAdm2, useWeatherDistricts, useWeatherCityLookup,
+} from '@/api/weather'
 import { useToastContext } from '@/context/ToastContext'
 import styles from '@/pages/SettingsPage.module.css'
 
@@ -12,7 +15,19 @@ export function WeatherSection() {
   const [weatherCredentialId, setWeatherCredentialId] = useState('')
   const [weatherApiHost, setWeatherApiHost] = useState('')
   const [weatherPrivateKey, setWeatherPrivateKey] = useState('')
-  const [weatherDefaultCity, setWeatherDefaultCity] = useState('')
+
+  const [province, setProvince] = useState('')
+  const [city, setCity] = useState('')
+  const [locationId, setLocationId] = useState('')
+
+  // 仅回填一次，避免用户选省市后被已保存城市覆盖
+  const initDone = useRef(false)
+  const existingId = weatherSettings?.default_city ?? ''
+  const { data: lookupResult } = useWeatherCityLookup(existingId || null)
+
+  const { data: provinces = [] } = useWeatherProvinces()
+  const { data: adm2List = [] } = useWeatherAdm2(province || null)
+  const { data: districts = [] } = useWeatherDistricts(province || null, city || null)
 
   useEffect(() => {
     if (!weatherSettings) return
@@ -20,16 +35,34 @@ export function WeatherSection() {
     setWeatherCredentialId(weatherSettings.credential_id)
     setWeatherApiHost(weatherSettings.api_host)
     setWeatherPrivateKey('')
-    setWeatherDefaultCity(weatherSettings.default_city_name || weatherSettings.default_city)
   }, [weatherSettings])
+
+  useEffect(() => {
+    if (!lookupResult || initDone.current) return
+    initDone.current = true
+    setProvince(lookupResult.adm1_zh)
+    setCity(lookupResult.adm2_zh)
+    setLocationId(existingId)
+  }, [lookupResult, existingId])
+
+  function handleProvinceChange(v: string) {
+    setProvince(v)
+    setCity('')
+    setLocationId('')
+  }
+
+  function handleCityChange(v: string) {
+    setCity(v)
+    setLocationId('')
+  }
 
   async function handleSave() {
     const payload: Record<string, string> = {
       project_id: weatherProjectId,
       credential_id: weatherCredentialId,
       api_host: weatherApiHost,
-      default_city: weatherDefaultCity,
     }
+    if (locationId) payload.location_id = locationId
     if (weatherPrivateKey.trim()) payload.private_key = weatherPrivateKey.trim()
     try {
       await saveWeather.mutateAsync(payload)
@@ -39,6 +72,8 @@ export function WeatherSection() {
       showToast('保存失败：' + (err as Error).message)
     }
   }
+
+  const selectedDistrict = districts.find(d => d.location_id === locationId)
 
   return (
     <section id="interface-weather" className={styles.section}>
@@ -87,12 +122,44 @@ export function WeatherSection() {
           <div className="field__label">
             <span>默认城市</span>
             <span className="field__hint">
-              {weatherSettings?.default_city_name
-                ? `当前：${weatherSettings.default_city_name} · 定位被拒时回退`
-                : '浏览器定位被拒时的回退城市'}
+              {selectedDistrict
+                ? `${province} · ${city} · ${selectedDistrict.name_zh}`
+                : weatherSettings?.default_city_name
+                  ? `当前：${weatherSettings.default_city_name} · 定位被拒时回退`
+                  : '浏览器定位被拒时的回退城市'}
             </span>
           </div>
-          <input className="field__input" value={weatherDefaultCity} onChange={e => setWeatherDefaultCity(e.target.value)} placeholder="城市名或城市 ID，例：深圳" />
+          <div style={{ display: 'flex', gap: 8 }}>
+            <select
+              className="field__input"
+              value={province}
+              onChange={e => handleProvinceChange(e.target.value)}
+              style={{ flex: 1 }}
+            >
+              <option value="">省/直辖市</option>
+              {provinces.map(p => <option key={p} value={p}>{p}</option>)}
+            </select>
+            <select
+              className="field__input"
+              value={city}
+              onChange={e => handleCityChange(e.target.value)}
+              disabled={!province}
+              style={{ flex: 1 }}
+            >
+              <option value="">市/地区</option>
+              {adm2List.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <select
+              className="field__input"
+              value={locationId}
+              onChange={e => setLocationId(e.target.value)}
+              disabled={!city}
+              style={{ flex: 1 }}
+            >
+              <option value="">区/县</option>
+              {districts.map(d => <option key={d.location_id} value={d.location_id}>{d.name_zh}</option>)}
+            </select>
+          </div>
         </div>
       </div>
 
