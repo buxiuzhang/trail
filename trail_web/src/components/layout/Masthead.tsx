@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { useOverview } from '@/api/insights'
-import { useWeather, WEATHER_EMOJI } from '@/api/weather'
+import { useWeather, useWeatherSettings, WEATHER_EMOJI } from '@/api/weather'
 import { TODAY } from '@/constants'
 import { Breadcrumb } from './Breadcrumb'
 import styles from './Masthead.module.css'
@@ -26,14 +26,19 @@ export function Masthead() {
   const [now, setNow] = useState(() => new Date())
   const [geoLocation, setGeoLocation] = useState<string | null | 'pending'>('pending')
 
+  const { data: weatherSettings } = useWeatherSettings()
+  const hasDefaultCity = !!(weatherSettings?.default_city)
+
+  // 只有未配置默认城市时才请求浏览器定位
   useEffect(() => {
+    if (hasDefaultCity) { setGeoLocation(null); return }
     if (!navigator.geolocation) { setGeoLocation(null); return }
     navigator.geolocation.getCurrentPosition(
       pos => setGeoLocation(`${pos.coords.latitude.toFixed(4)},${pos.coords.longitude.toFixed(4)}`),
       () => setGeoLocation(null),
       { timeout: 5000 }
     )
-  }, [])
+  }, [hasDefaultCity])
 
   const { data: weather } = useWeather(
     geoLocation === 'pending' ? null : geoLocation,
