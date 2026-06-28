@@ -52,7 +52,16 @@ export function SettingsPage() {
             <McpSection />
           </section>
           <section id="llm-skills" className={styles.section}>
-            <h2 className={styles.sectionTitle}>Skills 扩展</h2>
+            <h2 className={styles.sectionTitle}>
+              Skills 扩展
+              <a
+                href="https://promptpilot.volcengine.com/"
+                target="_blank"
+                rel="noreferrer"
+                className={styles.promptPilotLink}
+                title="在 PromptPilot 中调试和优化提示词"
+              >promptpilot</a>
+            </h2>
             <SkillsSection />
           </section>
           <LlmDisabledPromptsSection />

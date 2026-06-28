@@ -4,6 +4,9 @@ import { rsaDecrypt } from '@/api/crypto'
 import { useToastContext } from '@/context/ToastContext'
 import { useConfirm } from '@/utils/confirm'
 import styles from '@/pages/SettingsPage.module.css'
+import { Select } from '@/components/shared/Select'
+import eyeOpen from '@/assets/eye-open.svg'
+import eyeClosed from '@/assets/eye-closed.svg'
 
 const TOKEN_MAX_PRESETS = [256, 512, 1000, 2000, 4000, 8000, 16000]
 const TOKEN_MIN_PRESETS = [0, 100, 200, 500, 1000, 2000]
@@ -111,14 +114,15 @@ export function LlmConnectionSection() {
               />
               <button
                 type="button"
-                className="btn btn--ghost btn--sm"
                 onClick={() => {
                   if (showKey) { setShowKey(false); setApiKeyDecrypted('') }
                   else { handleShowApiKey() }
                 }}
                 disabled={isDecrypting}
+                title={isDecrypting ? '解密中...' : showKey ? '隐藏' : '显示'}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 6px', display: 'flex', alignItems: 'center' }}
               >
-                {isDecrypting ? '解密中...' : showKey ? '隐藏' : '显示'}
+                <img src={showKey ? eyeClosed : eyeOpen} width={18} height={18} alt={showKey ? '隐藏' : '显示'} style={{ display: 'block', opacity: isDecrypting ? 0.4 : 0.6 }} />
               </button>
             </div>
             <p className={styles.fieldHint}>
@@ -143,15 +147,14 @@ export function LlmConnectionSection() {
               <span>认证方式</span>
               <span className="field__hint">{authType === 'bearer' ? 'Authorization: Bearer' : 'x-api-key header'}</span>
             </div>
-            <select
-              className="field__input"
+            <Select
               value={authType}
-              onChange={e => setAuthType(e.target.value as 'bearer' | 'x-api-key')}
-              style={{ cursor: 'pointer' }}
-            >
-              <option value="bearer">Bearer（智谱、DeepSeek、MiniMax 等）</option>
-              <option value="x-api-key">x-api-key（Anthropic 原生）</option>
-            </select>
+              onChange={v => setAuthType(v as 'bearer' | 'x-api-key')}
+              options={[
+                { value: 'bearer', label: 'Bearer（智谱、DeepSeek、MiniMax 等）' },
+                { value: 'x-api-key', label: 'x-api-key（Anthropic 原生）' },
+              ]}
+            />
             <p className={styles.fieldHint}>
               {authType === 'bearer'
                 ? '使用 Authorization: Bearer <key> 认证，适用于大多数第三方 API'

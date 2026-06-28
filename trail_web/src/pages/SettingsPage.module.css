@@ -55,6 +55,23 @@
   font-size: 14px;
   color: var(--ink-ghost);
 }
+.promptPilotLink {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.05em;
+  text-transform: none;
+  color: var(--ink-ghost);
+  text-decoration: underline dashed;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  transition: color 150ms;
+}
+.promptPilotLink:hover {
+  color: var(--ink-soft);
+}
+
 .sectionHint {
   font-family: var(--body);
   font-style: italic;

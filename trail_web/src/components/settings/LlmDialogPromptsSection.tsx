@@ -59,7 +59,16 @@ export function LlmDialogPromptsSection() {
 
   return (
     <section id="llm-dialog" className={styles.section}>
-      <h2 className={styles.sectionTitle}>对话与报表</h2>
+      <h2 className={styles.sectionTitle}>
+        对话与报表
+        <a
+          href="https://promptpilot.volcengine.com/"
+          target="_blank"
+          rel="noreferrer"
+          className={styles.promptPilotLink}
+          title="在 PromptPilot 中调试和优化提示词"
+        >promptpilot</a>
+      </h2>
       <p className={styles.sectionHint}>对话提示词、日报/周报模板，留空则使用默认值。</p>
       {isLoading ? (
         <p className={styles.sectionHint}>载入中...</p>

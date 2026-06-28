@@ -4,7 +4,10 @@ import {
   useWeatherProvinces, useWeatherAdm2, useWeatherDistricts, useWeatherCityLookup,
 } from '@/api/weather'
 import { useToastContext } from '@/context/ToastContext'
+import { Select } from '@/components/shared/Select'
 import styles from '@/pages/SettingsPage.module.css'
+import eyeOpen from '@/assets/eye-open.svg'
+import eyeClosed from '@/assets/eye-closed.svg'
 
 export function WeatherSection() {
   const { showToast } = useToastContext()
@@ -15,6 +18,7 @@ export function WeatherSection() {
   const [weatherCredentialId, setWeatherCredentialId] = useState('')
   const [weatherApiHost, setWeatherApiHost] = useState('')
   const [weatherPrivateKey, setWeatherPrivateKey] = useState('')
+  const [showIds, setShowIds] = useState(false)
 
   const [province, setProvince] = useState('')
   const [city, setCity] = useState('')
@@ -83,15 +87,24 @@ export function WeatherSection() {
         凭据信息请在 <a href="https://console.qweather.com" target="_blank" rel="noreferrer" style={{ color: 'var(--green-ink)' }}>和风天气控制台</a> 获取。
       </p>
 
-      <div style={{ display: 'flex', gap: 16 }}>
-        <div className="field" style={{ flex: 1 }}>
-          <div className="field__label"><span>项目 ID</span></div>
-          <input className="field__input" value={weatherProjectId} onChange={e => setWeatherProjectId(e.target.value)} placeholder="例：24E6AVXK6B" style={{ fontFamily: 'var(--mono)', fontSize: '13.5px' }} />
+      <div className="field">
+        <div className="field__label">
+          <span>项目 ID / 凭据 ID</span>
+          <button
+            type="button"
+            onClick={() => setShowIds(v => !v)}
+            title={showIds ? '隐藏' : '显示'}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 2px', display: 'flex', alignItems: 'center' }}
+          >
+            <img src={showIds ? eyeClosed : eyeOpen} width={16} height={16} alt={showIds ? '隐藏' : '显示'} style={{ opacity: 0.5 }} />
+          </button>
         </div>
-        <div className="field" style={{ flex: 1 }}>
-          <div className="field__label"><span>凭据 ID</span></div>
-          <input className="field__input" value={weatherCredentialId} onChange={e => setWeatherCredentialId(e.target.value)} placeholder="例：TFB4P8GVXH" style={{ fontFamily: 'var(--mono)', fontSize: '13.5px' }} />
-        </div>
+        {showIds && (
+          <div style={{ display: 'flex', gap: 16 }}>
+            <input className="field__input" value={weatherProjectId} onChange={e => setWeatherProjectId(e.target.value)} placeholder="例：24E6AVXK6B" style={{ flex: 1, fontFamily: 'var(--mono)', fontSize: '13.5px' }} />
+            <input className="field__input" value={weatherCredentialId} onChange={e => setWeatherCredentialId(e.target.value)} placeholder="例：TFB4P8GVXH" style={{ flex: 1, fontFamily: 'var(--mono)', fontSize: '13.5px' }} />
+          </div>
+        )}
       </div>
 
       <div className="field">
@@ -130,35 +143,26 @@ export function WeatherSection() {
           </span>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <select
-            className="field__input"
+          <Select
             value={province}
-            onChange={e => handleProvinceChange(e.target.value)}
+            onChange={handleProvinceChange}
+            options={[{ value: '', label: '省/直辖市' }, ...provinces.map(p => ({ value: p, label: p }))]}
             style={{ flex: 1 }}
-          >
-            <option value="">省/直辖市</option>
-            {provinces.map(p => <option key={p} value={p}>{p}</option>)}
-          </select>
-          <select
-            className="field__input"
+          />
+          <Select
             value={city}
-            onChange={e => handleCityChange(e.target.value)}
+            onChange={handleCityChange}
+            options={[{ value: '', label: '市/地区' }, ...adm2List.map(c => ({ value: c, label: c }))]}
             disabled={!province}
             style={{ flex: 1 }}
-          >
-            <option value="">市/地区</option>
-            {adm2List.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
-          <select
-            className="field__input"
+          />
+          <Select
             value={locationId}
-            onChange={e => setLocationId(e.target.value)}
+            onChange={setLocationId}
+            options={[{ value: '', label: '区/县' }, ...districts.map(d => ({ value: d.location_id, label: d.name_zh }))]}
             disabled={!city}
             style={{ flex: 1 }}
-          >
-            <option value="">区/县</option>
-            {districts.map(d => <option key={d.location_id} value={d.location_id}>{d.name_zh}</option>)}
-          </select>
+          />
         </div>
       </div>
 

@@ -10,13 +10,14 @@ interface SelectProps {
   options: SelectOption[]
   onChange: (value: string) => void
   className?: string
+  style?: React.CSSProperties
+  disabled?: boolean
 }
 
-export function Select({ value, options, onChange, className }: SelectProps) {
+export function Select({ value, options, onChange, className, style, disabled }: SelectProps) {
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  // 点击外部关闭
   const handleClickOutside = useCallback((e: MouseEvent) => {
     if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
       setOpen(false)
@@ -36,15 +37,15 @@ export function Select({ value, options, onChange, className }: SelectProps) {
     <div
       ref={containerRef}
       className={className}
-      style={{ position: 'relative', cursor: 'pointer', userSelect: 'none' }}
+      style={{ position: 'relative', userSelect: 'none', cursor: disabled ? 'not-allowed' : 'pointer', ...style }}
     >
       {/* 选中值展示 — 下划线风格 */}
       <div
-        onClick={() => setOpen(!open)}
+        onClick={() => { if (!disabled) setOpen(!open) }}
         style={{
           fontFamily: 'var(--body)',
           fontSize: '16px',
-          color: 'var(--ink)',
+          color: disabled ? 'var(--ink-ghost)' : 'var(--ink)',
           padding: '8px 0',
           borderBottom: open ? '0.5px solid var(--ink)' : '0.5px solid var(--rule)',
           transition: 'border-bottom-color 200ms ease',
@@ -63,7 +64,7 @@ export function Select({ value, options, onChange, className }: SelectProps) {
       </div>
 
       {/* 下拉面板 */}
-      {open && (
+      {open && !disabled && (
         <div style={{
           position: 'absolute',
           top: '100%',

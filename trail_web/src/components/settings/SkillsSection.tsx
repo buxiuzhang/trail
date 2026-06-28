@@ -6,7 +6,6 @@ import {
 import { useConfirm } from '@/utils/confirm'
 import { useToastContext } from '@/context/ToastContext'
 import { MarkdownRenderer } from '@/components/shared/MarkdownRenderer'
-import { SkillOptimizeDialog } from './SkillOptimizeDialog'
 import EditIcon from '@/icons/edit.svg'
 import DeleteIcon from '@/icons/delete.svg'
 import LockIcon from '@/icons/lock.svg'
@@ -75,8 +74,6 @@ export function SkillsSection() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [promptMode, setPromptMode] = useState<'source' | 'preview'>('source')
-  const [optimizingSkill, setOptimizingSkill] = useState<Skill | null>(null)
-
   const formRef = useRef<HTMLFormElement>(null)
 
   function scrollToForm() {
@@ -195,12 +192,6 @@ export function SkillsSection() {
                 )}
               </div>
               <div className={styles.cardActions}>
-                <button
-                  type="button"
-                  className={styles.optimizeBtn}
-                  onClick={() => setOptimizingSkill(skill)}
-                  title="智能优化"
-                >✦</button>
                 <button
                   type="button"
                   className={styles.iconBtn}
@@ -371,12 +362,6 @@ export function SkillsSection() {
         </button>
       )}
 
-      {optimizingSkill && (
-        <SkillOptimizeDialog
-          skill={optimizingSkill}
-          onClose={() => setOptimizingSkill(null)}
-        />
-      )}
     </div>
   )
 }

@@ -55,7 +55,16 @@ export function LlmRecordPromptsSection() {
 
   return (
     <section id="llm-record" className={styles.section}>
-      <h2 className={styles.sectionTitle}>工作记录</h2>
+      <h2 className={styles.sectionTitle}>
+        工作记录
+        <a
+          href="https://promptpilot.volcengine.com/"
+          target="_blank"
+          rel="noreferrer"
+          className={styles.promptPilotLink}
+          title="在 PromptPilot 中调试和优化提示词"
+        >promptpilot</a>
+      </h2>
       <p className={styles.sectionHint}>润色采用对话式引导：LLM 先分析不足、询问方向，再给出建议版本。留空则使用默认值。</p>
       {isLoading ? (
         <p className={styles.sectionHint}>载入中...</p>
