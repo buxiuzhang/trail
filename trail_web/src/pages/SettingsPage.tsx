@@ -9,6 +9,7 @@ import { VectorSection } from '@/components/settings/VectorSection'
 import { LlmRecordPromptsSection } from '@/components/settings/LlmRecordPromptsSection'
 import { LlmDialogPromptsSection } from '@/components/settings/LlmDialogPromptsSection'
 import { LlmDisabledPromptsSection } from '@/components/settings/LlmDisabledPromptsSection'
+import { ReportTemplatesSection } from '@/components/settings/ReportTemplatesSection'
 import { DataDirSection } from '@/components/settings/DataDirSection'
 import { GeneralSection } from '@/components/settings/GeneralSection'
 import { WatchSection } from '@/components/settings/WatchSection'
@@ -47,6 +48,10 @@ export function SettingsPage() {
           <VectorSection />
           <LlmRecordPromptsSection />
           <LlmDialogPromptsSection />
+          <section id="llm-report-templates" className={styles.section}>
+            <h2 className={styles.sectionTitle}>导出模板</h2>
+            <ReportTemplatesSection />
+          </section>
           <section id="llm-mcp" className={styles.section}>
             <h2 className={styles.sectionTitle}>MCP 工具服务</h2>
             <McpSection />

@@ -194,6 +194,27 @@ CREATE TABLE IF NOT EXISTS skills (
 CREATE INDEX IF NOT EXISTS idx_mcp_servers_enabled ON mcp_servers(enabled);
 CREATE INDEX IF NOT EXISTS idx_skills_enabled_order ON skills(enabled, sort_order);
 
+-- 导出模板（用户自定义周报/月报/年报等）
+CREATE TABLE IF NOT EXISTS report_templates (
+    id          TEXT    PRIMARY KEY,
+    name        TEXT    NOT NULL,
+    description TEXT,
+    template    TEXT    NOT NULL,           -- Markdown 模板正文
+    enabled     INTEGER NOT NULL DEFAULT 1,
+    sort_order  INTEGER NOT NULL DEFAULT 0,
+    created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_report_templates_enabled ON report_templates(enabled, sort_order);
+
+-- 补充复合索引：覆盖高频查询模式
+-- listLogs/countLogs/latestLogDate 均以 task_id + is_deleted 过滤，再按 log_date 排序
+CREATE INDEX IF NOT EXISTS idx_work_logs_task_deleted_date ON work_logs(task_id, is_deleted, log_date DESC);
+-- getRefs/replaceRefs 均以四列精确过滤
+CREATE INDEX IF NOT EXISTS idx_entity_refs_src_full ON entity_refs(src_type, src_id, src_field, ref_type);
+-- listWatched 以 watched_at IS NOT NULL 过滤并按 watched_at DESC 排序
+CREATE INDEX IF NOT EXISTS idx_tasks_watched ON tasks(watched_at);
+
 -- 和风天气城市与 POI 列表（从 CSV 导入，启动时幂等初始化）
 CREATE TABLE IF NOT EXISTS qw_cities (
     location_id  TEXT PRIMARY KEY,

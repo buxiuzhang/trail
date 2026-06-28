@@ -29,9 +29,6 @@ export interface LLMSettings {
   // 推送消息模板
   watch_alert_template: string
   todo_alert_template: string
-  // 日报/周报模板
-  daily_report_template: string
-  weekly_report_template: string
   // AI 标注提示词
   batch_tag_system_prompt: string
   // 语音输入时长（秒）

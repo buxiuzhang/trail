@@ -348,10 +348,10 @@ export function SkillsSection() {
           </div>
 
           <div className={styles.formActions}>
+            <button type="button" className={styles.btn} onClick={closeForm}>取消</button>
             <button type="submit" className={`${styles.btn} ${styles.btnPrimary}`} disabled={createSkill.isPending || updateSkill.isPending}>
               {editingId ? '保存修改' : '添加'}
             </button>
-            <button type="button" className={styles.btn} onClick={closeForm}>取消</button>
           </div>
         </form>
       )}

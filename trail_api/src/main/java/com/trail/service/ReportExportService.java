@@ -1,7 +1,7 @@
 package com.trail.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.trail.store.LLMSettingsStore;
+import com.trail.store.ReportTemplateStore;
 import com.trail.store.WorkLogStore;
 import org.springframework.stereotype.Service;
 
@@ -12,18 +12,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-/**
- * 日报/周报导出服务
- * 根据模板和日志数据生成 Markdown 内容
- *
- * 默认模板在 application.yml 的 trail.defaults 配置，
- * 启动时由 DefaultSettingsInitializer 初始化到数据库。
- */
 @Service
 public class ReportExportService {
 
     private final WorkLogStore workLogStore;
-    private final LLMSettingsStore llmSettingsStore;
+    private final ReportTemplateStore reportTemplateStore;
     private final LlmService llmService;
     private final ObjectMapper mapper;
 
@@ -31,35 +24,40 @@ public class ReportExportService {
 
     public ReportExportService(
         WorkLogStore workLogStore,
-        LLMSettingsStore llmSettingsStore,
+        ReportTemplateStore reportTemplateStore,
         LlmService llmService,
         ObjectMapper mapper
     ) {
         this.workLogStore = workLogStore;
-        this.llmSettingsStore = llmSettingsStore;
+        this.reportTemplateStore = reportTemplateStore;
         this.llmService = llmService;
         this.mapper = mapper;
     }
 
     /**
-     * 导出今日日报
+     * 用自定义模板导出报表
      */
-    public String exportDaily(LocalDate date) {
-        // 1. 查询当日日志
-        List<Map<String, Object>> logs = workLogStore.getByDate(date);
-
-        // 2. 获取模板（从数据库读取）
-        String template = llmSettingsStore.get("daily_report_template");
+    public String exportCustom(String templateId, LocalDate start, LocalDate end) {
+        Map<String, Object> tpl = reportTemplateStore.findById(templateId);
+        String templateName = (String) tpl.get("name");
+        String template = (String) tpl.get("template");
         if (template == null || template.isBlank()) {
-            template = "";
+            throw new com.trail.store.exception.StoreError(
+                "模板「" + templateName + "」内容为空，请先在「设置 → 大模型 → 导出模板」中填写模板格式后再导出。");
         }
 
-        // 3. 构建数据 JSON
+        List<Map<String, Object>> logs = start.equals(end)
+            ? workLogStore.getByDate(start)
+            : workLogStore.getByDateRange(start, end);
+
         String logsJson = buildLogsJson(logs);
 
-        // 4. 调用 LLM 生成内容
+        String timeRange = start.equals(end)
+            ? start.format(DATE_CN_FORMAT)
+            : start.format(DATE_CN_FORMAT) + " 至 " + end.format(DATE_CN_FORMAT);
+
         String prompt = """
-            根据以下模板格式和工作日志数据，生成日报 Markdown 内容。
+            根据以下模板格式和工作日志数据，生成「%s」的 Markdown 内容。
 
             模板格式：
             %s
@@ -67,63 +65,20 @@ public class ReportExportService {
             工作日志数据（JSON）：
             %s
 
-            日期：%s（%s）
-
-            要求：
-            1. 严格遵循模板的结构和格式
-            2. 用实际日志数据填充内容，不要编造
-            3. 如果某天没有日志，如实说明"无工作记录"
-            4. 保持专业、简洁的文风
-            5. 只输出最终的 Markdown 内容，不要解释或包裹
-            """.formatted(template, logsJson, date, date.format(DATE_CN_FORMAT));
-
-        return llmService.chat(prompt);
-    }
-
-    /**
-     * 导出本周周报
-     */
-    public String exportWeekly(LocalDate start, LocalDate end) {
-        // 1. 查询日期范围内日志
-        List<Map<String, Object>> logs = workLogStore.getByDateRange(start, end);
-
-        // 2. 获取模板（从数据库读取）
-        String template = llmSettingsStore.get("weekly_report_template");
-        if (template == null || template.isBlank()) {
-            template = "";
-        }
-
-        // 3. 构建数据 JSON
-        String logsJson = buildLogsJson(logs);
-
-        // 4. 调用 LLM 生成内容
-        String prompt = """
-            根据以下模板格式和工作日志数据，生成周报 Markdown 内容。
-
-            模板格式：
-            %s
-
-            工作日志数据（JSON）：
-            %s
-
-            时间范围：%s 至 %s
+            时间范围：%s
 
             要求：
             1. 严格遵循模板的结构和格式
             2. 用实际日志数据填充内容，不要编造
             3. 按日期或任务合理组织内容
-            4. 如果某天没有日志，如实说明
+            4. 如果没有日志，如实说明
             5. 保持专业、简洁的文风
             6. 只输出最终的 Markdown 内容，不要解释或包裹
-            """.formatted(template, logsJson,
-                start.format(DATE_CN_FORMAT), end.format(DATE_CN_FORMAT));
+            """.formatted(templateName, template, logsJson, timeRange);
 
         return llmService.chat(prompt);
     }
 
-    /**
-     * 构建日志数据的 JSON 字符串
-     */
     private String buildLogsJson(List<Map<String, Object>> logs) {
         try {
             List<Map<String, Object>> enriched = workLogStore.enrichLogs(logs);

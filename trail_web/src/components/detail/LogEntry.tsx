@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useVisible } from '@/hooks/useVisible'
 import type { TaskOut, LogOut, TodoOut } from '@/types'
 import { isSealed } from '@/constants'
 import { LogCompose } from './LogCompose'
@@ -33,6 +34,7 @@ export function LogEntry({ task, log, todos, tasks = [], isEditing, onEdit, onDe
   const { enqueueDownload } = useDownloadQueue()
   const updateLog = useUpdateLog(task.id)
   const deleteAttachment = useDeleteAttachment()
+  const [visibleRef, visible] = useVisible()
   const [ctxMenu, setCtxMenu] = useState<{
     x: number; y: number
     att: { name: string; url: string; id: number; mime: string }
@@ -80,7 +82,7 @@ export function LogEntry({ task, log, todos, tasks = [], isEditing, onEdit, onDe
     : null
 
   return (
-    <div id={`log-${log.id}`} className={`${styles.entry} ${isMt ? styles.entryMt : ''}`}>
+    <div id={`log-${log.id}`} ref={visibleRef} className={`${styles.entry} ${isMt ? styles.entryMt : ''}`}>
       <div className={styles.date}>
         <span className={styles.dateDay}>{log.log_date.slice(8, 10)}</span>
         <span>{log.log_date.slice(5, 7)}/{log.log_date.slice(2, 4)}</span>
@@ -94,13 +96,17 @@ export function LogEntry({ task, log, todos, tasks = [], isEditing, onEdit, onDe
           {editedTag}
           {log.hours && <span className={styles.hours}>{log.hours}h</span>}
         </div>
-        <ContentViewer
-          text={log.content}
-          maxHeight={240}
-          previewClassName={styles.content}
-          todos={todos}
-          tasks={tasks}
-        />
+        {visible ? (
+          <ContentViewer
+            text={log.content}
+            maxHeight={240}
+            previewClassName={styles.content}
+            todos={todos}
+            tasks={tasks}
+          />
+        ) : (
+          <div className={styles.content} style={{ minHeight: '1.5em' }} />
+        )}
         {/* 附件区 */}
         {attIds.length > 0 && (
           <div className={styles.attachments}>
@@ -259,7 +265,7 @@ export function LogEntry({ task, log, todos, tasks = [], isEditing, onEdit, onDe
             })}
           </div>
         )}
-        {log.polished_content && (
+        {log.polished_content && visible && (
           <div className={styles.polish}>
             <span className={styles.polishLabel}>润色后</span>
             <ContentViewer

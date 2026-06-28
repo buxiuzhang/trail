@@ -10,6 +10,7 @@ import { useConfirm } from '@/utils/confirm'
 import { useModalContext } from '@/context/ModalContext'
 import { useWorkbench } from '@/context/WorkbenchContext'
 import { useDownloadQueue } from '@/context/DownloadQueueContext'
+import { useReportTemplates } from '@/api/reportTemplates'
 import { LogCompose } from '@/components/detail/LogCompose'
 import { BatchLogPanel } from '@/components/detail/BatchLogPanel'
 import { TaskSelectorRow } from '@/components/shared/TaskSelectorRow'
@@ -192,13 +193,6 @@ function LogRow({ log, idx, onEdit }: { log: LogByDateItem; idx: number; onEdit:
 }
 
 // ── 导出弹窗内容 ──────────────────────────────────────────────────
-const FORMATS = [
-  { value: 'markdown', label: 'Markdown', available: true },
-  { value: 'excel',    label: 'Excel',    available: false },
-  { value: 'word',     label: 'Word',     available: false },
-  { value: 'pdf',      label: 'PDF',      available: false },
-]
-
 const PRESETS = [
   { label: '今天', getRange: () => ({ start: TODAY, end: TODAY }) },
   {
@@ -223,16 +217,18 @@ const PRESETS = [
 function ExportModalBody({ defaultDate, onClose, enqueueDownload }: { defaultDate: string; onClose: () => void; enqueueDownload: (url: string, fileName?: string) => void }) {
   const [startDate, setStartDate] = useState(defaultDate)
   const [endDate, setEndDate] = useState(defaultDate)
-  const [format, setFormat] = useState('markdown')
+  const { data: templates = [] } = useReportTemplates()
+  const enabledTemplates = templates.filter(t => t.enabled)
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>(() => enabledTemplates[0]?.id ?? '')
+
+  // Sync selection when templates load
+  const firstId = enabledTemplates[0]?.id ?? ''
+  if (selectedTemplateId === '' && firstId) setSelectedTemplateId(firstId)
 
   function handleExport() {
+    if (!selectedTemplateId) return
     const apiBase = window.location.protocol === 'file:' ? 'http://localhost:8765' : ''
-    let url: string
-    if (startDate === endDate) {
-      url = `${apiBase}/api/reports/daily?date=${startDate}`
-    } else {
-      url = `${apiBase}/api/reports/weekly?start=${startDate}&end=${endDate}`
-    }
+    const url = `${apiBase}/api/settings/report-templates/${selectedTemplateId}/export?start=${startDate}&end=${endDate}`
     enqueueDownload(url)
     onClose()
   }
@@ -260,30 +256,34 @@ function ExportModalBody({ defaultDate, onClose, enqueueDownload }: { defaultDat
         </div>
       </div>
 
-      {/* 导出格式 */}
+      {/* 模板选择 */}
       <div>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-ghost)', marginBottom: 10 }}>导出格式</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-          {FORMATS.map(f => (
-            <label key={f.value}
-              style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: f.available ? 'pointer' : 'not-allowed', opacity: f.available ? 1 : 0.4 }}>
-              <input type="radio" name="format" value={f.value}
-                checked={format === f.value}
-                disabled={!f.available}
-                onChange={() => f.available && setFormat(f.value)}
-              />
-              <span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--ink-soft)' }}>
-                {f.label}{!f.available && <span style={{ fontSize: 10, color: 'var(--ink-ghost)', marginLeft: 4 }}>开发中</span>}
-              </span>
-            </label>
-          ))}
-        </div>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-ghost)', marginBottom: 10 }}>模板</div>
+        {enabledTemplates.length === 0 ? (
+          <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--ink-ghost)', fontStyle: 'italic' }}>
+            暂无可用模板，请先在「设置 → 大模型 → 导出模板」中添加
+          </span>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {enabledTemplates.map(tpl => (
+              <label key={tpl.id} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input type="radio" name="tpl" value={tpl.id}
+                  checked={selectedTemplateId === tpl.id}
+                  onChange={() => setSelectedTemplateId(tpl.id)} />
+                <span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--ink-soft)' }}>
+                  {tpl.name}
+                  {tpl.description && <span style={{ marginLeft: 6, fontSize: 11, color: 'var(--ink-ghost)' }}>{tpl.description}</span>}
+                </span>
+              </label>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* 操作按钮 */}
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
         <button type="button" className="btn btn--ghost" onClick={onClose}>取消</button>
-        <button type="button" className="btn btn--primary" onClick={handleExport}>导出</button>
+        <button type="button" className="btn btn--primary" onClick={handleExport} disabled={!selectedTemplateId}>导出</button>
       </div>
     </div>
   )

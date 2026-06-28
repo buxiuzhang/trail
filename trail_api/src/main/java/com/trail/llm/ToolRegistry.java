@@ -27,8 +27,8 @@ public class ToolRegistry {
             getApiDocs(),
             getLogsByDate(),
             callApi(),
-            exportDailyReport(),
-            exportWeeklyReport(),
+            listReportTemplates(),
+            exportReport(),
             vectorSearch(),
             getSkillDetail()
         );
@@ -149,26 +149,13 @@ public class ToolRegistry {
     }
 
     /**
-     * 导出今日日报
+     * 导出报表（使用用户配置的导出模板）
      */
-    private Tool exportDailyReport() {
+    private Tool exportReport() {
         ObjectNode props = mapper.createObjectNode();
-        props.set("date", mapper.createObjectNode()
+        props.set("template_id", mapper.createObjectNode()
             .put("type", "string")
-            .put("description", "日期，格式 YYYY-MM-DD，默认今天"));
-
-        return new Tool(
-            "export_daily_report",
-            "导出今日工作日报，返回下载链接。",
-            new Tool.InputSchema("object", props, null)
-        );
-    }
-
-    /**
-     * 导出本周周报
-     */
-    private Tool exportWeeklyReport() {
-        ObjectNode props = mapper.createObjectNode();
+            .put("description", "导出模板 ID，从 list_report_templates 获取，必填"));
         props.set("start_date", mapper.createObjectNode()
             .put("type", "string")
             .put("description", "起始日期，格式 YYYY-MM-DD，默认本周一"));
@@ -177,9 +164,20 @@ public class ToolRegistry {
             .put("description", "结束日期，格式 YYYY-MM-DD，默认今天"));
 
         return new Tool(
-            "export_weekly_report",
-            "导出本周工作周报，返回下载链接。",
-            new Tool.InputSchema("object", props, null)
+            "export_report",
+            "用指定模板导出工作报表（周报/月报/年报等），返回下载链接。调用前先用 list_report_templates 查询可用模板及其 ID。",
+            new Tool.InputSchema("object", props, List.of("template_id"))
+        );
+    }
+
+    /**
+     * 列出所有启用的导出模板
+     */
+    private Tool listReportTemplates() {
+        return new Tool(
+            "list_report_templates",
+            "列出所有启用的导出模板（名称、ID、描述），导出前调用此工具确认模板 ID。",
+            new Tool.InputSchema("object", mapper.createObjectNode(), null)
         );
     }
 

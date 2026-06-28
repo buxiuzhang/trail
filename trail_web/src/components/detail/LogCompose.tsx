@@ -135,8 +135,8 @@ export function LogCompose({ task, todos, tasks = [], editing, onSave, onCancel,
       setSelectedTodoIds([])
       setSelectedTaskIds([])
       if (!isEdit) setLogDate(TODAY)
-    } catch {
-      // error toasted by parent
+    } catch (err: unknown) {
+      showToast('保存失败：' + (err instanceof Error ? err.message : '未知错误'))
     } finally {
       setSubmitting(false)
     }

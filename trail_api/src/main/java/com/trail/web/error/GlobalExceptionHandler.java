@@ -83,12 +83,16 @@ public class GlobalExceptionHandler {
         if (msg.contains("database is locked") || msg.contains("SQLITE_BUSY")) {
             return of(HttpStatus.SERVICE_UNAVAILABLE, "数据库被其他进程占用（持写锁）。请断开连接后重试。");
         }
-        return of(HttpStatus.INTERNAL_SERVER_ERROR, "内部错误：SQLException: " + msg);
+        org.slf4j.LoggerFactory.getLogger(GlobalExceptionHandler.class)
+                .error("SQLException: {}", msg, e);
+        return of(HttpStatus.INTERNAL_SERVER_ERROR, "数据库操作失败，请稍后重试。");
     }
 
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<Map<String, Object>> illegalState(IllegalStateException e) {
-        return of(HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage());
+        org.slf4j.LoggerFactory.getLogger(GlobalExceptionHandler.class)
+                .error("IllegalStateException: {}", e.getMessage(), e);
+        return of(HttpStatus.INTERNAL_SERVER_ERROR, "服务内部状态异常，请稍后重试。");
     }
 
     /**
@@ -132,6 +136,6 @@ public class GlobalExceptionHandler {
         org.slf4j.LoggerFactory.getLogger(GlobalExceptionHandler.class)
                 .error("未处理异常: {}", e.getClass().getName(), e);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("detail", "内部错误：" + e.getClass().getSimpleName() + ": " + e.getMessage()));
+                .body(Map.of("detail", "服务内部错误，请稍后重试。"));
     }
 }

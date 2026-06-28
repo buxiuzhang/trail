@@ -22,9 +22,6 @@ public record LlmSettingsDto(
         String summarizeSystemPrompt,
         String summarizeMaintenancePrompt,
         String askMaintenancePrompt,
-        // 日报/周报模板
-        String dailyReportTemplate,
-        String weeklyReportTemplate,
         // AI 标注提示词
         String batchTagSystemPrompt,
         // 语音输入时长（秒）

@@ -3,6 +3,7 @@ package com.trail.llm;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.trail.db.SqliteDb;
 import com.trail.service.EmbeddingService;
+import com.trail.store.ReportTemplateStore;
 import com.trail.store.SkillStore;
 import com.trail.store.VectorStore;
 import com.trail.store.WorkLogStore;
@@ -42,11 +43,12 @@ public class ApiToolExecutor {
     private final EmbeddingService embeddingService;
     private final VectorStore vectorStore;
     private final SkillStore skillStore;
+    private final ReportTemplateStore reportTemplateStore;
 
     public ApiToolExecutor(OpenApiService openApiService, SqliteDb db, ObjectMapper mapper,
                            WorkLogStore workLogStore, McpClientManager mcpClientManager,
                            EmbeddingService embeddingService, VectorStore vectorStore,
-                           SkillStore skillStore) {
+                           SkillStore skillStore, ReportTemplateStore reportTemplateStore) {
         this.openApiService = openApiService;
         this.db = db;
         this.mapper = mapper;
@@ -56,6 +58,7 @@ public class ApiToolExecutor {
         this.embeddingService = embeddingService;
         this.vectorStore = vectorStore;
         this.skillStore = skillStore;
+        this.reportTemplateStore = reportTemplateStore;
     }
 
     /**
@@ -69,8 +72,8 @@ public class ApiToolExecutor {
                 case "get_api_docs" -> executeGetApiDocs(input);
                 case "get_logs_by_date" -> executeGetLogsByDate(input);
                 case "call_api" -> executeCallApi(input);
-                case "export_daily_report" -> executeExportDailyReport(input);
-                case "export_weekly_report" -> executeExportWeeklyReport(input);
+                case "list_report_templates" -> executeListReportTemplates();
+                case "export_report" -> executeExportReport(input);
                 case "vector_search" -> executeVectorSearch(input);
                 case "get_skill_detail" -> executeGetSkillDetail(input);
                 default -> {
@@ -404,72 +407,60 @@ public class ApiToolExecutor {
     }
 
     // ============================================================
-    // 日报/周报导出工具
+    // 列出导出模板
     // ============================================================
 
-    /**
-     * 导出今日日报
-     * 返回下载链接，用户点击后触发下载
-     */
-    private Map<String, Object> executeExportDailyReport(Map<String, Object> input) {
-        // 检查是否配置了模板
-        List<Map<String, Object>> settingsRows = db.query(
-            "SELECT value FROM llm_settings WHERE key = 'daily_report_template'");
-        if (settingsRows.isEmpty() || settingsRows.get(0).get("value") == null) {
-            return Map.of("error", "请先在系统设置中配置「今日工作模板」");
-        }
-
-        // 解析日期参数
-        String dateStr = (String) input.get("date");
-        LocalDate date;
-        if (dateStr == null || dateStr.isBlank()) {
-            date = LocalDate.now();
-        } else {
-            date = LocalDate.parse(dateStr);
-        }
-
-        String url = "/api/reports/daily?date=" + date;
-        return Map.of(
-            "message", "日报已生成，下载链接：[日报_" + date + ".md](" + url + ")"
-        );
+    private List<Map<String, Object>> executeListReportTemplates() {
+        return reportTemplateStore.findAllEnabled().stream()
+            .map(t -> {
+                Map<String, Object> m = new java.util.LinkedHashMap<>();
+                m.put("id", t.get("id"));
+                m.put("name", t.get("name"));
+                m.put("description", t.get("description"));
+                return m;
+            })
+            .toList();
     }
 
-    /**
-     * 导出本周周报
-     * 返回下载链接，用户点击后触发下载
-     */
-    private Map<String, Object> executeExportWeeklyReport(Map<String, Object> input) {
-        // 检查是否配置了模板
-        List<Map<String, Object>> settingsRows = db.query(
-            "SELECT value FROM llm_settings WHERE key = 'weekly_report_template'");
-        if (settingsRows.isEmpty() || settingsRows.get(0).get("value") == null) {
-            return Map.of("error", "请先在系统设置中配置「本周工作模板」");
+    // ============================================================
+    // 导出报表
+    // ============================================================
+
+    private Map<String, Object> executeExportReport(Map<String, Object> input) {
+        String templateId = (String) input.get("template_id");
+        if (templateId == null || templateId.isBlank()) {
+            return Map.of("error", "template_id 必填，请先调用 list_report_templates 查询可用模板");
         }
 
-        // 解析日期参数
+        // 验证模板存在
+        Map<String, Object> tpl;
+        try {
+            tpl = reportTemplateStore.findById(templateId);
+        } catch (com.trail.store.exception.NotFoundException e) {
+            return Map.of("error", "模板不存在，请先调用 list_report_templates 查询正确的模板 ID");
+        }
+
         String startStr = (String) input.get("start_date");
         String endStr = (String) input.get("end_date");
 
-        LocalDate start;
-        LocalDate end;
+        LocalDate start = (startStr != null && !startStr.isBlank())
+            ? LocalDate.parse(startStr)
+            : LocalDate.now().with(DayOfWeek.MONDAY);
 
-        if (startStr == null || startStr.isBlank()) {
-            start = LocalDate.now().with(DayOfWeek.MONDAY);
-        } else {
-            start = LocalDate.parse(startStr);
-        }
+        LocalDate end = (endStr != null && !endStr.isBlank())
+            ? LocalDate.parse(endStr)
+            : LocalDate.now();
 
-        if (endStr == null || endStr.isBlank()) {
-            end = LocalDate.now();
-        } else {
-            end = LocalDate.parse(endStr);
-        }
+        String templateName = (String) tpl.get("name");
+        String url = String.format("/api/settings/report-templates/%s/export?start=%s&end=%s",
+            templateId, start, end);
 
-        String url = String.format("/api/reports/weekly?start=%s&end=%s", start, end);
         return Map.of(
-            "message", "周报已生成，下载链接：[周报_" + start + "_" + end + ".md](" + url + ")"
+            "message", String.format("「%s」已生成，点击下载：[%s_%s_%s.md](%s)",
+                templateName, templateName, start, end, url)
         );
     }
+
 
     // ============================================================
     // vector_search 执行

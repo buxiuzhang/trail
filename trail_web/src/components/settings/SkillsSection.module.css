@@ -390,6 +390,7 @@
 .formActions {
   display: flex;
   gap: var(--space-sm);
+  justify-content: flex-end;
   margin-top: var(--space-sm);
 }
 

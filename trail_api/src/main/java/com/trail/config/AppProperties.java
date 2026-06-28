@@ -63,8 +63,6 @@ public record AppProperties(
             String summarizeMaintenancePrompt,
             String askMaintenancePrompt,
             String chatSystemPrompt,
-            String dailyReportTemplate,
-            String weeklyReportTemplate,
             String batchTagSystemPrompt
     ) {}
 }

@@ -44,8 +44,10 @@ async function request<T>(path: string, opts: FetchOptions = {}, retries = 3): P
         throw new DataDirNotConfiguredError(body.detail);
       }
     }
-    // 503/500 且还有重试次数：等一会儿再试（DuckDB 锁冲突）
-    if ((res.status === 503 || res.status === 500) && attempt < retries) {
+    // 503/500 且还有重试次数：等一会儿再试（SQLite 锁冲突）
+    // 只对 GET 重试，POST/PUT/DELETE 不重试，避免非幂等操作重复执行
+    const isSafeMethod = !rest.method || rest.method === 'GET'
+    if (isSafeMethod && (res.status === 503 || res.status === 500) && attempt < retries) {
       await new Promise(r => setTimeout(r, 200 * (attempt + 1)));
       continue;
     }

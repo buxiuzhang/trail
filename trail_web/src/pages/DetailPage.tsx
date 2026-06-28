@@ -47,23 +47,21 @@ export function DetailPage() {
 
   const revealLogId = hash?.startsWith('#log-') ? Number(hash.slice(5)) || undefined : undefined
 
-  if (isLoading) return <EmptyState glyph="⋯" title="调阅中..." subtitle="正在调取档案" />
-  if (error || !task) return <EmptyState glyph="!" title="档案不存在" subtitle={(error as Error)?.message || '该任务可能已被删除'} />
-
-  // task is guaranteed non-null past this point
-  const activeLogs = logsData?.pages.flatMap(p => p.items) ?? []
-  const lastLogDate = activeLogs.length > 0 ? activeLogs[0].log_date : null
-  const catalog = catalogOf(task.id, task.created_at)
-
-  // eslint-disable-next-line react-hooks/rules-of-hooks
   const modals = useTaskModals({
-    task,
+    task: task!,
     todos,
     mutations: { updateTask, changeStatus, cancelTask, createLog, deleteLog, createTodo, updateTodo, completeTodo, abandonTodo, deleteTodo },
     openModal,
     closeModal,
     showToast,
   })
+
+  if (isLoading) return <EmptyState glyph="⋯" title="调阅中..." subtitle="正在调取档案" />
+  if (error || !task) return <EmptyState glyph="!" title="档案不存在" subtitle={(error as Error)?.message || '该任务可能已被删除'} />
+
+  const activeLogs = logsData?.pages.flatMap(p => p.items) ?? []
+  const lastLogDate = activeLogs.length > 0 ? activeLogs[0].log_date : null
+  const catalog = catalogOf(task.id, task.created_at)
 
   async function handleSaveNew(data: { log_date: string; content: string; phase: string; hours: number; todo_ids: number[]; task_ids: number[] }) {
     await createLog.mutateAsync(data)

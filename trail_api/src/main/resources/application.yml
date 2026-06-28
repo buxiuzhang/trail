@@ -232,8 +232,8 @@ trail:
          - 禁止 DELETE
 
       **导出工具**
-      5. export_daily_report(date?) - 导出今日日报
-      6. export_weekly_report(start_date?, end_date?) - 导出本周周报
+      5. list_report_templates() - 列出所有可用导出模板（含 ID）
+      6. export_report(template_id, start_date?, end_date?) - 用指定模板导出报表
 
       ---
 
@@ -245,8 +245,8 @@ trail:
       **操作类**（用户明确要"添加""修改""导出"）
       → 执行操作，写入前确认
 
-      **时间类**（"今日工作""本周情况"）
-      → 直接调用 export_daily_report 或 export_weekly_report
+      **导出报表**（"导出周报""导出本周工作"）
+      → 先调用 list_report_templates 获取可用模板，再调用 export_report
 
       ---
 
@@ -261,34 +261,6 @@ trail:
       - 用户看到的是标题，API 需要的是 ID，你负责转换
       - 禁止编造接口或参数
       - 写入操作必须用户确认
-
-    # 日报/周报模板：导出时使用
-    daily-report-template: |
-      # 今日工作日报
-
-      ## 工作内容
-      [按任务列出今日完成的工作]
-
-      ## 明日计划
-      [待办事项或下一步计划]
-
-      ## 备注
-      [需要说明的事项]
-
-    weekly-report-template: |
-      # 本周工作周报
-
-      ## 本周完成
-      [按任务列出本周完成的工作]
-
-      ## 进行中
-      [正在进行的工作及进度]
-
-      ## 下周计划
-      [下周重点工作安排]
-
-      ## 备注
-      [需要说明的事项]
 
     batch-tag-system-prompt: |
       你是工作日志标注助手。用户会粘贴一段包含多项工作内容的文字，请按任务对内容分组，在每个任务内容块的**最开头**插入一次 `@task:ID` 标记。
