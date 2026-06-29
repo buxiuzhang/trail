@@ -8,7 +8,7 @@ export interface FilterState {
   month: string    // "all" | "YYYY-MM"
 }
 
-const DEFAULT_FILTER: FilterState = { status: 'all', nature: 'all', tag: 'all', month: 'all' }
+const DEFAULT_FILTER: FilterState = { status: '进行中', nature: 'all', tag: 'all', month: 'all' }
 
 interface FilterContextValue {
   filter: FilterState
