@@ -88,6 +88,7 @@ public class LlmService {
     private volatile String cachedAskMaintenancePrompt;
     private volatile String cachedChatPrompt;
     private volatile String cachedBatchTagPrompt;
+    private volatile String cachedPromptOptimizePrompt;
 
     public LlmService(AppProperties props, LLMSettingsStore settingsStore, TaskStore taskStore,
                       TodoStore todoStore, WorkLogStore workLogStore, AiRecordStore aiRecordStore,
@@ -119,6 +120,7 @@ public class LlmService {
         cachedAskMaintenancePrompt = settings.get("ask_maintenance_prompt");
         cachedChatPrompt = settings.get("chat_system_prompt");
         cachedBatchTagPrompt = settings.get("batch_tag_system_prompt");
+        cachedPromptOptimizePrompt = settings.get("prompt_optimize_system_prompt");
         log.info("Prompt 模板已加载到内存");
     }
 
@@ -378,15 +380,80 @@ public class LlmService {
                     baseSystem = cachedPolishTodoPrompt;
                 } else if ("task_desc".equals(type)) {
                     baseSystem = cachedPolishTaskDescPrompt;
+                } else if ("prompt_optimize".equals(type)) {
+                    baseSystem = cachedPromptOptimizePrompt;
                 } else {
                     baseSystem = cachedPolishPrompt;
                 }
                 if (baseSystem == null || baseSystem.isBlank()) {
                     baseSystem = switch (type) {
-                        case "todo"      -> "你是待办说明润色助手。";
-                        case "task_desc" -> "你是任务描述润色助手。";
-                        default          -> "你是工作日报润色助手。";
+                        case "todo"             -> "你是待办说明润色助手。";
+                        case "task_desc"        -> "你是任务描述润色助手。";
+                        case "prompt_optimize"  -> "你是提示词优化顾问。";
+                        default                 -> "你是工作日报润色助手。";
                     };
+                }
+
+                // prompt_optimize 模式：上下文由前端拼好，跳过任务/RAG/待办注入
+                if ("prompt_optimize".equals(type)) {
+                    List<Map<String, Object>> apiMsgs = messages.stream()
+                        .map(m -> {
+                            Map<String, Object> msg = new java.util.LinkedHashMap<>();
+                            msg.put("role", m.get("role"));
+                            msg.put("content", List.of(Map.of("type", "text", "text", m.get("content"))));
+                            return msg;
+                        })
+                        .toList();
+                    HttpClient optClient = HttpClient.newHttpClient();
+                    var optBody = new java.util.LinkedHashMap<String, Object>();
+                    optBody.put("model", cfg.model());
+                    optBody.put("max_tokens", cfg.maxTokens());
+                    if (cfg.minTokens() > 0) optBody.put("min_tokens", cfg.minTokens());
+                    optBody.put("system", baseSystem);
+                    optBody.put("stream", true);
+                    optBody.put("messages", apiMsgs);
+                    HttpRequest.Builder optReq = HttpRequest.newBuilder()
+                        .uri(URI.create(cfg.baseUrl() + "/v1/messages"))
+                        .header("Content-Type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(optBody)));
+                    if ("x-api-key".equals(cfg.authType())) {
+                        optReq.header("x-api-key", cfg.apiKey()).header("anthropic-version", ANTHROPIC_VERSION);
+                    } else {
+                        optReq.header("Authorization", "Bearer " + cfg.apiKey()).header("anthropic-version", ANTHROPIC_VERSION);
+                    }
+                    HttpResponse<java.io.InputStream> optResp = optClient.send(optReq.build(), HttpResponse.BodyHandlers.ofInputStream());
+                    if (optResp.statusCode() >= 400) {
+                        emitter.send(SseEmitter.event().data("{\"error\":\"LLM 服务异常\"}\n\n"));
+                        emitter.complete();
+                        return;
+                    }
+                    StringBuilder optFull = new StringBuilder();
+                    try (BufferedReader optReader = new BufferedReader(new InputStreamReader(optResp.body()))) {
+                        String optLine;
+                        while ((optLine = optReader.readLine()) != null) {
+                            if (optLine.startsWith("data: ")) {
+                                String data = optLine.substring(6);
+                                if ("[DONE]".equals(data)) break;
+                                JsonNode event = mapper.readTree(data);
+                                String eventType = event.has("type") ? event.get("type").asText() : "";
+                                if ("content_block_delta".equals(eventType)) {
+                                    JsonNode delta = event.path("delta");
+                                    if ("text_delta".equals(delta.path("type").asText())) {
+                                        String text = delta.path("text").asText();
+                                        optFull.append(text);
+                                        emitter.send(SseEmitter.event().data(mapper.writeValueAsString(Map.of("delta", text))));
+                                    }
+                                } else if ("message_stop".equals(eventType)) {
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    emitter.send(SseEmitter.event().data("{\"done\":true}"));
+                    emitter.send(SseEmitter.event().data("[DONE]"));
+                    emitter.complete();
+                    aiRecordStore.addRecord(null, null, "prompt_optimize", "prompt optimize stream", optFull.toString(), false);
+                    return;
                 }
 
                 // 注入任务上下文

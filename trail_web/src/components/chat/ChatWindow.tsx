@@ -59,6 +59,9 @@ export function ChatWindow() {
   const { showToast } = useToastContext()
   const confirm = useConfirm()
   const [input, setInput] = useState('')
+  const [activeTab, setActiveTab] = useState<'polish' | 'optimize'>('polish')
+  const [optimizeMessages, setOptimizeMessages] = useState<Message[]>([])
+  const optimizeLiveRef = useRef<HTMLDivElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -68,7 +71,8 @@ export function ChatWindow() {
 
   // 润色模式：首轮自动发送
   const sentInitial = useRef(false)
-  const isPending = polishConfig ? polishPending : chatPending
+  const isPending = (polishConfig && activeTab === 'optimize') ? polishPending
+    : polishConfig ? polishPending : chatPending
 
   const handleAction = useCallback((action: string) => {
     const parts = action.split(':')
@@ -168,7 +172,11 @@ export function ChatWindow() {
   }, [polishConfig])
 
   // polishConfig 变化时重置
-  useEffect(() => { sentInitial.current = false }, [polishConfig])
+  useEffect(() => {
+    sentInitial.current = false
+    setActiveTab('polish')
+    setOptimizeMessages([])
+  }, [polishConfig])
 
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null)
 
@@ -210,12 +218,79 @@ export function ChatWindow() {
     }
   }
 
+  // ——— 提示词优化发送 ———
+  async function handleSendOptimize(text: string) {
+    if (!polishConfig) return
+    const isFirst = optimizeMessages.length === 0
+
+    // 首条：自动拼入润色提示词 + 润色对话历史作为上下文
+    let userContent = text
+    if (isFirst) {
+      const promptKey = polishConfig.type === 'todo'
+        ? 'polish_todo_system_prompt'
+        : polishConfig.type === 'task_desc'
+          ? 'polish_task_desc_system_prompt'
+          : 'polish_system_prompt'
+      const currentPrompt = (llmSettings as Record<string, string> | undefined)?.[promptKey] ?? ''
+      const historyText = messages
+        .filter(m => m.content.trim())
+        .map(m => {
+          if (m.role === 'assistant') {
+            const { body } = splitAssistantContent(m.content)
+            return `assistant: ${body}`
+          }
+          return `user: ${m.content}`
+        })
+        .join('\n\n')
+      userContent = `【当前润色提示词】\n${currentPrompt}\n\n【润色对话记录】\n${historyText}\n\n【用户反馈】\n${text}`
+    }
+
+    const newUserMsg: Message = { id: crypto.randomUUID(), role: 'user', content: text, timestamp: Date.now() }
+    const newAssistantMsg: Message = { id: crypto.randomUUID(), role: 'assistant', content: '', timestamp: Date.now() }
+    setOptimizeMessages(prev => [...prev, newUserMsg, newAssistantMsg])
+    setIsLoading(true)
+
+    const historyMsgs = optimizeMessages
+      .filter(m => m.content.trim())
+      .map(m => ({ role: m.role, content: m.content }))
+    historyMsgs.push({ role: 'user', content: userContent })
+
+    let accum = ''
+    try {
+      await sendPolish(
+        { type: 'prompt_optimize', content: '', messages: historyMsgs },
+        (delta) => {
+          accum += delta
+          if (optimizeLiveRef.current) optimizeLiveRef.current.textContent = accum
+          scrollToBottom()
+        },
+      )
+    } catch (err: unknown) {
+      const msg = (err as Error).name === 'AbortError' ? null : (err as Error).message
+      if (msg) showToast(msg.includes('未配置') ? 'LLM 未配置，请在设置中配置 API Key' : '请求失败：' + msg)
+    } finally {
+      const finalText = optimizeLiveRef.current?.textContent ?? accum
+      if (optimizeLiveRef.current) optimizeLiveRef.current.textContent = ''
+      setOptimizeMessages(prev => {
+        const next = [...prev]
+        next[next.length - 1] = { ...next[next.length - 1], content: finalText }
+        return next
+      })
+      setIsLoading(false)
+    }
+  }
+
   // ——— 普通 Chat 发送 ———
   async function handleSend(e?: FormEvent) {
     e?.preventDefault()
     const text = input.trim()
     if (!text || isPending) return
     setInput('')
+
+    if (polishConfig && activeTab === 'optimize') {
+      await handleSendOptimize(text)
+      return
+    }
 
     if (polishConfig) {
       await handleSendPolish(text)
@@ -259,7 +334,9 @@ export function ChatWindow() {
     }
   }
 
-  const lastMsg = messages[messages.length - 1]
+  const lastMsg = activeTab === 'optimize'
+    ? optimizeMessages[optimizeMessages.length - 1]
+    : messages[messages.length - 1]
   const isStreaming = isPending && lastMsg?.role === 'assistant'
   const showTyping = isStreaming && lastMsg?.content === ''
 
@@ -272,7 +349,26 @@ export function ChatWindow() {
 
       {/* 头部 */}
       <div className={styles.header}>
-        <span className={styles.title}>{headerTitle}</span>
+        {isExpanded && polishConfig ? (
+          <div className={styles.tabBar}>
+            <button
+              type="button"
+              className={`${styles.tab} ${activeTab === 'polish' ? styles.tabActive : ''}`}
+              onClick={() => { abortPolish(); setActiveTab('polish') }}
+            >
+              {POLISH_TYPE_LABEL[polishConfig.type] ?? '润色对话'}
+            </button>
+            <button
+              type="button"
+              className={`${styles.tab} ${activeTab === 'optimize' ? styles.tabActive : ''}`}
+              onClick={() => { abortPolish(); setActiveTab('optimize') }}
+            >
+              优化提示词
+            </button>
+          </div>
+        ) : (
+          <span className={styles.title}>{headerTitle}</span>
+        )}
         <button
           className={styles.expandBtn}
           onClick={isExpanded ? collapseChat : expandChat}
@@ -290,30 +386,56 @@ export function ChatWindow() {
         onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY }) }}
         onClick={() => setCtxMenu(null)}
       >
-        {messages.map((msg, i) => {
-          const isLast = i === messages.length - 1
-          return (
-            <ChatMessageRow
-              key={msg.id}
-              message={msg}
-              modelName={modelName}
-              liveRef={isLast && isStreaming ? liveRef : undefined}
-              isStreaming={isLast && isStreaming}
-              showTyping={isLast && showTyping && !toolStatus}
-              onAction={handleAction}
-              isPolishMode={!!polishConfig}
-              polishTodos={polishConfig?.todos}
-              polishTasks={polishConfig?.tasks}
-              onAdopt={polishConfig && isLast ? (suggestion) => { polishConfig.onAdopt(suggestion); closeChat() } : undefined}
-            />
-          )
-        })}
-        {toolStatus && (
-          <div className={styles.toolStatus}>
-            <span className={styles.toolIcon}>⚙</span>
-            <span className={styles.toolText}>{TOOL_NAMES[toolStatus.name] || toolStatus.name}{toolStatus.executing ? '...' : ' ✓'}</span>
-            {iterationInfo && <span className={styles.iteration}>({iterationInfo.current}/{iterationInfo.max})</span>}
-          </div>
+        {activeTab === 'optimize' ? (
+          <>
+            {optimizeMessages.length === 0 && (
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--ink-ghost)', textAlign: 'center', marginTop: 24 }}>
+                描述你发现的问题，AI 将结合当前提示词和对话记录给出修改建议
+              </div>
+            )}
+            {optimizeMessages.map((msg, i) => {
+              const isLast = i === optimizeMessages.length - 1
+              const isOptStreaming = isPending && isLast && msg.role === 'assistant'
+              return (
+                <ChatMessageRow
+                  key={msg.id}
+                  message={msg}
+                  modelName={modelName}
+                  liveRef={isOptStreaming ? optimizeLiveRef : undefined}
+                  isStreaming={isOptStreaming}
+                  showTyping={isOptStreaming && msg.content === ''}
+                />
+              )
+            })}
+          </>
+        ) : (
+          <>
+            {messages.map((msg, i) => {
+              const isLast = i === messages.length - 1
+              return (
+                <ChatMessageRow
+                  key={msg.id}
+                  message={msg}
+                  modelName={modelName}
+                  liveRef={isLast && isStreaming ? liveRef : undefined}
+                  isStreaming={isLast && isStreaming}
+                  showTyping={isLast && showTyping && !toolStatus}
+                  onAction={handleAction}
+                  isPolishMode={!!polishConfig}
+                  polishTodos={polishConfig?.todos}
+                  polishTasks={polishConfig?.tasks}
+                  onAdopt={polishConfig && isLast ? (suggestion) => { polishConfig.onAdopt(suggestion); closeChat() } : undefined}
+                />
+              )
+            })}
+            {toolStatus && (
+              <div className={styles.toolStatus}>
+                <span className={styles.toolIcon}>⚙</span>
+                <span className={styles.toolText}>{TOOL_NAMES[toolStatus.name] || toolStatus.name}{toolStatus.executing ? '...' : ' ✓'}</span>
+                {iterationInfo && <span className={styles.iteration}>({iterationInfo.current}/{iterationInfo.max})</span>}
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -338,7 +460,11 @@ export function ChatWindow() {
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder={polishConfig ? '回复 AI 的问题，或输入调整要求…' : '询问工作进展…'}
+          placeholder={
+            activeTab === 'optimize'
+              ? '描述发现的问题，例如"建议版本里混入了收尾语"…'
+              : polishConfig ? '回复 AI 的问题，或输入调整要求…' : '询问工作进展…'
+          }
           autoComplete="off"
         />
         {speechSupported && (

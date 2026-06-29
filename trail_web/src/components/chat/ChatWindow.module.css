@@ -76,6 +76,36 @@
   border-bottom: 0.5px solid var(--rule-soft);
 }
 
+/* —— Tab 切换（仅放大模式 + 润色模式显示）—— */
+.tabBar {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex: 1;
+}
+
+.tab {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-ghost);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 2px 0;
+  margin-right: 20px;
+  cursor: pointer;
+  transition: color 150ms ease, border-color 150ms ease;
+  line-height: 1;
+}
+.tab:hover { color: var(--ink-faded); }
+.tabActive {
+  color: var(--ink);
+  border-bottom-color: var(--ink);
+}
+
 .title {
   font-family: var(--mono);
   font-size: 10px;
