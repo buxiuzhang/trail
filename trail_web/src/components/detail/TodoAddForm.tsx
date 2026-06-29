@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { usePlaceholders, DEFAULT_PLACEHOLDERS } from '@/api/settings'
 import { LLM_AVAILABLE } from '@/api/llm'
-import { usePolish } from '@/hooks/usePolish'
+import { useChatContext } from '@/context/ChatContext'
+import { useToastContext } from '@/context/ToastContext'
 import { DescriptionEditorWithMode as DescriptionEditor, type EditorMode } from '@/components/shared/DescriptionEditorWithMode'
 import { ModeToggleButton } from '@/components/shared/ModeToggleButton'
 import polishIcon from '@/icons/polish.svg'
@@ -15,13 +16,23 @@ interface TodoAddFormProps {
 
 export function TodoAddForm({ onSubmit, onClose, initialTitle = '', initialDescription = '' }: TodoAddFormProps) {
   const { data: placeholders } = usePlaceholders()
-  const polish = usePolish()
+  const { openPolish } = useChatContext()
+  const { showToast } = useToastContext()
   const [title, setTitle] = useState(initialTitle)
   const [description, setDescription] = useState(initialDescription)
   const [submitting, setSubmitting] = useState(false)
   const [hoverClose, setHoverClose] = useState(false)
   const [hoverContinue, setHoverContinue] = useState(false)
   const [editorMode, setEditorMode] = useState<EditorMode>('preview')
+
+  function handlePolish() {
+    const started = openPolish({
+      type: 'todo',
+      initialContent: description,
+      onAdopt: (suggestion) => setDescription(suggestion),
+    })
+    if (!started) showToast('工作对话已开启，请先关闭后再使用润色')
+  }
 
   const interactive = !submitting && title.trim()
 
@@ -61,11 +72,7 @@ export function TodoAddForm({ onSubmit, onClose, initialTitle = '', initialDescr
           <ModeToggleButton mode={editorMode} onModeChange={setEditorMode} style={{ marginLeft: 'auto' }} />
           <button
             type="button"
-            onClick={() => polish({
-                type: 'todo',
-                initialContent: description,
-                onAdopt: (suggestion) => setDescription(suggestion),
-              })}
+            onClick={handlePolish}
             disabled={!LLM_AVAILABLE || !description.trim()}
             title={LLM_AVAILABLE ? 'AI 对话润色' : 'LLM 暂未接入'}
             style={{ background: 'none', border: 'none', padding: '0 0 0 8px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', opacity: LLM_AVAILABLE ? 1 : 0.3 }}

@@ -11,9 +11,12 @@
   box-shadow: var(--shadow-xl);
   max-width: 520px;
   width: calc(100% - 48px);
+  max-height: calc(100dvh - 80px);
   padding: var(--space-xl) var(--space-lg);
   animation: modalIn 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
   position: relative;
+  display: flex;
+  flex-direction: column;
 }
 .modal::before {
   content: "";
@@ -69,6 +72,13 @@
   line-height: 1.65;
   color: var(--ink-soft);
   margin-bottom: 28px;
+  overflow-y: auto;
+  min-height: 0;
+  flex: 1;
+  scrollbar-width: none;
+}
+.bd::-webkit-scrollbar {
+  display: none;
 }
 .bd p { margin-bottom: 12px; }
 .bd p:last-child { margin-bottom: 0; }

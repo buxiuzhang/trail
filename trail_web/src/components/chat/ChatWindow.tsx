@@ -341,7 +341,7 @@ export function ChatWindow() {
           placeholder={polishConfig ? '回复 AI 的问题，或输入调整要求…' : '询问工作进展…'}
           autoComplete="off"
         />
-        {speechSupported && !polishConfig && (
+        {speechSupported && (
           <div className={styles.micWrapper}>
             <button type="button" className={isListening ? styles.micBtnActive : styles.micBtn}
               onClick={(e) => { e.preventDefault(); isListening ? stopSpeech() : startSpeech() }}
