@@ -133,6 +133,7 @@
 /* —— 消息列表 —— */
 .body {
   flex: 1;
+  width: 100%;
   overflow-y: auto;
   overflow-x: hidden;
   padding: 14px 18px;
@@ -140,6 +141,7 @@
   flex-direction: column;
   gap: 12px;
   min-height: 0;
+  box-sizing: border-box;
 }
 
 /* 滚动条完全隐藏 */
@@ -153,18 +155,23 @@
 /* —— 单条消息行 —— */
 .msg {
   display: flex;
-  max-width: 85%;
+  max-width: min(85%, 680px);
+  min-width: 0;
 }
 .msgUser {
   align-self: flex-end;
 }
 .msgAssistant {
   align-self: flex-start;
+  max-width: min(92%, 760px);
 }
 
 .msgBubble {
   position: relative;
   padding: 6px 10px;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .msgUser .msgBubble {
@@ -210,6 +217,31 @@
   color: var(--ink-soft);
   white-space: pre-wrap;
   word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.msgContent code {
+  font-family: var(--mono);
+  font-size: 12px;
+  background: var(--rule-soft);
+  padding: 1px 4px;
+  border-radius: 2px;
+  word-break: break-all;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.msgContent pre {
+  max-width: 100%;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.msgContent pre code {
+  background: none;
+  padding: 0;
 }
 
 /* 消息中的链接 */

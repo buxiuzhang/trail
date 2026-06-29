@@ -13,6 +13,7 @@ import CopyIcon from './copy.svg'
 import CopiedIcon from './copied.svg'
 import CloseCircleIcon from './close-circle.svg'
 import FullscreenIcon from '@/icons/fullscreen.svg'
+import PromptOptIcon from '@/icons/prompt.svg'
 import styles from './ChatWindow.module.css'
 
 const MAX_HISTORY = 20
@@ -231,6 +232,11 @@ export function ChatWindow() {
         : polishConfig.type === 'task_desc'
           ? 'polish_task_desc_system_prompt'
           : 'polish_system_prompt'
+      const promptTypeLabel = polishConfig.type === 'todo'
+        ? '待办说明润色'
+        : polishConfig.type === 'task_desc'
+          ? '任务描述润色'
+          : '工作日报润色'
       const currentPrompt = (llmSettings as Record<string, string> | undefined)?.[promptKey] ?? ''
       const historyText = messages
         .filter(m => m.content.trim())
@@ -242,7 +248,7 @@ export function ChatWindow() {
           return `user: ${m.content}`
         })
         .join('\n\n')
-      userContent = `【当前润色提示词】\n${currentPrompt}\n\n【润色对话记录】\n${historyText}\n\n【用户反馈】\n${text}`
+      userContent = `【当前润色类型】${promptTypeLabel}\n\n【当前润色提示词】\n${currentPrompt}\n\n【润色对话记录】\n${historyText}\n\n【用户反馈】\n${text}`
     }
 
     const newUserMsg: Message = { id: crypto.randomUUID(), role: 'user', content: text, timestamp: Date.now() }
@@ -363,6 +369,7 @@ export function ChatWindow() {
               className={`${styles.tab} ${activeTab === 'optimize' ? styles.tabActive : ''}`}
               onClick={() => { abortPolish(); setActiveTab('optimize') }}
             >
+              <img src={PromptOptIcon} width={12} height={12} alt="" style={{ marginRight: 5, verticalAlign: 'middle', opacity: 0.7 }} />
               优化提示词
             </button>
           </div>
@@ -448,7 +455,7 @@ export function ChatWindow() {
             const ok = await confirm({ level: 'moderate', title: '清空会话？', body: <p>当前对话记录将被清除，无法恢复。</p>, confirmLabel: '清空' })
             if (ok) clearMessages()
           }}>清空会话</li>
-          <li className={styles.ctxItem} onMouseDown={(e) => { e.preventDefault(); closeChat(); setCtxMenu(null) }}>关闭会话</li>
+          <li className={styles.ctxItem} onMouseDown={(e) => { e.preventDefault(); clearMessages(); closeChat(); setCtxMenu(null) }}>关闭会话</li>
         </ul>
       )}
 

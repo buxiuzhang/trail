@@ -69,8 +69,8 @@ export function MessageContent({
           li:    ({ children }) => <li style={{ margin: '2px 0' }}>{children}</li>,
           code:  ({ children, className }) =>
             className
-              ? <pre style={{ background: 'var(--card-deep)', padding: '6px 10px', borderRadius: 2, overflowX: 'auto', fontSize: 12, margin: '4px 0' }}><code>{children}</code></pre>
-              : <code style={{ background: 'var(--card-deep)', padding: '1px 5px', borderRadius: 2, fontSize: '0.9em' }}>{children}</code>,
+              ? <pre style={{ background: 'var(--card-deep)', padding: '6px 10px', borderRadius: 2, overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 12, margin: '4px 0', maxWidth: '100%' }}><code>{children}</code></pre>
+              : <code style={{ background: 'var(--card-deep)', padding: '1px 5px', borderRadius: 2, fontSize: '0.9em', wordBreak: 'break-all', overflowWrap: 'anywhere' }}>{children}</code>,
           table: ({ children }) => <table style={{ borderCollapse: 'collapse', fontSize: 13, margin: '4px 0', width: '100%' }}>{children}</table>,
           th:    ({ children }) => <th style={{ border: '0.5px solid var(--rule)', padding: '4px 8px', textAlign: 'left', background: 'var(--card-deep)' }}>{children}</th>,
           td:    ({ children }) => <td style={{ border: '0.5px solid var(--rule)', padding: '4px 8px' }}>{children}</td>,
