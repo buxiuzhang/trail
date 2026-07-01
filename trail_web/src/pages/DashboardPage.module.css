@@ -79,6 +79,166 @@
   text-transform: uppercase;
 }
 
+.weekProgress {
+  position: relative;
+  height: 3px;
+  background: var(--rule);
+  border-radius: 2px;
+  overflow: visible;
+  margin-top: 2px;
+  cursor: default;
+}
+
+/* 扩大 hover 感应区域 */
+.weekProgress::before {
+  content: '';
+  position: absolute;
+  inset: -6px 0;
+}
+
+.weekProgressBar {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 400ms ease;
+}
+
+.weekProgressBarToday {
+  background: #5B6E8A;
+}
+
+.weekProgressBarWeek {
+  background: #3D5A3D;
+}
+
+.inProgressRow {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.inProgressFrac {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.inProgressTotal {
+  color: var(--ink-faded);
+  font-size: 12px;
+}
+
+.inProgressHint {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: #8A7A6A;
+}
+
+.taskFollowCard {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0;
+  padding: var(--space-md);
+  background: var(--card);
+  border: 0.5px solid var(--rule);
+  box-shadow: var(--shadow-sm);
+}
+
+.taskFollowRow {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 0;
+}
+
+.taskFollowDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.taskFollowStatus {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-soft);
+  width: 40px;
+  flex-shrink: 0;
+}
+
+.taskFollowFrac {
+  font-family: var(--mono);
+  font-size: 12px;
+  flex-shrink: 0;
+  width: 52px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.taskFollowNum {
+  color: var(--ink);
+  width: 16px;
+  text-align: right;
+}
+
+.taskFollowTotal {
+  color: var(--ink-faded);
+}
+
+.taskFollowBar {
+  flex: 1;
+  height: 3px;
+  background: var(--rule);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.taskFollowBarFill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 400ms ease;
+}
+
+.taskFollowDivider {
+  height: 0.5px;
+  background: var(--rule);
+}
+
+.taskFollowLabel {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: #8A7A6A;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+/* CSS tooltip */
+.weekProgress::after {
+  content: attr(data-pct);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--ink);
+  color: #fff;
+  font-family: var(--mono);
+  font-size: 11px;
+  white-space: nowrap;
+  padding: 2px 8px;
+  border-radius: 3px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.weekProgress:hover::after {
+  opacity: 1;
+}
+
 .statCardSplit {
   flex-direction: row;
   align-items: stretch;
@@ -98,6 +258,56 @@
   width: 0.5px;
   background: var(--rule);
   align-self: stretch;
+}
+
+.todoStatCard {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0;
+  padding: var(--space-md);
+  background: var(--card);
+  border: 0.5px solid var(--rule);
+  box-shadow: var(--shadow-sm);
+}
+
+.todoStatRow {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 5px 0;
+}
+
+.todoStatIcon {
+  font-size: 13px;
+  color: var(--ink-faded);
+  width: 16px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.todoStatNum {
+  font-family: var(--display);
+  font-size: 24px;
+  font-weight: 400;
+  color: var(--ink);
+  line-height: 1;
+  font-variation-settings: "opsz" 48;
+  min-width: 28px;
+}
+
+.todoStatLabel {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: #8A7A6A;
+  text-transform: uppercase;
+}
+
+.todoStatDivider {
+  height: 0.5px;
+  background: var(--rule);
+  margin: 0 0;
 }
 
 

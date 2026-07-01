@@ -115,6 +115,9 @@ export function DashboardPage() {
     [trend14, wStart])
 
   const inProgress = overview?.by_status?.['进行中'] ?? 0
+  const inProgressWithLogToday = overview?.in_progress_with_log_today ?? 0
+  const completedCount = overview?.by_status?.['已完成'] ?? 0
+  const completedWithLogToday = overview?.completed_with_log_today ?? 0
 
   const activeCount = staleTasks.filter((t: StaleOut) => t.days_idle != null && t.days_idle <= 3).length
   const coolCount   = staleTasks.filter((t: StaleOut) => t.days_idle != null && t.days_idle >= 4 && t.days_idle <= 7).length
@@ -249,6 +252,62 @@ export function DashboardPage() {
       data: [{ value: todoRate, name: '完成率' }],
     }],
   }), [todoRate])
+
+  const todayGaugeOption = useMemo(() => ({
+    series: [{
+      type: 'gauge',
+      startAngle: 200,
+      endAngle: -20,
+      min: 0,
+      max: 7,
+      radius: '88%',
+      pointer: { show: false },
+      progress: { show: true, roundCap: true, width: 10, itemStyle: { color: '#5B6E8A' } },
+      axisLine: { roundCap: true, lineStyle: { width: 10, color: [[1, '#EFE5D0']] } },
+      axisTick: { show: false },
+      splitLine: { show: false },
+      axisLabel: { show: false },
+      detail: {
+        valueAnimation: true,
+        formatter: (v: number) => `${v}h`,
+        color: '#1A1612',
+        fontSize: 18,
+        fontFamily: 'JetBrains Mono, monospace',
+        offsetCenter: [0, '5%'],
+      },
+      title: { offsetCenter: [0, '32%'], color: '#B8AC95', fontSize: 10,
+        fontFamily: 'JetBrains Mono, monospace' },
+      data: [{ value: todayHours, name: '今日工时' }],
+    }],
+  }), [todayHours])
+
+  const weekGaugeOption = useMemo(() => ({
+    series: [{
+      type: 'gauge',
+      startAngle: 200,
+      endAngle: -20,
+      min: 0,
+      max: 35,
+      radius: '88%',
+      pointer: { show: false },
+      progress: { show: true, roundCap: true, width: 10, itemStyle: { color: '#3D5A3D' } },
+      axisLine: { roundCap: true, lineStyle: { width: 10, color: [[1, '#EFE5D0']] } },
+      axisTick: { show: false },
+      splitLine: { show: false },
+      axisLabel: { show: false },
+      detail: {
+        valueAnimation: true,
+        formatter: (v: number) => `${v}h`,
+        color: '#1A1612',
+        fontSize: 18,
+        fontFamily: 'JetBrains Mono, monospace',
+        offsetCenter: [0, '5%'],
+      },
+      title: { offsetCenter: [0, '32%'], color: '#B8AC95', fontSize: 10,
+        fontFamily: 'JetBrains Mono, monospace' },
+      data: [{ value: weekHours, name: '本周工时' }],
+    }],
+  }), [weekHours])
 
   const [selectedHealth, setSelectedHealth] = useState<'active' | 'cool' | 'warn'>('warn')
 
@@ -523,24 +582,72 @@ export function DashboardPage() {
           <div className={styles.statCard}>
             <span className={styles.statValue}>{todayHours}<span className={styles.statUnit}>h</span></span>
             <span className={styles.statLabel}>今日工时</span>
+            <div
+              className={styles.weekProgress}
+              data-pct={`${Math.min(100, Math.round((todayHours / 7) * 100))}% · 目标 7h`}
+            >
+              <div
+                className={`${styles.weekProgressBar} ${styles.weekProgressBarToday}`}
+                style={{ width: `${Math.min(100, Math.round((todayHours / 7) * 100))}%` }}
+              />
+            </div>
           </div>
           <div className={styles.statCard}>
             <span className={styles.statValue}>{weekHours}<span className={styles.statUnit}>h</span></span>
             <span className={styles.statLabel}>本周工时</span>
-          </div>
-          <div className={styles.statCard}>
-            <span className={styles.statValue}>{inProgress}</span>
-            <span className={styles.statLabel}>进行中任务</span>
-          </div>
-          <div className={`${styles.statCard} ${styles.statCardSplit}`}>
-            <div className={styles.statSplitItem}>
-              <span className={styles.statValue}>{todoStats?.new_today ?? 0}</span>
-              <span className={styles.statLabel}>今日新增待办</span>
+            <div
+              className={styles.weekProgress}
+              data-pct={`${Math.min(100, Math.round((weekHours / 35) * 100))}% · 目标 35h`}
+            >
+              <div
+                className={`${styles.weekProgressBar} ${styles.weekProgressBarWeek}`}
+                style={{ width: `${Math.min(100, Math.round((weekHours / 35) * 100))}%` }}
+              />
             </div>
-            <div className={styles.statSplitDivider} />
-            <div className={styles.statSplitItem}>
-              <span className={styles.statValue}>{todoStats?.followed_today ?? 0}</span>
-              <span className={styles.statLabel}>今日跟进待办</span>
+          </div>
+          <div className={styles.taskFollowCard}>
+            <span className={styles.taskFollowLabel}>今日跟进</span>
+            <div className={styles.taskFollowRow}>
+              <span className={styles.taskFollowDot} style={{ background: '#3D5A3D' }} />
+              <span className={styles.taskFollowStatus}>进行中</span>
+              <span className={styles.taskFollowFrac}>
+                <span className={styles.taskFollowNum}>{inProgressWithLogToday}</span>
+                <span className={styles.taskFollowTotal}>/ {inProgress}</span>
+              </span>
+              <div className={styles.taskFollowBar}>
+                <div className={styles.taskFollowBarFill} style={{
+                  width: inProgress > 0 ? `${Math.min(100, Math.round((inProgressWithLogToday / inProgress) * 100))}%` : '0%',
+                  background: '#3D5A3D',
+                }} />
+              </div>
+            </div>
+            <div className={styles.taskFollowDivider} />
+            <div className={styles.taskFollowRow}>
+              <span className={styles.taskFollowDot} style={{ background: '#8A7A5B' }} />
+              <span className={styles.taskFollowStatus}>已完成</span>
+              <span className={styles.taskFollowFrac}>
+                <span className={styles.taskFollowNum}>{completedWithLogToday}</span>
+                <span className={styles.taskFollowTotal}>/ {completedCount}</span>
+              </span>
+              <div className={styles.taskFollowBar}>
+                <div className={styles.taskFollowBarFill} style={{
+                  width: completedCount > 0 ? `${Math.min(100, Math.round((completedWithLogToday / completedCount) * 100))}%` : '0%',
+                  background: '#8A7A5B',
+                }} />
+              </div>
+            </div>
+          </div>
+          <div className={styles.todoStatCard}>
+            <div className={styles.todoStatRow}>
+              <span className={styles.todoStatIcon}>＋</span>
+              <span className={styles.todoStatNum}>{todoStats?.new_today ?? 0}</span>
+              <span className={styles.todoStatLabel}>今日新增</span>
+            </div>
+            <div className={styles.todoStatDivider} />
+            <div className={styles.todoStatRow}>
+              <span className={styles.todoStatIcon}>↻</span>
+              <span className={styles.todoStatNum}>{todoStats?.followed_today ?? 0}</span>
+              <span className={styles.todoStatLabel}>今日跟进</span>
             </div>
           </div>
         </div>

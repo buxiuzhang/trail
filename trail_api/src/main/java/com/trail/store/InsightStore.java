@@ -276,6 +276,30 @@ public class InsightStore {
             out.put("todo_active_count",    ((Number) todoStats.get(0).getOrDefault("active",    0)).intValue());
             out.put("todo_completed_count", ((Number) todoStats.get(0).getOrDefault("completed", 0)).intValue());
         }
+
+        String today = LocalDate.now().toString();
+        List<Map<String, Object>> inProgressTodayRows = db.query("""
+            SELECT COUNT(DISTINCT t.id) AS n
+            FROM tasks t
+            JOIN work_logs wl ON wl.task_id = t.id
+            WHERE t.status = '进行中'
+              AND wl.log_date = ?
+              AND wl.is_deleted = 0
+            """, today);
+        out.put("in_progress_with_log_today",
+            inProgressTodayRows.isEmpty() ? 0 : ((Number) inProgressTodayRows.get(0).getOrDefault("n", 0)).intValue());
+
+        List<Map<String, Object>> completedTodayRows = db.query("""
+            SELECT COUNT(DISTINCT t.id) AS n
+            FROM tasks t
+            JOIN work_logs wl ON wl.task_id = t.id
+            WHERE t.status = '已完成'
+              AND wl.log_date = ?
+              AND wl.is_deleted = 0
+            """, today);
+        out.put("completed_with_log_today",
+            completedTodayRows.isEmpty() ? 0 : ((Number) completedTodayRows.get(0).getOrDefault("n", 0)).intValue());
+
         return out;
     }
 }

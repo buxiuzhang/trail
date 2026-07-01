@@ -8,6 +8,8 @@ export interface OverviewOut {
   total_logs: number;
   todo_active_count?: number;
   todo_completed_count?: number;
+  in_progress_with_log_today?: number;
+  completed_with_log_today?: number;
 }
 
 /** 闲置任务（API 返回） */
