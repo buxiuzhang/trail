@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
+import ChevronDown from '@/icons/chevron-down.svg'
 
 export interface MultiSelectOption {
   value: string
@@ -110,11 +111,17 @@ export function MultiSelect({
           ))
         )}
         {!noArrow && (
-          <span style={{
-            marginLeft: 'auto', fontSize: '10px', color: 'var(--ink-ghost)',
-            transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 150ms',
-            flexShrink: 0,
-          }}>▼</span>
+          <img
+            src={ChevronDown}
+            width={12}
+            height={12}
+            alt=""
+            aria-hidden="true"
+            style={{
+              marginLeft: 'auto', opacity: 0.4, flexShrink: 0,
+              transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 150ms',
+            }}
+          />
         )}
       </div>
 

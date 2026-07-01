@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { TaskOut } from '@/types'
+import ChevronDown from '@/icons/chevron-down.svg'
 import styles from './TaskSelectorRow.module.css'
 
 interface Props {
@@ -27,13 +28,14 @@ export function TaskSelectorRow({ tasks, taskId, onChange }: Props) {
           onChange={e => { setSearch(e.target.value); onChange(null, null) }}
           onFocus={() => { setSearch(''); setFocused(true) }}
           onBlur={() => setTimeout(() => setFocused(false), 150)}
+          onKeyDown={e => { if (e.key === 'Escape') setFocused(false) }}
           placeholder="搜索并选择任务…"
         />
         <span
           className={styles.taskArrow}
           onMouseDown={e => e.preventDefault()}
-          onClick={() => { setSearch(''); setFocused(true) }}
-        >▼</span>
+          onClick={() => { if (focused) { setFocused(false) } else { setSearch(''); setFocused(true) } }}
+        ><img src={ChevronDown} width={12} height={12} alt="" aria-hidden="true" /></span>
         {focused && (
           <div className={styles.dropdown}>
             {filtered.map(t => (

@@ -204,6 +204,10 @@
   margin-bottom: 0;
 }
 
+.entryComposeRow input[type="number"] {
+  width: 40px;
+}
+
 .phaseSelect {
   min-width: 148px;
 }

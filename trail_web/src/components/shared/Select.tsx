@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
+import ChevronDown from '@/icons/chevron-down.svg'
 
 interface SelectOption {
   value: string
@@ -55,12 +56,18 @@ export function Select({ value, options, onChange, className, style, disabled }:
         }}
       >
         <span>{currentLabel}</span>
-        <span style={{
-          fontSize: '10px',
-          color: 'var(--ink-ghost)',
-          transform: open ? 'rotate(180deg)' : 'none',
-          transition: 'transform 150ms',
-        }}>▼</span>
+        <img
+          src={ChevronDown}
+          width={12}
+          height={12}
+          alt=""
+          aria-hidden="true"
+          style={{
+            opacity: 0.4,
+            transform: open ? 'rotate(180deg)' : 'none',
+            transition: 'transform 150ms',
+          }}
+        />
       </div>
 
       {/* 下拉面板 */}
