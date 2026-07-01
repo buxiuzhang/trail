@@ -6,8 +6,10 @@
  *   2. @tiptap/markdown 不识别 ``` 代码块的缺陷（添加 parseMarkdown/renderMarkdown）
  */
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
+import { ReactNodeViewRenderer } from '@tiptap/react'
 import { common, createLowlight } from 'lowlight'
 import type { JSONContent } from '@tiptap/core'
+import { MermaidNodeView } from './MermaidBlock'
 
 const lowlight = createLowlight(common)
 
@@ -37,5 +39,15 @@ export const HighlightedCodeBlock = CodeBlockLowlight.extend({
     const code = helpers.renderChildren(node)
     const fence = '```' + lang + '\n'
     return fence + code + (code.endsWith('\n') ? '' : '\n') + '```\n'
+  },
+
+  addNodeView() {
+    return (props) => {
+      if (props.node.attrs.language === 'mermaid') {
+        return ReactNodeViewRenderer(MermaidNodeView)(props)
+      }
+      // 其他语言使用默认渲染（lowlight 高亮）
+      return this.parent?.(props) ?? {}
+    }
   },
 })

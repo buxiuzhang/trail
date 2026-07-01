@@ -280,6 +280,11 @@
   transition: border-color 0.3s ease;
 }
 
+.formInline {
+  border: 0.5px solid var(--rule);
+  background: color-mix(in srgb, var(--accent) 4%, var(--surface));
+}
+
 .formActive {
   border-color: var(--ink-faded);
 }
@@ -391,7 +396,15 @@
   display: flex;
   gap: var(--space-sm);
   justify-content: flex-end;
+  align-items: center;
   margin-top: var(--space-sm);
+}
+
+.formError {
+  flex: 1;
+  font-size: 13px;
+  color: var(--red, #d9534f);
+  text-align: left;
 }
 
 .addBtn {

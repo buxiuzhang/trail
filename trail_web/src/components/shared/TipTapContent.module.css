@@ -143,3 +143,44 @@
   border-top: 1px solid var(--ink-faded);
   margin: 1.5em 0;
 }
+
+/* 表格 */
+.content :global(.tiptap table) {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.75em 0;
+  font-size: 14px;
+  overflow-x: auto;
+  display: block;
+}
+
+.content :global(.tiptap th),
+.content :global(.tiptap td) {
+  border: 1px solid var(--rule);
+  padding: 6px 12px;
+  text-align: left;
+  vertical-align: top;
+  min-width: 60px;
+}
+
+.content :global(.tiptap th) {
+  background: var(--ink-ghost);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.content :global(.tiptap tr:nth-child(even) td) {
+  background: color-mix(in srgb, var(--ink-ghost) 40%, transparent);
+}
+
+.content :global(.tiptap .selectedCell) {
+  background: color-mix(in srgb, var(--green) 15%, transparent);
+}
+
+/* mermaid NodeView 容器：重置 pre 样式，避免代码块背景干扰 SVG 渲染 */
+.content :global(.tiptap [data-node-view-wrapper] pre) {
+  background: transparent;
+  padding: 0;
+  font-size: inherit;
+}
+

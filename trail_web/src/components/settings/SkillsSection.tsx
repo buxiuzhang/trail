@@ -73,6 +73,7 @@ export function SkillsSection() {
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
+  const [formError, setFormError] = useState<string | null>(null)
   const [promptMode, setPromptMode] = useState<'source' | 'preview'>('source')
   const formRef = useRef<HTMLFormElement>(null)
 
@@ -104,6 +105,7 @@ export function SkillsSection() {
     setShowForm(false)
     setEditingId(null)
     setForm(EMPTY_FORM)
+    setFormError(null)
   }
 
   function toggleScope(value: string) {
@@ -117,6 +119,7 @@ export function SkillsSection() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    setFormError(null)
     const payload: SkillSaveRequest = {
       name: form.name,
       description: form.description || undefined,
@@ -134,7 +137,7 @@ export function SkillsSection() {
       }
       closeForm()
     } catch (err: unknown) {
-      showToast((err as Error).message ?? '保存失败')
+      setFormError((err as Error).message ?? '保存失败')
     }
   }
 
@@ -169,6 +172,150 @@ export function SkillsSection() {
 
   if (isLoading) return <div className={styles.empty}>加载中…</div>
 
+  function renderForm() {
+    return (
+      <form
+        ref={formRef}
+        className={`${styles.form} ${styles.formInline}`}
+        onSubmit={handleSubmit}
+      >
+        <div className={styles.formTitle}>{editingId ? '编辑 Skill' : '添加 Skill'}</div>
+
+        <div className={styles.field}>
+          <label className={styles.label}>名称</label>
+          <input
+            className={styles.input}
+            value={form.name}
+            onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
+            placeholder="例：工作助理"
+            required
+          />
+        </div>
+
+        <div className={styles.field}>
+          <label className={styles.label}>描述（可选）</label>
+          <input
+            className={styles.input}
+            value={form.description}
+            onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
+            placeholder="简短描述这个 Skill 的用途"
+          />
+        </div>
+
+        <div className={styles.field}>
+          <div className={styles.promptHeader}>
+            <label className={styles.label}>系统提示词</label>
+            <button
+              type="button"
+              className={styles.modeToggle}
+              onClick={() => setPromptMode(m => m === 'source' ? 'preview' : 'source')}
+            >
+              {promptMode === 'source' ? '预览模式' : '源码模式'}
+            </button>
+          </div>
+          {promptMode === 'preview' ? (
+            <div className={styles.promptPreviewFull}>
+              {form.system_prompt
+                ? <MarkdownRenderer text={form.system_prompt} />
+                : <span style={{ color: 'var(--ink-ghost)', fontStyle: 'italic' }}>（空）</span>}
+            </div>
+          ) : (
+            <textarea
+              className={styles.textarea}
+              value={form.system_prompt}
+              onChange={e => {
+                setForm(p => ({ ...p, system_prompt: e.target.value }))
+                e.target.style.height = 'auto'
+                e.target.style.height = e.target.scrollHeight + 'px'
+              }}
+              onInput={e => {
+                const el = e.currentTarget
+                el.style.height = 'auto'
+                el.style.height = el.scrollHeight + 'px'
+              }}
+              ref={el => {
+                if (el) {
+                  el.style.height = 'auto'
+                  el.style.height = el.scrollHeight + 'px'
+                }
+              }}
+              placeholder="输入提示词片段，将追加到对应场景的 System Prompt 末尾…"
+              rows={10}
+              required
+            />
+          )}
+        </div>
+
+        <div className={styles.field}>
+          <label className={styles.label}>作用范围</label>
+          <div className={styles.scopePolishRow}>
+            <span className={styles.scopePolishLabel}>对话与草稿</span>
+            <div className={styles.scopeGroup}>
+              {SCOPE_OPTIONS.filter(o => !o.value.startsWith('polish')).map(opt => {
+                const checked = form.scope.includes(opt.value)
+                return (
+                  <label key={opt.value} className={`${styles.scopeOption} ${checked ? styles.scopeOptionChecked : ''}`}>
+                    <input type="checkbox" checked={checked} onChange={() => toggleScope(opt.value)} />
+                    <span className={styles.scopeCheck}>{checked ? '✓' : ''}</span>
+                    <span>{opt.label}</span>
+                  </label>
+                )
+              })}
+            </div>
+          </div>
+          <div className={styles.scopePolishRow}>
+            <span className={styles.scopePolishLabel}>润色</span>
+            <div className={styles.scopeGroup}>
+              {SCOPE_OPTIONS.filter(o => o.value.startsWith('polish')).map(opt => {
+                const checked = form.scope.includes(opt.value)
+                return (
+                  <label key={opt.value} className={`${styles.scopeOption} ${checked ? styles.scopeOptionChecked : ''}`}>
+                    <input type="checkbox" checked={checked} onChange={() => toggleScope(opt.value)} />
+                    <span className={styles.scopeCheck}>{checked ? '✓' : ''}</span>
+                    <span>{opt.label}</span>
+                  </label>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+
+        <div className={styles.field}>
+          <label className={styles.label}>注入方式</label>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button
+              type="button"
+              className={`${styles.btn} ${form.injection_mode === 'full' ? styles.btnPrimary : ''}`}
+              onClick={() => setForm(p => ({ ...p, injection_mode: 'full' }))}
+            >
+              全量注入
+            </button>
+            <button
+              type="button"
+              className={`${styles.btn} ${form.injection_mode === 'lazy' ? styles.btnPrimary : ''}`}
+              onClick={() => setForm(p => ({ ...p, injection_mode: 'lazy' }))}
+            >
+              渐进式披露
+            </button>
+          </div>
+          {form.injection_mode === 'lazy' && (
+            <p style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 6, marginBottom: 0 }}>
+              仅将名称和描述注入上下文，LLM 按需调用 get_skill_detail 获取完整提示词。
+            </p>
+          )}
+        </div>
+
+        <div className={styles.formActions}>
+          {formError && <span className={styles.formError}>{formError}</span>}
+          <button type="button" className={styles.btn} onClick={closeForm}>取消</button>
+          <button type="submit" className={`${styles.btn} ${styles.btnPrimary}`} disabled={createSkill.isPending || updateSkill.isPending}>
+            {createSkill.isPending || updateSkill.isPending ? '保存中…' : editingId ? '保存修改' : '添加'}
+          </button>
+        </div>
+      </form>
+    )
+  }
+
   return (
     <div className={styles.root}>
       <p className={styles.hint}>
@@ -181,180 +328,46 @@ export function SkillsSection() {
 
       <div className={styles.list}>
         {skills.map((skill, index) => (
-          <div key={skill.id} className={`${styles.card} ${!skill.enabled ? styles.cardDisabled : ''}`}>
-            <span className={styles.cardIndex}>{index + 1}</span>
-            <div className={styles.cardMain}>
-              <div className={styles.cardInfo}>
-                <span className={styles.cardName}>{skill.name}</span>
-                <ScopeBadges scope={skill.scope} />
-                {skill.injection_mode === 'lazy' && (
-                  <span className={`${styles.scopeBadge} ${styles.scopeBadge_lazy}`}>渐进</span>
-                )}
+          editingId === skill.id ? (
+            <div key={skill.id}>{renderForm()}</div>
+          ) : (
+            <div key={skill.id} className={`${styles.card} ${!skill.enabled ? styles.cardDisabled : ''}`}>
+              <span className={styles.cardIndex}>{index + 1}</span>
+              <div className={styles.cardMain}>
+                <div className={styles.cardInfo}>
+                  <span className={styles.cardName}>{skill.name}</span>
+                  <ScopeBadges scope={skill.scope} />
+                  {skill.injection_mode === 'lazy' && (
+                    <span className={`${styles.scopeBadge} ${styles.scopeBadge_lazy}`}>渐进</span>
+                  )}
+                </div>
+                <div className={styles.cardActions}>
+                  <button
+                    type="button"
+                    className={styles.iconBtn}
+                    title={skill.enabled ? '已启用，点击禁用' : '已禁用，点击启用'}
+                    onClick={() => handleToggle(skill)}
+                  >
+                    <img src={skill.enabled ? UnlockIcon : LockIcon} width={16} height={16} alt={skill.enabled ? '已启用' : '已禁用'} style={{ opacity: skill.enabled ? 0.7 : 0.3 }} />
+                  </button>
+                  <button type="button" className={styles.iconBtn} onClick={() => openEdit(skill)} title="编辑">
+                    <img src={EditIcon} width={16} height={16} alt="编辑" />
+                  </button>
+                  <button type="button" className={`${styles.iconBtn} ${styles.iconBtnDanger}`} onClick={() => handleDelete(skill)} title="删除">
+                    <img src={DeleteIcon} width={16} height={16} alt="删除" />
+                  </button>
+                </div>
               </div>
-              <div className={styles.cardActions}>
-                <button
-                  type="button"
-                  className={styles.iconBtn}
-                  title={skill.enabled ? '已启用，点击禁用' : '已禁用，点击启用'}
-                  onClick={() => handleToggle(skill)}
-                >
-                  <img src={skill.enabled ? UnlockIcon : LockIcon} width={16} height={16} alt={skill.enabled ? '已启用' : '已禁用'} style={{ opacity: skill.enabled ? 0.7 : 0.3 }} />
-                </button>
-                <button type="button" className={styles.iconBtn} onClick={() => openEdit(skill)} title="编辑">
-                  <img src={EditIcon} width={16} height={16} alt="编辑" />
-                </button>
-                <button type="button" className={`${styles.iconBtn} ${styles.iconBtnDanger}`} onClick={() => handleDelete(skill)} title="删除">
-                  <img src={DeleteIcon} width={16} height={16} alt="删除" />
-                </button>
-              </div>
+              {skill.description && (
+                <div className={styles.cardDesc}>{skill.description}</div>
+              )}
+              <div className={styles.promptPreview}>{skill.system_prompt.slice(0, 120)}{skill.system_prompt.length > 120 ? '…' : ''}</div>
             </div>
-            {skill.description && (
-              <div className={styles.cardDesc}>{skill.description}</div>
-            )}
-            <div className={styles.promptPreview}>{skill.system_prompt.slice(0, 120)}{skill.system_prompt.length > 120 ? '…' : ''}</div>
-          </div>
+          )
         ))}
       </div>
 
-      {showForm && (
-        <form ref={formRef} className={`${styles.form} ${editingId ? styles.formActive : ''}`} onSubmit={handleSubmit}>
-          {editingId && (
-            <img src={EditIcon} width={14} height={14} alt="" aria-hidden="true" className={styles.formEditIcon} />
-          )}
-          <div className={styles.formTitle}>{editingId ? '编辑 Skill' : '添加 Skill'}</div>
-
-          <div className={styles.field}>
-            <label className={styles.label}>名称</label>
-            <input
-              className={styles.input}
-              value={form.name}
-              onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
-              placeholder="例：工作助理"
-              required
-            />
-          </div>
-
-          <div className={styles.field}>
-            <label className={styles.label}>描述（可选）</label>
-            <input
-              className={styles.input}
-              value={form.description}
-              onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
-              placeholder="简短描述这个 Skill 的用途"
-            />
-          </div>
-
-          <div className={styles.field}>
-            <div className={styles.promptHeader}>
-              <label className={styles.label}>系统提示词</label>
-              <button
-                type="button"
-                className={styles.modeToggle}
-                onClick={() => setPromptMode(m => m === 'source' ? 'preview' : 'source')}
-              >
-                {promptMode === 'source' ? '预览模式' : '源码模式'}
-              </button>
-            </div>
-            {promptMode === 'preview' ? (
-              <div className={styles.promptPreviewFull}>
-                {form.system_prompt
-                  ? <MarkdownRenderer text={form.system_prompt} />
-                  : <span style={{ color: 'var(--ink-ghost)', fontStyle: 'italic' }}>（空）</span>}
-              </div>
-            ) : (
-              <textarea
-                className={styles.textarea}
-                value={form.system_prompt}
-                onChange={e => {
-                  setForm(p => ({ ...p, system_prompt: e.target.value }))
-                  e.target.style.height = 'auto'
-                  e.target.style.height = e.target.scrollHeight + 'px'
-                }}
-                onInput={e => {
-                  const el = e.currentTarget
-                  el.style.height = 'auto'
-                  el.style.height = el.scrollHeight + 'px'
-                }}
-                ref={el => {
-                  if (el) {
-                    el.style.height = 'auto'
-                    el.style.height = el.scrollHeight + 'px'
-                  }
-                }}
-                placeholder="输入提示词片段，将追加到对应场景的 System Prompt 末尾…"
-                rows={10}
-                required
-              />
-            )}
-          </div>
-
-          <div className={styles.field}>
-            <label className={styles.label}>作用范围</label>
-            <div className={styles.scopePolishRow}>
-              <span className={styles.scopePolishLabel}>对话与草稿</span>
-              <div className={styles.scopeGroup}>
-                {SCOPE_OPTIONS.filter(o => !o.value.startsWith('polish')).map(opt => {
-                  const checked = form.scope.includes(opt.value)
-                  return (
-                    <label key={opt.value} className={`${styles.scopeOption} ${checked ? styles.scopeOptionChecked : ''}`}>
-                      <input type="checkbox" checked={checked} onChange={() => toggleScope(opt.value)} />
-                      <span className={styles.scopeCheck}>{checked ? '✓' : ''}</span>
-                      <span>{opt.label}</span>
-                    </label>
-                  )
-                })}
-              </div>
-            </div>
-            <div className={styles.scopePolishRow}>
-              <span className={styles.scopePolishLabel}>润色</span>
-              <div className={styles.scopeGroup}>
-                {SCOPE_OPTIONS.filter(o => o.value.startsWith('polish')).map(opt => {
-                  const checked = form.scope.includes(opt.value)
-                  return (
-                    <label key={opt.value} className={`${styles.scopeOption} ${checked ? styles.scopeOptionChecked : ''}`}>
-                      <input type="checkbox" checked={checked} onChange={() => toggleScope(opt.value)} />
-                      <span className={styles.scopeCheck}>{checked ? '✓' : ''}</span>
-                      <span>{opt.label}</span>
-                    </label>
-                  )
-                })}
-              </div>
-            </div>
-          </div>
-
-          <div className={styles.field}>
-            <label className={styles.label}>注入方式</label>
-            <div style={{ display: 'flex', gap: 6 }}>
-              <button
-                type="button"
-                className={`${styles.btn} ${form.injection_mode === 'full' ? styles.btnPrimary : ''}`}
-                onClick={() => setForm(p => ({ ...p, injection_mode: 'full' }))}
-              >
-                全量注入
-              </button>
-              <button
-                type="button"
-                className={`${styles.btn} ${form.injection_mode === 'lazy' ? styles.btnPrimary : ''}`}
-                onClick={() => setForm(p => ({ ...p, injection_mode: 'lazy' }))}
-              >
-                渐进式披露
-              </button>
-            </div>
-            {form.injection_mode === 'lazy' && (
-              <p style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 6, marginBottom: 0 }}>
-                仅将名称和描述注入上下文，LLM 按需调用 get_skill_detail 获取完整提示词。
-              </p>
-            )}
-          </div>
-
-          <div className={styles.formActions}>
-            <button type="button" className={styles.btn} onClick={closeForm}>取消</button>
-            <button type="submit" className={`${styles.btn} ${styles.btnPrimary}`} disabled={createSkill.isPending || updateSkill.isPending}>
-              {editingId ? '保存修改' : '添加'}
-            </button>
-          </div>
-        </form>
-      )}
+      {showForm && !editingId && renderForm()}
 
       {!showForm && (
         <button type="button" className={`${styles.btn} ${styles.btnPrimary} ${styles.addBtn}`} onClick={openCreate}>

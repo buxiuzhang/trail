@@ -244,6 +244,40 @@
   padding: 0;
 }
 
+/* 代码块容器 + 复制按钮 */
+.codeBlock {
+  position: relative;
+  margin: 4px 0;
+}
+
+.codeCopyBtn {
+  position: absolute;
+  top: 5px;
+  right: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 150ms ease;
+  z-index: 1;
+}
+
+.codeBlock:hover .codeCopyBtn {
+  opacity: 1;
+}
+
+.codeCopyBtnCopied {
+  opacity: 1 !important;
+  color: var(--green-ink, #2a7a4b);
+  border-color: var(--green-ink, #2a7a4b);
+}
+
 /* 消息中的链接 */
 .msgContent .link,
 .link {
