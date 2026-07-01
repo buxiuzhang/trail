@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { NodeViewWrapper, type NodeViewProps } from '@tiptap/react'
 import mermaid from 'mermaid'
+import { ImagePreview } from './ImagePreview'
 import styles from './MermaidBlock.module.css'
 
 mermaid.initialize({
@@ -23,6 +24,7 @@ export function MermaidNodeView({ node }: NodeViewProps) {
 export function MermaidBlock({ code }: { code: string }) {
   const [svg, setSvg] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [previewSrc, setPreviewSrc] = useState<string | null>(null)
   const idRef = useRef(`mermaid-${++idCounter}`)
 
   useEffect(() => {
@@ -39,6 +41,12 @@ export function MermaidBlock({ code }: { code: string }) {
       })
   }, [code])
 
+  const handleClick = useCallback(() => {
+    if (!svg) return
+    const uri = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
+    setPreviewSrc(uri)
+  }, [svg])
+
   if (error) {
     return (
       <div className={styles.mermaidError}>
@@ -51,10 +59,17 @@ export function MermaidBlock({ code }: { code: string }) {
   if (!svg) return <pre className={styles.mermaidLoading}>{code}</pre>
 
   return (
-    <div
-      className={styles.mermaidBlock}
-      // eslint-disable-next-line react/no-danger
-      dangerouslySetInnerHTML={{ __html: svg }}
-    />
+    <>
+      <div
+        className={styles.mermaidBlock}
+        title="点击预览"
+        onClick={handleClick}
+        // eslint-disable-next-line react/no-danger
+        dangerouslySetInnerHTML={{ __html: svg }}
+      />
+      {previewSrc && (
+        <ImagePreview src={previewSrc} onClose={() => setPreviewSrc(null)} />
+      )}
+    </>
   )
 }
