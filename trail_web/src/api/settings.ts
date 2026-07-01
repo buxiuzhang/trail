@@ -31,6 +31,8 @@ export interface LLMSettings {
   todo_alert_template: string
   // AI 标注提示词
   batch_tag_system_prompt: string
+  // 优化提示词顾问
+  prompt_optimize_system_prompt: string
   // 语音输入时长（秒）
   speech_duration: string
   // 工具调用最大迭代次数

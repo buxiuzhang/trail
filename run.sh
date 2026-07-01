@@ -96,7 +96,7 @@ start_api() {
     cd ..
 
     # 等待启动
-    sleep 5
+    sleep 10
 
     if check_port $API_PORT; then
         log_info "API 后端已启动 (端口 $API_PORT)"

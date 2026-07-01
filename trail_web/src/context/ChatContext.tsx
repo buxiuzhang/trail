@@ -34,6 +34,7 @@ interface ChatContextValue {
   openPolish: (config: PolishConfig) => boolean
   addMessage: (role: 'user' | 'assistant', content: string) => void
   updateLastMessage: (content: string) => void
+  removeLastMessage: () => void
   clearMessages: () => void
   setIsLoading: (v: boolean) => void
   pushAlert: (content: string) => void
@@ -94,6 +95,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
+  const removeLastMessage = useCallback(() => {
+    setMessages(prev => prev.length === 0 ? prev : prev.slice(0, -1))
+  }, [])
+
   const clearMessages = useCallback(() => setMessages([]), [])
 
   const pushAlert = useCallback((content: string) => {
@@ -112,7 +117,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     <ChatContext.Provider value={{
       isOpen, isExpanded, polishConfig, messages, isLoading, alertCount,
       openChat, closeChat, expandChat, collapseChat, openPolish,
-      addMessage, updateLastMessage, clearMessages, setIsLoading,
+      addMessage, updateLastMessage, removeLastMessage, clearMessages, setIsLoading,
       pushAlert, clearAlerts,
     }}>
       {children}

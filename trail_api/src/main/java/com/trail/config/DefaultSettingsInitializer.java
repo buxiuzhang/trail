@@ -75,6 +75,7 @@ public class DefaultSettingsInitializer {
         putIfPresent(defaults, "ask_maintenance_prompt", d.askMaintenancePrompt());
         putIfPresent(defaults, "chat_system_prompt", d.chatSystemPrompt());
         putIfPresent(defaults, "batch_tag_system_prompt", d.batchTagSystemPrompt());
+        putIfPresent(defaults, "prompt_optimize_system_prompt", d.promptOptimizeSystemPrompt());
 
         int initialized = 0;
         for (Map.Entry<String, String> e : defaults.entrySet()) {

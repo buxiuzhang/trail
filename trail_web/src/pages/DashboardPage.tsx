@@ -582,28 +582,28 @@ export function DashboardPage() {
           <div className={styles.statCard}>
             <span className={styles.statValue}>{todayHours}<span className={styles.statUnit}>h</span></span>
             <span className={styles.statLabel}>今日工时</span>
-            <div
-              className={styles.weekProgress}
-              data-pct={`${Math.min(100, Math.round((todayHours / 7) * 100))}% · 目标 7h`}
-            >
+            <div className={styles.weekProgress}>
               <div
                 className={`${styles.weekProgressBar} ${styles.weekProgressBarToday}`}
                 style={{ width: `${Math.min(100, Math.round((todayHours / 7) * 100))}%` }}
               />
             </div>
+            <span className={styles.progressHint}>
+              {Math.min(100, Math.round((todayHours / 7) * 100))}% · 目标 7h
+            </span>
           </div>
           <div className={styles.statCard}>
             <span className={styles.statValue}>{weekHours}<span className={styles.statUnit}>h</span></span>
             <span className={styles.statLabel}>本周工时</span>
-            <div
-              className={styles.weekProgress}
-              data-pct={`${Math.min(100, Math.round((weekHours / 35) * 100))}% · 目标 35h`}
-            >
+            <div className={styles.weekProgress}>
               <div
                 className={`${styles.weekProgressBar} ${styles.weekProgressBarWeek}`}
                 style={{ width: `${Math.min(100, Math.round((weekHours / 35) * 100))}%` }}
               />
             </div>
+            <span className={styles.progressHint}>
+              {Math.min(100, Math.round((weekHours / 35) * 100))}% · 目标 35h
+            </span>
           </div>
           <div className={styles.taskFollowCard}>
             <span className={styles.taskFollowLabel}>今日跟进</span>
@@ -638,6 +638,7 @@ export function DashboardPage() {
             </div>
           </div>
           <div className={styles.todoStatCard}>
+            <span className={styles.todoStatTitle}>待办事项</span>
             <div className={styles.todoStatRow}>
               <span className={styles.todoStatIcon}>＋</span>
               <span className={styles.todoStatNum}>{todoStats?.new_today ?? 0}</span>

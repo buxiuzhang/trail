@@ -29,11 +29,14 @@ export function LlmDialogPromptsSection() {
   const [chatPromptMode, setChatPromptMode] = useState<EditorMode>('preview')
   const [batchTagPrompt, setBatchTagPrompt] = useState('')
   const [batchTagPromptMode, setBatchTagPromptMode] = useState<EditorMode>('source')
+  const [promptOptimizePrompt, setPromptOptimizePrompt] = useState('')
+  const [promptOptimizePromptMode, setPromptOptimizePromptMode] = useState<EditorMode>('source')
 
   useEffect(() => {
     if (!settings) return
     setChatPrompt(settings.chat_system_prompt || '')
     setBatchTagPrompt(settings.batch_tag_system_prompt || '')
+    setPromptOptimizePrompt(settings.prompt_optimize_system_prompt || '')
   }, [settings])
 
   async function handleSave(e: React.SyntheticEvent) {
@@ -42,6 +45,7 @@ export function LlmDialogPromptsSection() {
       await saveLLM.mutateAsync({
         chat_system_prompt: chatPrompt.trim(),
         batch_tag_system_prompt: batchTagPrompt.trim(),
+        prompt_optimize_system_prompt: promptOptimizePrompt.trim(),
       })
       showToast('已保存')
     } catch (err: unknown) {
@@ -88,6 +92,18 @@ export function LlmDialogPromptsSection() {
             <p className={styles.promptDesc}>今日填报「AI 标注」按钮的系统提示，控制如何在文本中插入 @task:ID 标记</p>
             <div style={{ marginTop: '8px' }}>
               <DescriptionEditorWithMode value={batchTagPrompt || ''} onChange={setBatchTagPrompt} mode={batchTagPromptMode} onModeChange={setBatchTagPromptMode} minHeight={180} textareaClassName="field__textarea" hideInlineToggle autoGrow maxHeight={400} />
+            </div>
+          </PromptGroup>
+          <PromptGroup name="优化提示词顾问" desc="润色窗口">
+            <div className={styles.promptLabel}>
+              <span className={styles.promptName}>
+                <button type="button" onClick={async () => { if (await confirm({ level: 'moderate', title: '重置优化提示词顾问提示词？', body: <p>将恢复为系统默认值。</p>, confirmLabel: '重置' })) setPromptOptimizePrompt('') }} className={styles.resetBtn}>重置</button>
+              </span>
+              <button type="button" className={styles.modeToggle} onClick={() => setPromptOptimizePromptMode(promptOptimizePromptMode === 'source' ? 'preview' : 'source')}>{promptOptimizePromptMode === 'source' ? '预览模式' : '源码模式'}</button>
+            </div>
+            <p className={styles.promptDesc}>润色窗口「优化提示词」tab 的系统提示，控制 LLM 如何分析并改进润色提示词。需包含【修改后提示词】标记供前端识别。</p>
+            <div style={{ marginTop: '8px' }}>
+              <DescriptionEditorWithMode value={promptOptimizePrompt || ''} onChange={setPromptOptimizePrompt} mode={promptOptimizePromptMode} onModeChange={setPromptOptimizePromptMode} minHeight={180} textareaClassName="field__textarea" hideInlineToggle autoGrow maxHeight={400} />
             </div>
           </PromptGroup>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>

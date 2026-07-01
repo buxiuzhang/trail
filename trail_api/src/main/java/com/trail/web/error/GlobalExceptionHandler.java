@@ -131,6 +131,12 @@ public class GlobalExceptionHandler {
                 .body(Map.of("detail", e.getReason() == null ? e.getMessage() : e.getReason()));
     }
 
+    /** SSE 长连接正常超时，客户端会自动重连，无需响应体 */
+    @ExceptionHandler(org.springframework.web.context.request.async.AsyncRequestTimeoutException.class)
+    public void asyncTimeout() {
+        // intentionally empty — SSE reconnects automatically
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> fallback(Exception e) {
         org.slf4j.LoggerFactory.getLogger(GlobalExceptionHandler.class)

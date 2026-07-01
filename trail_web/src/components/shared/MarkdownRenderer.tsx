@@ -16,6 +16,7 @@ import { EditorContent, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Image from '@tiptap/extension-image'
 import { Markdown } from '@tiptap/markdown'
+import { TableKit } from '@tiptap/extension-table'
 import { HighlightedCodeBlock } from './HighlightedCodeBlock'
 import { createMentionDecorationExtension } from './DescriptionEditor'
 import { useAttachmentsByIds } from '@/api/attachments'
@@ -73,6 +74,7 @@ export function MarkdownRenderer({ text, className, todos = [], tasks = [] }: Ma
         HTMLAttributes: { class: 'tiptap-image' },
       }),
       Markdown,
+      TableKit,
       // 添加 mention decoration 扩展，渲染 @todo:ID、@task:ID 和 @file:ID
       createMentionDecorationExtension(todosRef, tasksRef, {
         todoMentionDecor: styles.todoMentionDecor,

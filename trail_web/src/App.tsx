@@ -26,8 +26,9 @@ import { NotFoundPage } from './pages/NotFoundPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { WorkbenchProvider } from './context/WorkbenchContext'
 import { useWatchAlerts } from './hooks/useWatchAlerts'
-import { useState, type ReactNode } from 'react'
+import { useState, useEffect, type ReactNode } from 'react'
 import { SettingsContext } from './context/SettingsContext'
+import { CommandPalette } from './components/shared/CommandPalette'
 
 /** 始终挂载，确保 WebSocket 长连接不依赖 ChatWindow 是否打开。 */
 function WatchAlertsMount() {
@@ -59,6 +60,19 @@ function AppLayout({ children }: { children: ReactNode }) {
 }
 
 export default function App() {
+  const [paletteOpen, setPaletteOpen] = useState(false)
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        setPaletteOpen(o => !o)
+      }
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [])
+
   return (
     <HashRouter>
       <FilterProvider>
@@ -96,6 +110,7 @@ export default function App() {
                 </div>
                 <ChatBubble />
                 <ChatWindow />
+                <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
               </DataDirGate>
               </DownloadQueueProvider>
               </UploadQueueProvider>

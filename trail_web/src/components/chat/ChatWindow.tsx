@@ -3,7 +3,7 @@ import { useChatContext, type Message } from '@/context/ChatContext'
 import { useChat } from '@/api/chat'
 import { usePolishDialog } from '@/api/polishDialog'
 import { useToastContext } from '@/context/ToastContext'
-import { useLLMSettings } from '@/api/settings'
+import { useLLMSettings, useSaveLLMSettings } from '@/api/settings'
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition'
 import { ignoreAlert } from '@/hooks/useWatchAlerts'
 import { useConfirm } from '@/utils/confirm'
@@ -36,8 +36,17 @@ function extractSuggestion(text: string): string | null {
   const idx = text.indexOf(marker)
   if (idx === -1) return null
   const after = text.slice(idx + marker.length)
-  const codeMatch = after.match(/```[\s\S]*?\n([\s\S]*?)```/)
-  if (codeMatch) return codeMatch[1].trim()
+  // 找第一个 ``` 开标记，取最后一个 ``` 为闭合 —— 兼容内容本身含代码块的情况
+  const openIdx = after.indexOf('```')
+  if (openIdx !== -1) {
+    const afterOpen = after.slice(openIdx + 3)
+    const newlineIdx = afterOpen.indexOf('\n')
+    if (newlineIdx !== -1) {
+      const content = afterOpen.slice(newlineIdx + 1)
+      const closeIdx = content.lastIndexOf('```')
+      if (closeIdx !== -1) return content.slice(0, closeIdx).trim()
+    }
+  }
   return after.trim() || null
 }
 
@@ -48,15 +57,28 @@ function splitAssistantContent(text: string): { body: string; suggestion: string
   return { body: text.slice(0, idx).trim(), suggestion: extractSuggestion(text) }
 }
 
+/** 从优化 tab 的回复中提取【修改后提示词】代码块 */
+function extractOptimizedPrompt(text: string): string | null {
+  const marker = '【修改后提示词】'
+  const idx = text.indexOf(marker)
+  if (idx === -1) return null
+  const after = text.slice(idx + marker.length)
+  // 取最后一个代码块：LLM 可能先输出 diff 块再输出完整提示词块
+  const matches = [...after.matchAll(/```[^\n]*\n([\s\S]*?)```/g)]
+  if (matches.length === 0) return null
+  return matches[matches.length - 1][1].trim()
+}
+
 export function ChatWindow() {
   const {
     isOpen, isExpanded, polishConfig,
-    messages, closeChat, addMessage, updateLastMessage,
+    messages, closeChat, addMessage, updateLastMessage, removeLastMessage,
     setIsLoading, clearAlerts, clearMessages,
     expandChat, collapseChat,
   } = useChatContext()
   const { send: sendChat, abort: abortChat, isPending: chatPending } = useChat()
   const { send: sendPolish, abort: abortPolish, isPending: polishPending } = usePolishDialog()
+  const saveLLM = useSaveLLMSettings()
   const { showToast } = useToastContext()
   const confirm = useConfirm()
   const [input, setInput] = useState('')
@@ -224,7 +246,6 @@ export function ChatWindow() {
     if (!polishConfig) return
     const isFirst = optimizeMessages.length === 0
 
-    // 首条：自动拼入润色提示词 + 润色对话历史作为上下文
     let userContent = text
     if (isFirst) {
       const promptKey = polishConfig.type === 'todo'
@@ -282,6 +303,69 @@ export function ChatWindow() {
         next[next.length - 1] = { ...next[next.length - 1], content: finalText }
         return next
       })
+      setIsLoading(false)
+    }
+  }
+
+  // ——— 应用优化后的提示词 ———
+  async function handleApplyOptimizedPrompt(newPrompt: string) {
+    if (!polishConfig) return
+    const promptKey = polishConfig.type === 'todo'
+      ? 'polish_todo_system_prompt'
+      : polishConfig.type === 'task_desc'
+        ? 'polish_task_desc_system_prompt'
+        : 'polish_system_prompt'
+    try {
+      await saveLLM.mutateAsync({ [promptKey]: newPrompt })
+      showToast('提示词已更新')
+    } catch (err: unknown) {
+      showToast('保存失败：' + (err as Error).message)
+      return
+    }
+
+    // 切回润色 tab
+    setActiveTab('polish')
+
+    // 快照当前 messages：去掉最后一条 assistant，保留所有历史（含最后用户消息）
+    const validMsgs = messages.filter(m => m.content.trim())
+    const lastUserIdx = [...validMsgs].map(m => m.role).lastIndexOf('user')
+    if (lastUserIdx === -1) {
+      // 找不到用户消息，降级为从头重跑
+      clearMessages()
+      sentInitial.current = false
+      handleSendPolish(polishConfig.initialContent, polishConfig.contentForLLM)
+      return
+    }
+    const historyBeforeLast = validMsgs.slice(0, lastUserIdx).map(m => ({ role: m.role, content: m.content }))
+    const lastUserContent = validMsgs[lastUserIdx].content
+
+    // 只删最后一条 assistant，保留其余所有对话
+    removeLastMessage()
+    addMessage('assistant', '')
+    setIsLoading(true)
+
+    const historyMsgs = [...historyBeforeLast, { role: 'user' as const, content: lastUserContent }]
+
+    let accum = ''
+    try {
+      await sendPolish(
+        {
+          type: polishConfig.type,
+          content: polishConfig.contentForLLM ?? polishConfig.initialContent,
+          task_id: polishConfig.taskId,
+          messages: historyMsgs,
+        },
+        (delta) => {
+          accum += delta
+          if (liveRef.current) liveRef.current.textContent = accum
+          scrollToBottom()
+        },
+      )
+    } catch (err: unknown) {
+      const msg = (err as Error).name === 'AbortError' ? null : (err as Error).message
+      if (msg) showToast(msg.includes('未配置') ? 'LLM 未配置，请在设置中配置 API Key' : '请求失败：' + msg)
+    } finally {
+      syncLiveToState()
       setIsLoading(false)
     }
   }
@@ -403,15 +487,31 @@ export function ChatWindow() {
             {optimizeMessages.map((msg, i) => {
               const isLast = i === optimizeMessages.length - 1
               const isOptStreaming = isPending && isLast && msg.role === 'assistant'
+              const optimizedPrompt = (!isOptStreaming && isLast && msg.role === 'assistant')
+                ? extractOptimizedPrompt(msg.content)
+                : null
               return (
-                <ChatMessageRow
-                  key={msg.id}
-                  message={msg}
-                  modelName={modelName}
-                  liveRef={isOptStreaming ? optimizeLiveRef : undefined}
-                  isStreaming={isOptStreaming}
-                  showTyping={isOptStreaming && msg.content === ''}
-                />
+                <div key={msg.id} style={{ display: 'contents' }}>
+                  <ChatMessageRow
+                    message={msg}
+                    modelName={modelName}
+                    liveRef={isOptStreaming ? optimizeLiveRef : undefined}
+                    isStreaming={isOptStreaming}
+                    showTyping={isOptStreaming && msg.content === ''}
+                  />
+                  {optimizedPrompt && (
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '4px 12px 8px' }}>
+                      <button
+                        type="button"
+                        className={styles.adoptBtn}
+                        onClick={() => handleApplyOptimizedPrompt(optimizedPrompt)}
+                        disabled={saveLLM.isPending}
+                      >
+                        {saveLLM.isPending ? '应用中…' : '应用并重跑润色'}
+                      </button>
+                    </div>
+                  )}
+                </div>
               )
             })}
           </>

@@ -24,6 +24,8 @@ public record LlmSettingsDto(
         String askMaintenancePrompt,
         // AI 标注提示词
         String batchTagSystemPrompt,
+        // 优化提示词顾问
+        String promptOptimizeSystemPrompt,
         // 语音输入时长（秒）
         String speechDuration,
         // 工具调用最大迭代次数

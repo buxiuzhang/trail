@@ -80,20 +80,11 @@
 }
 
 .weekProgress {
-  position: relative;
   height: 3px;
   background: var(--rule);
   border-radius: 2px;
-  overflow: visible;
+  overflow: hidden;
   margin-top: 2px;
-  cursor: default;
-}
-
-/* 扩大 hover 感应区域 */
-.weekProgress::before {
-  content: '';
-  position: absolute;
-  inset: -6px 0;
 }
 
 .weekProgressBar {
@@ -108,6 +99,14 @@
 
 .weekProgressBarWeek {
   background: #3D5A3D;
+}
+
+.progressHint {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink-faded);
+  margin-top: 5px;
+  letter-spacing: 0.04em;
 }
 
 .inProgressRow {
@@ -216,29 +215,6 @@
   margin-bottom: 4px;
 }
 
-/* CSS tooltip */
-.weekProgress::after {
-  content: attr(data-pct);
-  position: absolute;
-  bottom: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--ink);
-  color: #fff;
-  font-family: var(--mono);
-  font-size: 11px;
-  white-space: nowrap;
-  padding: 2px 8px;
-  border-radius: 3px;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 120ms ease;
-}
-
-.weekProgress:hover::after {
-  opacity: 1;
-}
-
 .statCardSplit {
   flex-direction: row;
   align-items: stretch;
@@ -276,6 +252,15 @@
   align-items: baseline;
   gap: 6px;
   padding: 5px 0;
+}
+
+.todoStatTitle {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: #8A7A6A;
+  text-transform: uppercase;
+  margin-bottom: 4px;
 }
 
 .todoStatIcon {

@@ -29,6 +29,7 @@ import Image from '@tiptap/extension-image'
 import Placeholder from '@tiptap/extension-placeholder'
 import Mention from '@tiptap/extension-mention'
 import { Markdown } from '@tiptap/markdown'
+import { TableKit } from '@tiptap/extension-table'
 import { Extension } from '@tiptap/core'
 import { HighlightedCodeBlock } from './HighlightedCodeBlock'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
@@ -344,6 +345,7 @@ export const DescriptionEditor = forwardRef<HTMLTextAreaElement, DescriptionEdit
         placeholder: placeholder ?? '',
       }),
       Markdown,
+      TableKit,
       // 装饰器扩展：将 @task:ID 和 @todo:ID 显示为标题，@file:ID 显示图片或文件 chip
       createMentionDecorationExtension(todosRef, tasksRef, undefined, attachmentsRef, downloadRef),
       Mention.configure({
